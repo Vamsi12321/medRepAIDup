@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 
 const roleRoutes = {
-  admin:   ["/admin"],
   company: ["/company"],
   doctor:  ["/doctor"],
   mr:      ["/mr"],
+};
+
+const dashboards = {
+  company: "/company/overview",
+  doctor:  "/doctor/home",
+  mr:      "/mr/dashboard",
 };
 
 export function middleware(request) {
@@ -13,16 +18,10 @@ export function middleware(request) {
   const token    = request.cookies.get("access_token")?.value;
   const userRole = request.cookies.get("userRole")?.value;
 
-  // Already on login or public — let through
+  // Public routes — let through
   if (pathname === "/" || pathname.startsWith("/login") || pathname.startsWith("/api")) {
-    // If logged in and hitting login/root, redirect to their dashboard
+    // If already logged in, redirect to their dashboard
     if (token && userRole && (pathname === "/" || pathname === "/login")) {
-      const dashboards = {
-        admin:   "/admin/dashboard",
-        company: "/company/overview",
-        doctor:  "/doctor/home",
-        mr:      "/mr/dashboard",
-      };
       const dest = dashboards[userRole];
       if (dest) return NextResponse.redirect(new URL(dest, request.url));
     }
@@ -39,12 +38,6 @@ export function middleware(request) {
   const hasAccess = allowedPrefixes.some((prefix) => pathname.startsWith(prefix));
 
   if (!hasAccess) {
-    const dashboards = {
-      admin:   "/admin/dashboard",
-      company: "/company/overview",
-      doctor:  "/doctor/home",
-      mr:      "/mr/dashboard",
-    };
     return NextResponse.redirect(new URL(dashboards[userRole] || "/login", request.url));
   }
 
