@@ -16,6 +16,7 @@ export default function CompanyDoctors() {
   const [showModal, setShowModal] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const fetchDoctors = useCallback(async () => {
     setLoading(true);
@@ -23,23 +24,25 @@ export default function CompanyDoctors() {
       const params = new URLSearchParams({ page, page_size: 10 });
       if (search) params.append("search", search);
       const data = await get(`/api/v1/doctors/?${params}`);
-      setDoctors(data.doctors);
-      setTotal(data.total);
+      setDoctors(data.doctors || []);
+      setTotal(data.total || 0);
     } catch {
       setToast({ message: "Failed to load doctors.", type: "error" });
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, search, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchDoctors(); }, [fetchDoctors]);
+
+  const refetch = () => setRefreshKey((k) => k + 1);
 
   const handleDelete = async () => {
     try {
       await del(`/api/v1/doctors/${confirmDelete.id}`);
       setConfirmDelete(null);
       setToast({ message: "Doctor removed successfully.", type: "success" });
-      fetchDoctors();
+      refetch();
     } catch {
       setConfirmDelete(null);
       setToast({ message: "Failed to remove doctor.", type: "error" });
@@ -47,17 +50,18 @@ export default function CompanyDoctors() {
   };
 
   const handleToggleStatus = async (doctor) => {
-    setDoctors(prev => prev.map(d => d.id === doctor.id ? { ...d, is_active: !d.is_active } : d));
+    // Optimistic update
+    setDoctors((prev) => prev.map((d) => d.id === doctor.id ? { ...d, is_active: !d.is_active } : d));
     try {
       await put(`/api/v1/doctors/${doctor.id}`, { is_active: !doctor.is_active });
       setToast({ message: `Doctor marked as ${!doctor.is_active ? "active" : "inactive"}.`, type: "success" });
     } catch {
-      setDoctors(prev => prev.map(d => d.id === doctor.id ? { ...d, is_active: doctor.is_active } : d));
-      setToast({ message: "Failed to update doctor status.", type: "error" });
+      setDoctors((prev) => prev.map((d) => d.id === doctor.id ? { ...d, is_active: doctor.is_active } : d));
+      setToast({ message: "Failed to update status.", type: "error" });
     }
   };
 
-  const activeCount = doctors.filter(d => d.is_active).length;
+  const activeCount = doctors.filter((d) => d.is_active).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50 overflow-x-hidden">
@@ -87,7 +91,7 @@ export default function CompanyDoctors() {
             { label: "Total Doctors", value: total, icon: "👨‍⚕️", color: "from-blue-500 to-indigo-600", text: "from-blue-600 to-indigo-600" },
             { label: "Active", value: activeCount, icon: "✅", color: "from-green-500 to-emerald-600", text: "from-green-600 to-emerald-600" },
             { label: "Inactive", value: total - activeCount, icon: "⏸️", color: "from-gray-400 to-gray-500", text: "from-gray-500 to-gray-600" },
-          ].map(s => (
+          ].map((s) => (
             <div key={s.label} className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100">
               <div className={`w-10 h-10 bg-gradient-to-br ${s.color} rounded-xl flex items-center justify-center text-xl mb-3 shadow`}>{s.icon}</div>
               <p className={`text-3xl font-bold bg-gradient-to-r ${s.text} bg-clip-text text-transparent`}>{s.value}</p>
@@ -98,15 +102,13 @@ export default function CompanyDoctors() {
 
         {/* Search */}
         <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-100 mb-6">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="🔍 Search by name or email..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-200 focus:border-purple-500 text-sm transition-all"
-            />
-          </div>
+          <input
+            type="text"
+            placeholder="🔍 Search by name or email..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-200 focus:border-purple-500 text-sm transition-all"
+          />
         </div>
 
         {/* Table */}
@@ -122,7 +124,7 @@ export default function CompanyDoctors() {
                       <th className="px-5 py-4 text-left font-bold text-sm">Doctor</th>
                       <th className="px-5 py-4 text-left font-bold text-sm">Specialization</th>
                       <th className="px-5 py-4 text-left font-bold text-sm">Hospital</th>
-                      <th className="px-5 py-4 text-left font-bold text-sm">Experience</th>
+                      <th className="px-5 py-4 text-left font-bold text-sm">Phone</th>
                       <th className="px-5 py-4 text-left font-bold text-sm">Status</th>
                       <th className="px-5 py-4 text-center font-bold text-sm">Actions</th>
                     </tr>
@@ -133,15 +135,15 @@ export default function CompanyDoctors() {
                         <td className="px-5 py-4">
                           <p className="font-bold text-gray-800">{doctor.name}</p>
                           <p className="text-sm text-gray-500">{doctor.email}</p>
-                          {doctor.phone && <p className="text-xs text-gray-400">{doctor.phone}</p>}
                         </td>
                         <td className="px-5 py-4">
-                          <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-sm font-semibold capitalize">
+                          <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-sm font-semibold">
                             {doctor.specialization || "—"}
                           </span>
                         </td>
-                        <td className="px-5 py-4 text-gray-600 text-sm">{doctor.hospital_name || "—"}</td>
-                        <td className="px-5 py-4 text-gray-600 text-sm">{doctor.years_of_experience ? `${doctor.years_of_experience} yrs` : "—"}</td>
+                        {/* API returns "hospital" not "hospital_name" */}
+                        <td className="px-5 py-4 text-gray-600 text-sm">{doctor.hospital || "—"}</td>
+                        <td className="px-5 py-4 text-gray-600 text-sm">{doctor.phone || "—"}</td>
                         <td className="px-5 py-4">
                           <button
                             onClick={() => handleToggleStatus(doctor)}
@@ -186,12 +188,12 @@ export default function CompanyDoctors() {
 
             {total > 10 && (
               <div className="flex justify-center items-center space-x-4 mt-6">
-                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
                   className="px-4 py-2 bg-white border-2 border-gray-200 rounded-xl font-semibold text-gray-600 hover:border-purple-400 disabled:opacity-40 transition-all">
                   ← Prev
                 </button>
                 <span className="text-gray-600 font-medium">Page {page} of {Math.ceil(total / 10)}</span>
-                <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / 10)}
+                <button onClick={() => setPage((p) => p + 1)} disabled={page >= Math.ceil(total / 10)}
                   className="px-4 py-2 bg-white border-2 border-gray-200 rounded-xl font-semibold text-gray-600 hover:border-purple-400 disabled:opacity-40 transition-all">
                   Next →
                 </button>
@@ -205,7 +207,7 @@ export default function CompanyDoctors() {
         <DoctorModal
           doctor={selectedDoctor}
           onClose={() => setShowModal(false)}
-          onSaved={(msg) => { fetchDoctors(); setToast({ message: msg, type: "success" }); }}
+          onSaved={(msg) => { refetch(); setToast({ message: msg, type: "success" }); }}
         />
       )}
 
@@ -228,17 +230,19 @@ export default function CompanyDoctors() {
 
 function DoctorModal({ doctor, onClose, onSaved }) {
   const isEdit = !!doctor;
+
+  // Form keys match exactly what the API accepts:
+  // POST: name, email, password, phone, specialization, hospital, license_number, address
+  // PUT:  name, phone, specialization, hospital, license_number, address, is_active
   const [form, setForm] = useState({
-    name: doctor?.name || "",
-    email: doctor?.email || "",
-    password: "",
-    phone: doctor?.phone || "",
+    name:           doctor?.name           || "",
+    email:          doctor?.email          || "",
+    password:       "",
+    phone:          doctor?.phone          || "",
     specialization: doctor?.specialization || "",
+    hospital:       doctor?.hospital       || "",
     license_number: doctor?.license_number || "",
-    hospital_name: doctor?.hospital_name || "",
-    hospital_address: doctor?.hospital_address || "",
-    years_of_experience: doctor?.years_of_experience || "",
-    qualifications: doctor?.qualifications || "",
+    address:        doctor?.address        || "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -248,19 +252,28 @@ function DoctorModal({ doctor, onClose, onSaved }) {
     setError("");
     setSaving(true);
     try {
-      const body = isEdit
-        ? { name: form.name, phone: form.phone, specialization: form.specialization,
-            license_number: form.license_number, hospital_name: form.hospital_name,
-            hospital_address: form.hospital_address,
-            years_of_experience: form.years_of_experience ? Number(form.years_of_experience) : undefined,
-            qualifications: form.qualifications }
-        : { ...form, years_of_experience: form.years_of_experience ? Number(form.years_of_experience) : undefined,
-            ...(form.password ? {} : { password: "Doctor@123" }) };
-
       if (isEdit) {
+        const body = {
+          name:           form.name,
+          phone:          form.phone,
+          specialization: form.specialization,
+          hospital:       form.hospital,
+          license_number: form.license_number,
+          address:        form.address,
+        };
         await put(`/api/v1/doctors/${doctor.id}`, body);
       } else {
-        await post(`/api/v1/doctors/`, body);
+        const body = {
+          name:           form.name,
+          email:          form.email,
+          password:       form.password || "Doctor@123",
+          phone:          form.phone,
+          specialization: form.specialization,
+          hospital:       form.hospital,
+          license_number: form.license_number,
+          address:        form.address,
+        };
+        await post(`/api/v1/doctors`, body);
       }
       onSaved(isEdit ? "Doctor updated successfully." : "Doctor added successfully.");
       onClose();
@@ -271,50 +284,61 @@ function DoctorModal({ doctor, onClose, onSaved }) {
     }
   };
 
-  const f = (label, key, type = "text", placeholder = "") => (
+  const field = (label, key, type = "text", placeholder = "", required = false) => (
     <div>
-      <label className="block text-sm font-bold text-gray-700 mb-2">{label}</label>
-      <input type={type} value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })}
+      <label className="block text-sm font-bold text-gray-700 mb-1.5">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <input
+        type={type}
+        value={form[key]}
+        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
         placeholder={placeholder}
-        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm" />
+        required={required}
+        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-transparent text-sm outline-none"
+      />
     </div>
   );
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6 rounded-t-3xl flex items-center justify-between">
+        <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-5 rounded-t-3xl flex items-center justify-between sticky top-0 z-10">
           <div className="flex items-center space-x-3">
-            <span className="text-4xl">👨‍⚕️</span>
-            <h2 className="text-2xl font-bold text-white">{isEdit ? "Edit Doctor" : "Add Doctor"}</h2>
+            <span className="text-3xl">👨‍⚕️</span>
+            <h2 className="text-xl font-bold text-white">{isEdit ? "Edit Doctor" : "Add Doctor"}</h2>
           </div>
-          <button onClick={onClose} className="text-white hover:bg-white/20 rounded-lg p-2">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button onClick={onClose} className="text-white hover:bg-white/20 rounded-lg p-1.5">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && <div className="bg-red-50 border-2 border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-semibold">{error}</div>}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-semibold">
+              {error}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {f("Full Name *", "name", "text", "Dr. Full Name")}
-            {f("Email *", "email", "email", "doctor@hospital.com")}
-            {!isEdit && f("Password (default: Doctor@123)", "password", "password", "Leave blank for default")}
-            {f("Phone", "phone", "tel", "+91 98765 43210")}
-            {f("Specialization", "specialization", "text", "e.g. Cardiology")}
-            {f("License Number", "license_number", "text", "LIC-123")}
-            {f("Hospital Name", "hospital_name", "text", "KIMS Hospital")}
-            {f("Hospital Address", "hospital_address", "text", "Hyderabad")}
-            {f("Years of Experience", "years_of_experience", "number", "8")}
-            {f("Qualifications", "qualifications", "text", "MBBS, MD")}
+            {field("Full Name", "name", "text", "Dr. Sarah Sharma", true)}
+            {field("Email", "email", "email", "doctor@hospital.com", !isEdit)}
+            {!isEdit && field("Password (default: Doctor@123)", "password", "password", "Leave blank for default")}
+            {field("Phone", "phone", "tel", "+91 98765 43210")}
+            {field("Specialization", "specialization", "text", "e.g. Cardiologist")}
+            {field("Hospital", "hospital", "text", "City Hospital")}
+            {field("License Number", "license_number", "text", "MH12345")}
+            {field("Address", "address", "text", "123 Medical Street, Mumbai")}
           </div>
 
-          <div className="flex space-x-4 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-300 transition-all">Cancel</button>
+          <div className="flex space-x-3 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-bold hover:bg-gray-200 transition-all text-sm">
+              Cancel
+            </button>
             <button type="submit" disabled={saving}
-              className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-xl font-bold hover:shadow-lg transition-all disabled:opacity-50">
+              className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2.5 rounded-xl font-bold hover:shadow-lg transition-all disabled:opacity-50 text-sm">
               {saving ? "Saving..." : isEdit ? "Update Doctor" : "Add Doctor"}
             </button>
           </div>
