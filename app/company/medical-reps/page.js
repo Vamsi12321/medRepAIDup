@@ -17,6 +17,7 @@ export default function CompanyMedicalReps() {
   const [selectedMR, setSelectedMR] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [visitsMR, setVisitsMR] = useState(null); // MR whose visits panel is open
 
   const fetchMRs = useCallback(async () => {
     setLoading(true);
@@ -110,91 +111,81 @@ export default function CompanyMedicalReps() {
           />
         </div>
 
-        {/* Table */}
+        {/* MR List */}
         {loading ? (
-          <TableSkeleton rows={5} cols={6} />
+          <TableSkeleton rows={5} cols={4} />
         ) : (
           <>
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[700px]">
-                  <thead className="bg-gradient-to-r from-orange-500 to-red-500 text-white">
-                    <tr>
-                      <th className="px-5 py-4 text-left font-bold text-sm">MR</th>
-                      <th className="px-5 py-4 text-left font-bold text-sm">Territory</th>
-                      <th className="px-5 py-4 text-left font-bold text-sm">Assigned Doctors</th>
-                      <th className="px-5 py-4 text-left font-bold text-sm">Status</th>
-                      <th className="px-5 py-4 text-center font-bold text-sm">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mrs.map((mr, i) => (
-                      <tr key={mr.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-all ${i % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}>
-                        <td className="px-5 py-4">
-                          <p className="font-bold text-gray-800">{mr.name}</p>
-                          <p className="text-sm text-gray-500">{mr.email}</p>
-                          {mr.phone && <p className="text-xs text-gray-400">{mr.phone}</p>}
-                        </td>
-                        <td className="px-5 py-4 text-gray-600 text-sm">{mr.territory || "—"}</td>
-                        <td className="px-5 py-4 text-gray-600 text-sm">
-                          {mr.assigned_doctors?.length ? (
-                            <div className="relative group inline-block">
-                              <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-lg text-xs font-semibold cursor-default">
-                                {mr.assigned_doctors.length} doctor{mr.assigned_doctors.length !== 1 ? "s" : ""}
-                              </span>
-                              <div className="absolute left-0 top-full mt-1 z-20 hidden group-hover:block bg-white border border-gray-200 rounded-xl shadow-lg p-2 min-w-max">
-                                {mr.assigned_doctors.map((d) => (
-                                  <p key={d.id} className="text-xs text-gray-700 font-medium px-2 py-1 hover:bg-gray-50 rounded">
-                                    👨‍⚕️ {d.name}
-                                  </p>
-                                ))}
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-gray-400">None</span>
-                          )}
-                        </td>
-                        <td className="px-5 py-4">
-                          <button
-                            onClick={() => handleToggleStatus(mr)}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 transition-all text-xs font-bold ${mr.is_active ? "bg-green-50 border-green-300 text-green-700 hover:bg-green-100" : "bg-gray-50 border-gray-300 text-gray-500 hover:bg-gray-100"}`}
-                          >
-                            <div className={`relative w-8 h-4 rounded-full transition-colors duration-300 ${mr.is_active ? "bg-green-500" : "bg-gray-300"}`}>
-                              <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform duration-300 ${mr.is_active ? "translate-x-4" : "translate-x-0.5"}`} />
-                            </div>
-                            {mr.is_active ? "Active" : "Inactive"}
-                          </button>
-                        </td>
-                        <td className="px-5 py-4">
-                          <div className="flex items-center justify-center space-x-2">
-                            <button
-                              onClick={() => { setSelectedMR(mr); setShowModal(true); }}
-                              className="bg-blue-100 text-blue-600 px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-200 transition-all text-sm"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => setConfirmDelete(mr)}
-                              className="bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-semibold hover:bg-red-200 transition-all text-sm"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {mrs.length === 0 && (
-                <div className="text-center py-16">
-                  <span className="text-5xl">💼</span>
-                  <h3 className="text-xl font-bold text-gray-900 mt-4 mb-2">No MRs found</h3>
-                  <p className="text-gray-500 text-sm">Add a medical representative to get started</p>
+            <div className="space-y-3">
+              {mrs.map((mr) => (
+                <div key={mr.id} className="bg-white rounded-2xl shadow border border-gray-100 hover:shadow-md transition-all p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow">
+                        {mr.name?.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-800 truncate">{mr.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{mr.email}</p>
+                        {mr.phone && <p className="text-xs text-gray-400">{mr.phone}</p>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => setVisitsMR(mr)}
+                        className="bg-purple-100 text-purple-600 px-3 py-1.5 rounded-lg font-semibold hover:bg-purple-200 transition-all text-xs">
+                        Visits
+                      </button>
+                      <button
+                        onClick={() => handleToggleStatus(mr)}
+                        className={`relative w-9 h-5 rounded-full transition-colors duration-300 ${mr.is_active ? "bg-green-500" : "bg-gray-300"}`}
+                        title={mr.is_active ? "Active — click to deactivate" : "Inactive — click to activate"}
+                      >
+                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-300 ${mr.is_active ? "translate-x-4" : "translate-x-0.5"}`} />
+                      </button>
+                      <button onClick={() => { setSelectedMR(mr); setShowModal(true); }}
+                        className="bg-blue-100 text-blue-600 px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-200 transition-all text-xs">
+                        Edit
+                      </button>
+                      <button onClick={() => setConfirmDelete(mr)}
+                        className="bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-semibold hover:bg-red-200 transition-all text-xs">
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+                    {mr.territory && (
+                      <span className="flex items-center gap-1 bg-orange-50 text-orange-600 px-2.5 py-1 rounded-lg text-xs font-semibold">
+                        📍 {mr.territory}
+                      </span>
+                    )}
+                    <div className="relative group">
+                      <span className="flex items-center gap-1 bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-default">
+                        👨‍⚕️ {mr.assigned_doctors?.length || 0} doctor{mr.assigned_doctors?.length !== 1 ? "s" : ""}
+                      </span>
+                      {mr.assigned_doctors?.length > 0 && (
+                        <div className="absolute left-0 top-full mt-1 z-20 hidden group-hover:block bg-white border border-gray-200 rounded-xl shadow-lg p-2 min-w-max">
+                          {mr.assigned_doctors.map((d) => (
+                            <p key={d.id} className="text-xs text-gray-700 font-medium px-2 py-1 hover:bg-gray-50 rounded">👨‍⚕️ {d.name}</p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <span className={`ml-auto px-2.5 py-1 rounded-lg text-xs font-bold ${mr.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                      {mr.is_active ? "Active" : "Inactive"}
+                    </span>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
+
+            {mrs.length === 0 && (
+              <div className="text-center py-16 bg-white rounded-2xl shadow border border-gray-100">
+                <span className="text-5xl">💼</span>
+                <h3 className="text-xl font-bold text-gray-900 mt-4 mb-2">No MRs found</h3>
+                <p className="text-gray-500 text-sm">Add a medical representative to get started</p>
+              </div>
+            )}
 
             {total > 10 && (
               <div className="flex justify-center items-center space-x-4 mt-6">
@@ -212,6 +203,10 @@ export default function CompanyMedicalReps() {
           </>
         )}
       </main>
+
+      {visitsMR && (
+        <MRVisitsPanel mr={visitsMR} onClose={() => setVisitsMR(null)} />
+      )}
 
       {showModal && (
         <MRModal
@@ -265,7 +260,7 @@ function MRModal({ mr, onClose, onSaved }) {
   // Fetch all doctors once on modal open
   useEffect(() => {
     setLoadingDoctors(true);
-    get(`/api/v1/doctors?page_size=500`)
+    get(isEdit ? `/api/v1/doctors?page_size=500` : `/api/v1/doctors/available`)
       .then((data) => {
         setAllDoctors(data.doctors || []);
         // doctorObjects already pre-populated from API response above
@@ -378,9 +373,9 @@ function MRModal({ mr, onClose, onSaved }) {
             {field("Territory", "territory", "text", "Mumbai North")}
           </div>
 
-          {/* Assigned Doctors */}
+          {/* Assign Doctors */}
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">Assigned Doctors</label>
+            <label className="block text-sm font-bold text-gray-700 mb-1.5">Assign Doctors</label>
 
             {/* Selected doctors chips */}
             {doctorObjects.length > 0 && (
@@ -445,6 +440,246 @@ function MRModal({ mr, onClose, onSaved }) {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// Convert "09:30" → "9:30 AM"
+const to12h = (t) => {
+  if (!t) return "—";
+  const [h, m] = t.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, "0")} ${ampm}`;
+};
+
+const STATUS_STYLES = {
+  scheduled: { bg: "bg-blue-100",  text: "text-blue-700",  label: "Scheduled" },
+  completed: { bg: "bg-green-100", text: "text-green-700", label: "Completed" },
+  cancelled: { bg: "bg-red-100",   text: "text-red-600",   label: "Cancelled" },
+};
+
+function MRVisitsPanel({ mr, onClose }) {
+  const [visits, setVisits] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterDoctor, setFilterDoctor] = useState("");
+
+  const assignedDoctors = mr.assigned_doctors || [];
+
+  useEffect(() => {
+    setLoading(true);
+    const params = new URLSearchParams({ mr_id: mr.id });
+    if (filterStatus) params.append("status",    filterStatus);
+    if (filterDoctor) params.append("doctor_id", filterDoctor);
+    get(`/api/v1/visits?${params}`)
+      .then((data) => setVisits(data.visits || []))
+      .catch(() => setVisits([]))
+      .finally(() => setLoading(false));
+  }, [mr.id, filterStatus, filterDoctor]);
+
+  const total      = visits.length;
+  const scheduled  = visits.filter((v) => v.status === "scheduled").length;
+  const completed  = visits.filter((v) => v.status === "completed").length;
+  const cancelled  = visits.filter((v) => v.status === "cancelled").length;
+  const successRate = total ? Math.round((completed / total) * 100) : 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Panel */}
+      <div className="w-full max-w-lg bg-gray-50 shadow-2xl flex flex-col h-full overflow-hidden border-l border-gray-200">
+
+        {/* Header */}
+        <div className="bg-gradient-to-br from-orange-500 via-red-500 to-pink-600 p-5 flex-shrink-0 relative overflow-hidden">
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full" />
+            <div className="absolute bottom-0 left-1/3 w-24 h-24 bg-white/5 rounded-full" />
+          </div>
+          <div className="relative flex items-start justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg border border-white/30">
+                {mr.name?.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">{mr.name}</h2>
+                <div className="flex items-center gap-2 mt-0.5">
+                  {mr.territory && (
+                    <span className="text-xs text-orange-100 bg-white/15 px-2 py-0.5 rounded-full">📍 {mr.territory}</span>
+                  )}
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${mr.is_active ? "bg-green-400/30 text-green-100" : "bg-gray-400/30 text-gray-200"}`}>
+                    {mr.is_active ? "Active" : "Inactive"}
+                  </span>
+                </div>
+                <p className="text-orange-200 text-xs mt-1">{mr.email}</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="text-white/80 hover:text-white hover:bg-white/20 rounded-xl p-2 transition-all">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Mini stats in header */}
+          <div className="relative grid grid-cols-4 gap-2 mt-4">
+            {[
+              { label: "Total",     value: total,       color: "bg-white/20" },
+              { label: "Scheduled", value: scheduled,   color: "bg-blue-400/30" },
+              { label: "Completed", value: completed,   color: "bg-green-400/30" },
+              { label: "Cancelled", value: cancelled,   color: "bg-red-400/30" },
+            ].map((s) => (
+              <div key={s.label} className={`${s.color} backdrop-blur-sm rounded-xl p-2 text-center border border-white/20`}>
+                <p className="text-white font-bold text-lg leading-none">{s.value}</p>
+                <p className="text-white/70 text-xs mt-0.5">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Success rate bar */}
+        {total > 0 && (
+          <div className="px-4 py-3 bg-white border-b border-gray-100 flex-shrink-0">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-semibold text-gray-600">Visit Success Rate</span>
+              <span className="text-xs font-bold text-green-600">{successRate}%</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full transition-all duration-500"
+                style={{ width: `${successRate}%` }} />
+            </div>
+          </div>
+        )}
+
+        {/* Filters */}
+        <div className="px-4 py-3 bg-white border-b border-gray-100 flex-shrink-0 space-y-2">
+          {assignedDoctors.length > 0 && (
+            <select value={filterDoctor} onChange={(e) => setFilterDoctor(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-orange-400 bg-white text-gray-700">
+              <option value="">👨‍⚕️ All Doctors</option>
+              {assignedDoctors.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          )}
+          <div className="flex gap-1.5">
+            {["", "scheduled", "completed", "cancelled"].map((s) => {
+              const st = s ? STATUS_STYLES[s] : null;
+              const count = s ? visits.filter((v) => v.status === s).length : total;
+              return (
+                <button key={s} onClick={() => setFilterStatus(s)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    filterStatus === s
+                      ? s ? `${st.bg} ${st.text} shadow-sm` : "bg-gray-800 text-white shadow-sm"
+                      : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                  }`}>
+                  {s ? STATUS_STYLES[s].label : "All"} <span className="opacity-70">({count})</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Visit list */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {loading ? (
+            <div className="space-y-3">
+              {[1,2,3].map((i) => (
+                <div key={i} className="bg-white rounded-2xl p-4 animate-pulse">
+                  <div className="flex justify-between mb-3">
+                    <div className="space-y-1.5">
+                      <div className="h-3.5 bg-gray-200 rounded w-32" />
+                      <div className="h-2.5 bg-gray-100 rounded w-20" />
+                    </div>
+                    <div className="h-6 bg-gray-200 rounded-full w-20" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[1,2,3].map((j) => <div key={j} className="h-10 bg-gray-100 rounded-lg" />)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : visits.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">📅</span>
+              </div>
+              <p className="text-gray-500 font-semibold text-sm">No visits found</p>
+              <p className="text-gray-400 text-xs mt-1">Try changing the filters</p>
+            </div>
+          ) : (
+            visits.map((visit) => {
+              const s = STATUS_STYLES[visit.status] || STATUS_STYLES.scheduled;
+              const isNegative = visit.outcome?.toLowerCase().includes("negative");
+              return (
+                <div key={visit.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all">
+                  {/* Card top accent */}
+                  <div className={`h-1 w-full ${
+                    visit.status === "completed" ? (isNegative ? "bg-red-400" : "bg-green-400") :
+                    visit.status === "cancelled" ? "bg-red-300" : "bg-blue-400"
+                  }`} />
+
+                  <div className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl flex items-center justify-center text-sm font-bold text-indigo-600 flex-shrink-0">
+                          {visit.doctor_name?.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-800 text-sm">{visit.doctor_name}</p>
+                          <p className="text-xs text-gray-400">{visit.purpose}</p>
+                        </div>
+                      </div>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${s.bg} ${s.text} flex-shrink-0`}>{s.label}</span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      {[
+                        { icon: "📅", label: "Date",     value: visit.scheduled_date },
+                        { icon: "⏰", label: "Time",     value: to12h(visit.scheduled_time) },
+                        { icon: "📍", label: "Location", value: visit.location || "—" },
+                      ].map((row) => (
+                        <div key={row.label} className="bg-gray-50 rounded-xl p-2 border border-gray-100">
+                          <p className="text-gray-400 text-xs mb-0.5">{row.icon} {row.label}</p>
+                          <p className="font-semibold text-gray-700 text-xs truncate">{row.value}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {visit.notes && (
+                      <div className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-2 flex items-start gap-2">
+                        <span className="text-amber-500 text-xs mt-0.5">📝</span>
+                        <p className="text-xs text-amber-800">{visit.notes}</p>
+                      </div>
+                    )}
+
+                    {visit.status === "completed" && (visit.outcome || visit.feedback) && (
+                      <div className={`rounded-xl px-3 py-2 border ${isNegative ? "bg-red-50 border-red-100" : "bg-green-50 border-green-100"}`}>
+                        {visit.outcome && (
+                          <p className={`text-xs font-semibold mb-0.5 ${isNegative ? "text-red-600" : "text-green-700"}`}>
+                            {isNegative ? "👎" : "👍"} {visit.outcome}
+                          </p>
+                        )}
+                        {visit.feedback && (
+                          <p className={`text-xs ${isNegative ? "text-red-500" : "text-green-600"}`}>{visit.feedback}</p>
+                        )}
+                      </div>
+                    )}
+
+                    {visit.status === "cancelled" && visit.cancel_reason && (
+                      <div className="bg-red-50 border border-red-100 rounded-xl px-3 py-2 flex items-start gap-2">
+                        <span className="text-red-400 text-xs mt-0.5">🚫</span>
+                        <p className="text-xs text-red-600">{visit.cancel_reason}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );

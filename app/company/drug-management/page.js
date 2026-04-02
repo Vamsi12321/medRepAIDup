@@ -1,96 +1,67 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
-
-const BASE_FIELDS = [
-  { id: "drug_name",           name: "Drug Name",            type: "text",     required: true,  locked: true },
-  { id: "brand_name",          name: "Brand Name",           type: "text",     required: true,  locked: true },
-  { id: "generic_name",        name: "Generic Name",         type: "text",     required: false, locked: true },
-  { id: "drug_class",          name: "Drug Class",           type: "text",     required: false, locked: true },
-  { id: "specialization",      name: "Specialization",       type: "select",   required: true,  locked: true, options: ["diabetology","cardiology","neurology","oncology","orthopedics","dermatology"] },
-  { id: "indications",         name: "Indications",          type: "textarea", required: true,  locked: true },
-  { id: "mechanism_of_action", name: "Mechanism of Action",  type: "textarea", required: false, locked: true },
-  { id: "dosage",              name: "Dosage",               type: "text",     required: true,  locked: true },
-  { id: "side_effects",        name: "Side Effects",         type: "textarea", required: false, locked: true },
-  { id: "contraindications",   name: "Contraindications",    type: "textarea", required: false, locked: true },
-  { id: "drug_interactions",   name: "Drug Interactions",    type: "textarea", required: false, locked: true },
-  { id: "launch_date",         name: "Launch Date",          type: "date",     required: true,  locked: true },
-  { id: "brochure_url",        name: "Brochure PDF",         type: "file",     required: false, locked: true },
-];
+import { get, post, put, del } from "@/lib/api";
 
 const FIELD_TYPES = ["text", "textarea", "number", "date", "select", "url"];
 
+// "mechanism_of_action" → "Mechanism Of Action"
+const formatKey = (key) => key?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "";
+
+// Get field value from drug field_values array by key
+const getVal = (drug, key) => drug?.field_values?.find((f) => f.key === key)?.value || "";
+
 export default function CompanyDrugManagement() {
   const [activeTab, setActiveTab] = useState("drugs");
-  const [drugTab, setDrugTab] = useState("all");
-  const [showDrugModal, setShowDrugModal] = useState(false);
-  const [showBulkModal, setShowBulkModal] = useState(false);
-  const [customFields, setCustomFields] = useState([]);
-  const [loadingFields, setLoadingFields] = useState(false);
-  const [savingFields, setSavingFields] = useState(false);
-  const [fieldsSaved, setFieldsSaved] = useState(false);
+  const [drugTab, setDrugTab]     = useState("all");
 
-  const [drugs] = useState([
-    { _id: "drug123", drug_name: "Tirzepatide", brand_name: "Mounjaro", drug_class: "GLP-1 receptor agonist", specialization: ["diabetology"], indications: "Treatment of type 2 diabetes", mechanism_of_action: "Dual GIP and GLP-1 receptor agonist", dosage: "5 mg once weekly", side_effects: ["nausea","vomiting"], contraindications: "Thyroid carcinoma", drug_interactions: "May interact with insulin", launch_date: "2024-01-10", brochure_url: "https://example.com/mounjaro.pdf", status: "Active" },
-    { _id: "drug124", drug_name: "Metformin", brand_name: "Glycomet", drug_class: "Biguanide", specialization: ["diabetology"], indications: "Type 2 diabetes mellitus", mechanism_of_action: "Decreases hepatic glucose production", dosage: "500 mg twice daily", side_effects: ["diarrhea","nausea"], contraindications: "Severe kidney disease", drug_interactions: "Alcohol, contrast agents", launch_date: "2023-08-15", brochure_url: null, status: "Active" },
-    { _id: "drug125", drug_name: "Atorvastatin", brand_name: "Lipitor", drug_class: "HMG-CoA reductase inhibitor", specialization: ["cardiology"], indications: "Hypercholesterolemia", mechanism_of_action: "Inhibits cholesterol synthesis", dosage: "20 mg once daily", side_effects: ["muscle pain","headache"], contraindications: "Active liver disease", drug_interactions: "Warfarin, digoxin", launch_date: "2024-03-20", brochure_url: "https://example.com/lipitor.pdf", status: "Active" },
-  ]);
+  // Template state
+  const [template, setTemplate]         = useState(null);
+  const [loadingTemplate, setLoadingTemplate] = useState(true);
+  const [templateError, setTemplateError]     = useState("");
 
-  const companyId = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+  // Drugs state
+  const [drugs, setDrugs]           = useState([]);
+  const [loadingDrugs, setLoadingDrugs] = useState(true);
+  const [drugsTotal, setDrugsTotal] = useState(0);
 
+  // Modals
+  const [showDrugModal, setShowDrugModal]   = useState(false);
+  const [showBulkModal, setShowBulkModal]   = useState(false);
+  const [editDrug, setEditDrug]             = useState(null);
+  const [templateRefresh, setTemplateRefresh] = useState(0);
+
+  // Fetch template
   useEffect(() => {
-    if (activeTab !== "fields" || !companyId) return;
-    setLoadingFields(true);
-    fetch(`/api/v1/companies/${companyId}/drug-form-config`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        const custom = (data.fields || []).filter((f) => !f.locked);
-        setCustomFields(custom);
-      })
+    setLoadingTemplate(true);
+    get("/api/v1/drugs/templates")
+      .then((data) => setTemplate(data))
+      .catch(() => setTemplate(null))
+      .finally(() => setLoadingTemplate(false));
+  }, [templateRefresh]);
+
+  // Fetch drugs
+  useEffect(() => {
+    if (activeTab !== "drugs") return;
+    setLoadingDrugs(true);
+    get("/api/v1/drugs?limit=100")
+      .then((data) => { setDrugs(data.drugs || []); setDrugsTotal(data.total || 0); })
       .catch(() => {})
-      .finally(() => setLoadingFields(false));
-  }, [activeTab, companyId]);
+      .finally(() => setLoadingDrugs(false));
+  }, [activeTab]);
 
-  const saveFields = async () => {
-    if (!companyId) return;
-    setSavingFields(true);
-    try {
-      await fetch(`/api/v1/companies/${companyId}/drug-form-config`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("access_token")}` },
-        body: JSON.stringify({ fields: [...BASE_FIELDS, ...customFields] }),
-      });
-      setFieldsSaved(true);
-      setTimeout(() => setFieldsSaved(false), 2500);
-    } catch {}
-    setSavingFields(false);
+  const refetchDrugs = () => {
+    get("/api/v1/drugs?limit=100")
+      .then((data) => { setDrugs(data.drugs || []); setDrugsTotal(data.total || 0); })
+      .catch(() => {});
   };
 
-  const addCustomField = () => {
-    setCustomFields((prev) => [
-      ...prev,
-      { id: `custom_${Date.now()}`, name: "", type: "text", required: false, locked: false, options: "" },
-    ]);
-  };
+  // Helper: get value from drug field_values by key — defined at module level above
 
-  const updateCustomField = (id, key, value) => {
-    setCustomFields((prev) => prev.map((f) => (f.id === id ? { ...f, [key]: value } : f)));
-  };
+  const filteredDrugs = drugs;
 
-  const removeCustomField = (id) => {
-    setCustomFields((prev) => prev.filter((f) => f.id !== id));
-  };
-
-  const filteredDrugs = drugs.filter((d) => {
-    if (drugTab === "with-brochure") return d.brochure_url;
-    if (drugTab === "missing-brochure") return !d.brochure_url;
-    return true;
-  });
-
-  const allFields = [...BASE_FIELDS, ...customFields];
+  const visibleFields = template?.fields?.filter((f) => f.visible) || [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50">
@@ -102,14 +73,17 @@ export default function CompanyDrugManagement() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Drug Management</h1>
-            <p className="text-gray-500 text-sm">Manage your pharmaceutical products and form configuration</p>
+            <p className="text-gray-500 text-sm">Manage your pharmaceutical products and form template</p>
           </div>
           {activeTab === "drugs" && (
-            <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2">
-              <button onClick={() => setShowBulkModal(true)} className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 text-sm">
+            <div className="flex gap-2">
+              <button onClick={() => setShowBulkModal(true)}
+                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 text-sm">
                 <span>📊</span><span>Bulk Upload</span>
               </button>
-              <button onClick={() => setShowDrugModal(true)} className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-4 py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 text-sm">
+              <button onClick={() => { setEditDrug(null); setShowDrugModal(true); }}
+                disabled={!template}
+                className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-4 py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 text-sm disabled:opacity-50">
                 <span>➕</span><span>Add Drug</span>
               </button>
             </div>
@@ -118,12 +92,9 @@ export default function CompanyDrugManagement() {
 
         {/* Main tabs */}
         <div className="flex space-x-2 mb-6 bg-white rounded-xl p-1.5 shadow border border-gray-100 w-fit">
-          {[{ id: "drugs", label: "💊 Drugs" }, { id: "fields", label: "⚙️ Form Fields" }].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={`px-5 py-2 rounded-lg font-semibold text-sm transition-all ${activeTab === t.id ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow" : "text-gray-600 hover:bg-gray-50"}`}
-            >
+          {[{ id: "drugs", label: "💊 Drugs" }, { id: "template", label: "⚙️ Form Template" }].map((t) => (
+            <button key={t.id} onClick={() => setActiveTab(t.id)}
+              className={`px-5 py-2 rounded-lg font-semibold text-sm transition-all ${activeTab === t.id ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow" : "text-gray-600 hover:bg-gray-50"}`}>
               {t.label}
             </button>
           ))}
@@ -132,12 +103,19 @@ export default function CompanyDrugManagement() {
         {/* ── DRUGS TAB ── */}
         {activeTab === "drugs" && (
           <>
+            {!template && !loadingTemplate && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6 flex items-center gap-3">
+                <span>⚠️</span>
+                <p className="text-sm text-amber-800">No drug template found. Go to <button onClick={() => setActiveTab("template")} className="font-bold underline">Form Template</button> tab to create one first.</p>
+              </div>
+            )}
+
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4 mb-6">
               {[
-                { label: "Total Drugs", value: drugs.length, icon: "💊", from: "from-blue-500", to: "to-indigo-600", text: "from-blue-600 to-indigo-600" },
-                { label: "With Brochures", value: drugs.filter((d) => d.brochure_url).length, icon: "✅", from: "from-green-500", to: "to-emerald-600", text: "from-green-600 to-emerald-600" },
-                { label: "Missing Brochures", value: drugs.filter((d) => !d.brochure_url).length, icon: "❌", from: "from-red-500", to: "to-pink-600", text: "from-red-600 to-pink-600" },
+                { label: "Total Drugs",       value: drugsTotal,                                          icon: "💊", from: "from-blue-500",  to: "to-indigo-600", text: "from-blue-600 to-indigo-600" },
+                { label: "With Brochures",    value: drugs.filter((d) => !!getVal(d,"brochure_url")).length, icon: "✅", from: "from-green-500", to: "to-emerald-600", text: "from-green-600 to-emerald-600" },
+                { label: "Missing Brochures", value: drugs.filter((d) => !getVal(d,"brochure_url")).length,  icon: "❌", from: "from-red-500",   to: "to-pink-600",   text: "from-red-600 to-pink-600" },
               ].map((s) => (
                 <div key={s.label} className="bg-white rounded-2xl p-5 shadow border border-gray-100">
                   <div className={`w-10 h-10 bg-gradient-to-br ${s.from} ${s.to} rounded-xl flex items-center justify-center mb-3`}>
@@ -152,271 +130,499 @@ export default function CompanyDrugManagement() {
             {/* Filter tabs */}
             <div className="flex space-x-2 mb-6 bg-white rounded-xl p-1.5 shadow border border-gray-100">
               {[
-                { id: "all", label: `📋 All (${drugs.length})` },
-                { id: "with-brochure", label: `✅ With Brochures (${drugs.filter((d) => d.brochure_url).length})` },
-                { id: "missing-brochure", label: `❌ Missing (${drugs.filter((d) => !d.brochure_url).length})` },
+                { id: "all",             label: `📋 All (${drugsTotal})` },
+                { id: "with-brochure",   label: `✅ With Brochures (${drugs.filter((d) => !!getVal(d,"brochure_url")).length})` },
+                { id: "missing-brochure",label: `❌ Missing (${drugs.filter((d) => !getVal(d,"brochure_url")).length})` },
               ].map((t) => (
-                <button key={t.id} onClick={() => setDrugTab(t.id)} className={`flex-1 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${drugTab === t.id ? "bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow" : "text-gray-600 hover:bg-gray-50"}`}>
+                <button key={t.id} onClick={() => setDrugTab(t.id)}
+                  className={`flex-1 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${drugTab === t.id ? "bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow" : "text-gray-600 hover:bg-gray-50"}`}>
                   {t.label}
                 </button>
               ))}
             </div>
 
             {/* Drug cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredDrugs.map((drug) => (
-                <div key={drug._id} className="bg-white rounded-2xl p-5 shadow border border-gray-100 hover:shadow-xl transition-all">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-xs font-bold">{drug.specialization[0]}</span>
-                    <span className={`px-3 py-1 rounded-lg text-xs font-bold ${drug.brochure_url ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                      {drug.brochure_url ? "✅ Brochure" : "❌ Missing"}
-                    </span>
-                  </div>
-                  <h3 className="text-lg font-bold text-gray-800 mb-1">{drug.brand_name}</h3>
-                  <p className="text-gray-600 text-sm font-semibold mb-0.5">{drug.drug_name}</p>
-                  <p className="text-gray-400 text-xs mb-3">{drug.drug_class}</p>
-                  <div className="space-y-1.5 mb-4 text-xs">
-                    {[
-                      { label: "💊 Dosage", value: drug.dosage, color: "indigo" },
-                      { label: "🎯 Indication", value: drug.indications, color: "green" },
-                      { label: "⚠️ Side Effects", value: Array.isArray(drug.side_effects) ? drug.side_effects.join(", ") : drug.side_effects, color: "yellow" },
-                      { label: "🚫 Contraindications", value: drug.contraindications, color: "red" },
-                    ].map((row) => (
-                      <div key={row.label} className={`bg-${row.color}-50 rounded-lg p-2 border-l-4 border-${row.color}-400`}>
-                        <p className={`text-${row.color}-600 font-semibold mb-0.5`}>{row.label}</p>
-                        <p className="text-gray-700 font-medium">{row.value}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex space-x-2">
-                    <button className="flex-1 bg-blue-100 text-blue-600 px-3 py-2 rounded-lg font-semibold hover:bg-blue-200 transition-all text-sm">Edit</button>
-                    {!drug.brochure_url
-                      ? <button className="flex-1 bg-green-100 text-green-600 px-3 py-2 rounded-lg font-semibold hover:bg-green-200 transition-all text-sm">Upload PDF</button>
-                      : <button className="flex-1 bg-purple-100 text-purple-600 px-3 py-2 rounded-lg font-semibold hover:bg-purple-200 transition-all text-sm">View PDF</button>
-                    }
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* ── FORM FIELDS TAB ── */}
-        {activeTab === "fields" && (
-          <div className="space-y-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start space-x-3">
-              <span className="text-blue-500 mt-0.5">ℹ️</span>
-              <p className="text-sm text-blue-800">Locked fields are part of the standard drug schema and cannot be removed. Add custom fields below to extend the drug form for your company.</p>
-            </div>
-
-            {/* Base fields (read-only) */}
-            <div className="bg-white rounded-2xl shadow border border-gray-100 overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100 flex items-center space-x-2">
-                <span className="text-lg">🔒</span>
-                <h2 className="font-bold text-gray-800">Standard Fields</h2>
-                <span className="text-xs text-gray-400 ml-1">({BASE_FIELDS.length} fields — locked)</span>
+            {loadingDrugs ? (
+              <div className="text-center py-16 text-gray-400 text-sm">Loading drugs...</div>
+            ) : filteredDrugs.length === 0 ? (
+              <div className="text-center py-16 bg-white rounded-2xl shadow border border-gray-100">
+                <span className="text-5xl">💊</span>
+                <p className="text-gray-500 mt-4 font-medium text-sm">No drugs yet. Add your first drug.</p>
               </div>
-              <div className="divide-y divide-gray-50">
-                {BASE_FIELDS.map((f) => (
-                  <div key={f.id} className="px-5 py-3 flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-gray-400 text-xs font-mono bg-gray-100 px-2 py-0.5 rounded">{f.type}</span>
-                      <span className="text-sm font-semibold text-gray-700">{f.name}</span>
-                      {f.required && <span className="text-xs text-red-500 font-medium">required</span>}
-                    </div>
-                    <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">locked</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredDrugs.map((drug) => {
+                  const specialization = getVal(drug, "specialization");
+                  const drugName       = getVal(drug, "drug_name") || drug.field_values?.find((f) => f.key?.includes("name"))?.value || "Drug";
+                  const brandName      = getVal(drug, "brand_name");
+                  const drugClass      = getVal(drug, "drug_class");
 
-            {/* Custom fields */}
-            <div className="bg-white rounded-2xl shadow border border-gray-100 overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <span className="text-lg">✏️</span>
-                  <h2 className="font-bold text-gray-800">Custom Fields</h2>
-                  <span className="text-xs text-gray-400">({customFields.length} fields)</span>
-                </div>
-                <button onClick={addCustomField} className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-all flex items-center space-x-1">
-                  <span>+</span><span>Add Field</span>
-                </button>
-              </div>
+                  const displayFields = visibleFields.length > 0
+                    ? visibleFields.filter((f) => !["brand_name","drug_name","drug_class","specialization","brochure_url"].includes(f.key))
+                    : (drug.field_values || []).filter((fv) => !["brand_name","drug_name","drug_class","specialization","brochure_url"].includes(fv.key)).map((fv) => ({ key: fv.key, label: null, field_id: fv.key }));
 
-              {loadingFields ? (
-                <div className="px-5 py-8 text-center text-gray-400 text-sm">Loading fields...</div>
-              ) : customFields.length === 0 ? (
-                <div className="px-5 py-10 text-center">
-                  <p className="text-gray-400 text-sm mb-3">No custom fields yet.</p>
-                  <button onClick={addCustomField} className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-100 transition-all">
-                    + Add your first custom field
-                  </button>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-50">
-                  {customFields.map((f, i) => (
-                    <div key={f.id} className="px-5 py-4 grid grid-cols-12 gap-3 items-start">
-                      <div className="col-span-1 pt-2 text-gray-400 text-sm font-mono">{i + 1}.</div>
+                  // Rotating color palette for field rows
+                  const fieldColors = [
+                    { border: "border-indigo-400", label: "text-indigo-600", bg: "bg-indigo-50", icon: "💊" },
+                    { border: "border-blue-400",   label: "text-blue-600",   bg: "bg-blue-50",   icon: "🎯" },
+                    { border: "border-green-400",  label: "text-green-600",  bg: "bg-green-50",  icon: "⚙️" },
+                    { border: "border-yellow-400", label: "text-yellow-600", bg: "bg-yellow-50", icon: "⚠️" },
+                    { border: "border-red-400",    label: "text-red-600",    bg: "bg-red-50",    icon: "🚫" },
+                    { border: "border-pink-400",   label: "text-pink-600",   bg: "bg-pink-50",   icon: "🔄" },
+                    { border: "border-purple-400", label: "text-purple-600", bg: "bg-purple-50", icon: "📅" },
+                    { border: "border-orange-400", label: "text-orange-600", bg: "bg-orange-50", icon: "🏢" },
+                    { border: "border-teal-400",   label: "text-teal-600",   bg: "bg-teal-50",   icon: "📋" },
+                    { border: "border-cyan-400",   label: "text-cyan-600",   bg: "bg-cyan-50",   icon: "🔬" },
+                  ];
 
-                      <div className="col-span-4">
-                        <label className="block text-xs text-gray-500 mb-1">Field Name</label>
-                        <input
-                          type="text"
-                          value={f.name}
-                          onChange={(e) => updateCustomField(f.id, "name", e.target.value)}
-                          placeholder="e.g. Storage Temp"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
-                        />
-                      </div>
-
-                      <div className="col-span-3">
-                        <label className="block text-xs text-gray-500 mb-1">Type</label>
-                        <select
-                          value={f.type}
-                          onChange={(e) => updateCustomField(f.id, "type", e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-white"
-                        >
-                          {FIELD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      </div>
-
-                      {f.type === "select" && (
-                        <div className="col-span-3">
-                          <label className="block text-xs text-gray-500 mb-1">Options (comma-separated)</label>
-                          <input
-                            type="text"
-                            value={f.options || ""}
-                            onChange={(e) => updateCustomField(f.id, "options", e.target.value)}
-                            placeholder="opt1, opt2, opt3"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
-                          />
+                  return (
+                    <div key={drug._id} className="bg-white rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all overflow-hidden">
+                      {/* Card header */}
+                      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-5 pt-5 pb-4 border-b border-gray-100">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-lg font-bold text-gray-800 truncate">{drugName}</h3>
+                            {brandName && <p className="text-sm text-indigo-600 font-semibold mt-0.5">{brandName}</p>}
+                            {drugClass && <p className="text-xs text-gray-400 mt-0.5">{drugClass}</p>}
+                          </div>
+                          {specialization && (
+                            <span className="bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-lg text-xs font-bold ml-2 flex-shrink-0">{specialization}</span>
+                          )}
                         </div>
-                      )}
+                      </div>
 
-                      <div className={`${f.type === "select" ? "col-span-1" : "col-span-3"} flex items-end gap-3 pt-5`}>
-                        {f.type !== "select" && (
-                          <label className="flex items-center space-x-1.5 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={f.required}
-                              onChange={(e) => updateCustomField(f.id, "required", e.target.checked)}
-                              className="w-4 h-4 accent-indigo-600"
-                            />
-                            <span className="text-xs text-gray-600">Required</span>
-                          </label>
-                        )}
-                        <button onClick={() => removeCustomField(f.id)} className="text-red-400 hover:text-red-600 transition-colors ml-auto">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
+                      {/* Field rows */}
+                      <div className="p-4 space-y-2">
+                        {displayFields.slice(0, 10).map((f, idx) => {
+                          const val = getVal(drug, f.key);
+                          if (!val) return null;
+                          const c = fieldColors[idx % fieldColors.length];
+                          return (
+                            <div key={f.field_id || f.key} className={`${c.bg} rounded-xl p-2.5 border-l-4 ${c.border}`}>
+                              <p className={`text-xs ${c.label} font-bold mb-0.5 flex items-center gap-1`}>
+                                <span>{c.icon}</span>{f.label || formatKey(f.key)}
+                              </p>
+                              <p className="text-gray-700 font-medium text-xs line-clamp-2">{val}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="px-4 pb-4">
+                        <button onClick={() => { setEditDrug(drug); setShowDrugModal(true); }}
+                          className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-2.5 rounded-xl font-bold text-sm hover:shadow-lg transition-all">
+                          Edit Drug →
                         </button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
 
-            {/* Save */}
-            <div className="flex items-center justify-end space-x-3">
-              {fieldsSaved && <span className="text-green-600 text-sm font-medium">✅ Saved successfully</span>}
-              <button
-                onClick={saveFields}
-                disabled={savingFields}
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-2.5 rounded-xl font-bold shadow hover:shadow-lg transition-all disabled:opacity-60 text-sm"
-              >
-                {savingFields ? "Saving..." : "Save Field Configuration"}
-              </button>
-            </div>
-          </div>
+        {/* ── TEMPLATE TAB ── */}
+        {activeTab === "template" && (
+          <TemplateManager
+            template={template}
+            loading={loadingTemplate}
+            onRefresh={() => setTemplateRefresh((k) => k + 1)}
+          />
         )}
       </main>
 
-      {showDrugModal && <DrugModal fields={allFields} onClose={() => setShowDrugModal(false)} />}
-      {showBulkModal && <BulkUploadModal customFields={customFields} onClose={() => setShowBulkModal(false)} />}
+      {showDrugModal && template && (
+        <DrugModal
+          template={template}
+          drug={editDrug}
+          onClose={() => { setShowDrugModal(false); setEditDrug(null); }}
+          onSaved={refetchDrugs}
+        />
+      )}
+      {showBulkModal && <BulkUploadModal onClose={() => setShowBulkModal(false)} />}
     </div>
   );
 }
 
-function DrugModal({ fields, onClose }) {
-  const [formData, setFormData] = useState({});
+// ── Template Manager ─────────────────────────────────────────────────────────
+function TemplateManager({ template, loading, onRefresh }) {
+  const [creating, setCreating]   = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [editingField, setEditingField] = useState(null);
+  const [addingField, setAddingField]   = useState(false);
+  const [saving, setSaving]             = useState(false);
+  const [error, setError]               = useState("");
 
-  const handleChange = (id, value) => setFormData((p) => ({ ...p, [id]: value }));
+  const createTemplate = async () => {
+    if (!templateName.trim()) return;
+    setSaving(true);
+    try {
+      await post("/api/v1/drugs/templates", { template_name: templateName });
+      onRefresh();
+      setCreating(false);
+    } catch (e) { setError(e.message || "Failed to create template"); }
+    setSaving(false);
+  };
+
+  const updateField = async (fieldId, body) => {
+    setSaving(true);
+    try {
+      await put(`/api/v1/drugs/templates/${template._id}/fields/${fieldId}`, body);
+      onRefresh();
+      setEditingField(null);
+    } catch (e) { setError(e.message || "Failed to update field"); }
+    setSaving(false);
+  };
+
+  const deleteField = async (fieldId) => {
+    if (!confirm("Delete this field?")) return;
+    try {
+      await del(`/api/v1/drugs/templates/${template._id}/fields/${fieldId}`);
+      onRefresh();
+    } catch (e) { setError(e.message || "Failed to delete field"); }
+  };
+
+  const addField = async (body) => {
+    setSaving(true);
+    try {
+      await post(`/api/v1/drugs/templates/${template._id}/fields`, body);
+      onRefresh();
+      setAddingField(false);
+    } catch (e) { setError(e.message || "Failed to add field"); }
+    setSaving(false);
+  };
+
+  if (loading) return <div className="text-center py-16 text-gray-400 text-sm">Loading template...</div>;
+
+  if (!template) return (
+    <div className="space-y-4">
+      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+        No template exists yet. Create one to start adding drugs.
+      </div>
+      {!creating ? (
+        <button onClick={() => setCreating(true)}
+          className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-2.5 rounded-xl font-bold shadow text-sm">
+          + Create Drug Template
+        </button>
+      ) : (
+        <div className="bg-white rounded-2xl shadow border border-gray-100 p-5 space-y-3 max-w-md">
+          <h3 className="font-bold text-gray-800">New Template</h3>
+          {error && <p className="text-red-500 text-xs">{error}</p>}
+          <input type="text" value={templateName} onChange={(e) => setTemplateName(e.target.value)}
+            placeholder="Template name e.g. Standard Drug Form"
+            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400" />
+          <div className="flex gap-2">
+            <button onClick={() => setCreating(false)} className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-xl font-bold text-sm">Cancel</button>
+            <button onClick={createTemplate} disabled={saving}
+              className="flex-1 bg-indigo-600 text-white py-2 rounded-xl font-bold text-sm disabled:opacity-50">
+              {saving ? "Creating..." : "Create"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const fixedFields   = template.fields?.filter((f) => f.is_fixed)   || [];
+  const dynamicFields = template.fields?.filter((f) => !f.is_fixed)  || [];
+
+  return (
+    <div className="space-y-6">
+      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>}
+
+      <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-3">
+        <span className="text-blue-500">ℹ️</span>
+        <div className="text-sm text-blue-800">
+          <span className="font-bold">{template.template_name}</span> — Fixed fields can have their label, visibility and options updated. Dynamic fields can be fully edited or deleted.
+        </div>
+      </div>
+
+      {/* Fixed fields */}
+      <div className="bg-white rounded-2xl shadow border border-gray-100 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+          <span>🔒</span>
+          <h2 className="font-bold text-gray-800">Fixed Fields</h2>
+          <span className="text-xs text-gray-400">({fixedFields.length})</span>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {fixedFields.map((f) => (
+            <FieldRow key={f.field_id} field={f} templateId={template._id}
+              onUpdate={(body) => updateField(f.field_id, body)}
+              isEditing={editingField === f.field_id}
+              onEdit={() => setEditingField(f.field_id)}
+              onCancel={() => setEditingField(null)}
+              saving={saving}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Dynamic fields */}
+      <div className="bg-white rounded-2xl shadow border border-gray-100 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span>✏️</span>
+            <h2 className="font-bold text-gray-800">Dynamic Fields</h2>
+            <span className="text-xs text-gray-400">({dynamicFields.length})</span>
+          </div>
+          <button onClick={() => setAddingField(true)}
+            className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-all">
+            + Add Field
+          </button>
+        </div>
+
+        {dynamicFields.length === 0 && !addingField ? (
+          <div className="px-5 py-10 text-center">
+            <p className="text-gray-400 text-sm mb-3">No dynamic fields yet.</p>
+            <button onClick={() => setAddingField(true)}
+              className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-100">
+              + Add your first custom field
+            </button>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {dynamicFields.map((f) => (
+              <FieldRow key={f.field_id} field={f} templateId={template._id}
+                onUpdate={(body) => updateField(f.field_id, body)}
+                onDelete={() => deleteField(f.field_id)}
+                isEditing={editingField === f.field_id}
+                onEdit={() => setEditingField(f.field_id)}
+                onCancel={() => setEditingField(null)}
+                saving={saving}
+              />
+            ))}
+            {addingField && (
+              <AddFieldRow
+                onSave={addField}
+                onCancel={() => setAddingField(false)}
+                saving={saving}
+                nextOrder={(template.fields?.length || 0) + 1}
+              />
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Contextual hints per field key — shown when editing
+const FIELD_HINTS = {
+  drug_name:           { label: "The generic/scientific name of the drug. Changing this label affects how it appears in all drug forms and doctor-facing views.", visible: "Hiding drug name will make it invisible in the drug form — doctors won't see the generic name.", required: "Making this optional means MRs can submit a drug without a generic name, which may cause data quality issues." },
+  brand_name:          { label: "The commercial brand name (e.g. Mounjaro, Lipitor). This is what doctors and MRs primarily identify the drug by.", visible: "Hiding brand name means the drug card won't show its commercial name to doctors.", required: "Brand name is usually required — without it, drugs become hard to identify in the field." },
+  generic_name:        { label: "The non-proprietary name. Useful when multiple brands share the same molecule.", visible: "Hiding generic name is fine if you only deal with branded drugs.", required: "" },
+  drug_class:          { label: "Pharmacological category (e.g. Biguanide, Statin). Helps doctors quickly understand the drug's mechanism family.", visible: "Hiding drug class removes a key context clue for doctors evaluating the drug.", required: "" },
+  specialization:      { label: "Which medical specialization this drug targets (e.g. Cardiology, Diabetology). Used to match drugs to the right doctors.", visible: "Hiding specialization means MRs won't be guided on which doctors to pitch this drug to.", required: "Required is recommended — without it, drug-doctor matching won't work correctly." },
+  indications:         { label: "The conditions or diseases this drug is approved to treat. Core clinical information for doctors.", visible: "Hiding indications removes the most important clinical context for doctors.", required: "Strongly recommended as required — a drug without indications is clinically incomplete." },
+  mechanism_of_action: { label: "How the drug works at a molecular/physiological level. Important for doctor education during MR visits.", visible: "Hiding mechanism of action reduces the educational value of the drug profile.", required: "" },
+  dosage:              { label: "Recommended dose and frequency (e.g. 500mg twice daily). Critical for safe prescribing.", visible: "Hiding dosage is not recommended — it's essential safety information.", required: "Strongly recommended as required — dosage is critical clinical data." },
+  side_effects:        { label: "Known adverse reactions. Doctors need this to counsel patients and make prescribing decisions.", visible: "Hiding side effects is not recommended — transparency builds doctor trust.", required: "" },
+  contraindications:   { label: "Conditions where the drug must NOT be used (e.g. pregnancy, kidney disease). Safety-critical field.", visible: "Hiding contraindications is strongly discouraged — it's a patient safety concern.", required: "" },
+  drug_interactions:   { label: "Other drugs or substances that interact with this drug. Important for polypharmacy patients.", visible: "Hiding drug interactions reduces safety information available to doctors.", required: "" },
+  launch_date:         { label: "When this drug was launched or made available. Helps doctors understand how new or established the drug is.", visible: "Hiding launch date removes context about the drug's market maturity.", required: "" },
+  brochure_url:        { label: "Link to the drug's PDF brochure or visual aid. MRs use this during doctor visits.", visible: "Hiding brochure URL means doctors won't have access to the detailed PDF.", required: "" },
+};
+
+const IMPACT_COLORS = {
+  warning: "bg-amber-50 border-amber-200 text-amber-800",
+  danger:  "bg-red-50 border-red-200 text-red-700",
+  info:    "bg-blue-50 border-blue-200 text-blue-700",
+};
+
+function FieldRow({ field, onUpdate, onDelete, isEditing, onEdit, onCancel, saving }) {
+  const [form, setForm] = useState({ visible: field.visible, required: field.required });
+
+  const hints = FIELD_HINTS[field.key] || {};
+
+  if (!isEditing) return (
+    <div className="px-5 py-3 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <span className="text-gray-400 text-xs font-mono bg-gray-100 px-2 py-0.5 rounded">{field.type}</span>
+        <span className="text-sm font-semibold text-gray-700">{field.label}</span>
+        <span className="text-xs text-gray-400 font-mono bg-gray-50 px-2 py-0.5 rounded border border-gray-200">{field.key}</span>
+        {field.required && <span className="text-xs text-red-500">required</span>}
+        {!field.visible && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">hidden</span>}
+      </div>
+      <div className="flex items-center gap-2">
+        <button onClick={onEdit} className="text-xs text-blue-600 hover:text-blue-800 font-semibold">Edit</button>
+        {onDelete && <button onClick={onDelete} className="text-xs text-red-400 hover:text-red-600 font-semibold">Delete</button>}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="px-5 py-4 bg-indigo-50 space-y-3">
+      {hints.label && (
+        <div className={`flex items-start gap-2 px-3 py-2.5 rounded-xl border text-xs ${IMPACT_COLORS.info}`}>
+          <span className="mt-0.5 flex-shrink-0">💡</span>
+          <p>{hints.label}</p>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2">
+        <div className="space-y-1">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={form.visible} onChange={(e) => setForm({ ...form, visible: e.target.checked })} className="accent-indigo-600 w-4 h-4" />
+            <span className="text-xs font-semibold text-gray-700">Visible in form</span>
+          </label>
+          {!form.visible && hints.visible && (
+            <div className={`flex items-start gap-2 px-3 py-2 rounded-lg border text-xs ${IMPACT_COLORS.warning}`}>
+              <span className="flex-shrink-0">⚠️</span><p>{hints.visible}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-1">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={form.required} onChange={(e) => setForm({ ...form, required: e.target.checked })} className="accent-red-500 w-4 h-4" />
+            <span className="text-xs font-semibold text-gray-700">Required</span>
+          </label>
+          {hints.required && (
+            <div className={`flex items-start gap-2 px-3 py-2 rounded-lg border text-xs ${form.required ? IMPACT_COLORS.danger : IMPACT_COLORS.info}`}>
+              <span className="flex-shrink-0">{form.required ? "🔴" : "ℹ️"}</span><p>{hints.required}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex gap-2 pt-1">
+        <button onClick={onCancel} className="px-4 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold">Cancel</button>
+        <button disabled={saving} onClick={() => onUpdate({ visible: form.visible, required: form.required })}
+          className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold disabled:opacity-50">
+          {saving ? "Saving..." : "Save"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AddFieldRow({ onSave, onCancel, saving, nextOrder }) {
+  const [label, setLabel]   = useState("");
+  const [type, setType]     = useState("text");
+  const [options, setOptions] = useState("");
+
+  return (
+    <div className="px-5 py-4 bg-green-50 space-y-3">
+      <p className="text-xs font-bold text-green-700">New Custom Field</p>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Label <span className="text-red-500">*</span></label>
+          <input type="text" value={label} onChange={(e) => setLabel(e.target.value)}
+            placeholder="e.g. Storage Temperature"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Type</label>
+          <select value={type} onChange={(e) => setType(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400 bg-white">
+            {FIELD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+      </div>
+      {type === "select" && (
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Options (comma-separated)</label>
+          <input type="text" value={options} onChange={(e) => setOptions(e.target.value)}
+            placeholder="opt1, opt2, opt3"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-400" />
+        </div>
+      )}
+      {label.trim() && (
+        <p className="text-xs text-gray-400">
+          Key: <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{label.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "")}</span>
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button onClick={onCancel} className="px-4 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold">Cancel</button>
+        <button disabled={saving || !label.trim()}
+          onClick={() => onSave({ label, type, key: label.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, ""), order: nextOrder, options: type === "select" ? options.split(",").map((o) => o.trim()).filter(Boolean) : [] })}
+          className="px-4 py-1.5 bg-green-600 text-white rounded-lg text-xs font-semibold disabled:opacity-50">
+          {saving ? "Adding..." : "Add Field"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Drug Modal (Add / Edit) ───────────────────────────────────────────────────
+function DrugModal({ template, drug, onClose, onSaved }) {
+  const isEdit = !!drug;
+  // Build initial form from existing drug field_values
+  const initForm = () => {
+    if (!drug) return {};
+    return Object.fromEntries((drug.field_values || []).map((fv) => [fv.key, fv.value]));
+  };
+  const [formData, setFormData] = useState(initForm);
+  const [saving, setSaving]     = useState(false);
+  const [error, setError]       = useState("");
+
+  const visibleFields = template.fields?.filter((f) => f.visible) || [];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const token = localStorage.getItem("access_token");
-    const basePayload = {
-      drugName: formData.drug_name,
-      brandName: formData.brand_name,
-      genericName: formData.generic_name,
-      drugClass: formData.drug_class,
-      specialization: formData.specialization ? [formData.specialization] : [],
-      indications: formData.indications,
-      mechanismOfAction: formData.mechanism_of_action,
-      dosage: formData.dosage,
-      sideEffects: formData.side_effects,
-      contraindications: formData.contraindications,
-      drugInteractions: formData.drug_interactions,
-      launchDate: formData.launch_date,
-    };
-    const customFields = {};
-    fields.filter((f) => !f.locked).forEach((f) => {
-      if (formData[f.id] !== undefined) customFields[f.id] = formData[f.id];
-    });
-    if (Object.keys(customFields).length) basePayload.customFields = customFields;
+    setSaving(true);
+    setError("");
+    const field_values = visibleFields.map((f) => ({
+      field_id: f.field_id,
+      key:      f.key,
+      value:    formData[f.key] || "",
+    }));
 
     try {
-      await fetch("/api/v1/drugs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(basePayload),
-      });
+      if (isEdit) {
+        await put(`/api/v1/drugs/${drug._id}`, { field_values });
+      } else {
+        await post("/api/v1/drugs", { template_id: template._id, field_values });
+      }
+      onSaved();
       onClose();
-    } catch {}
+    } catch (err) {
+      setError(err.message || "Failed to save drug");
+    }
+    setSaving(false);
   };
 
   const renderField = (f) => {
-    const base = "w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-400 focus:border-transparent text-sm outline-none";
+    const base = "w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-400 text-sm outline-none";
+    const val  = formData[f.key] || "";
+    const onChange = (v) => setFormData((p) => ({ ...p, [f.key]: v }));
+
     switch (f.type) {
-      case "textarea":
-        return <textarea className={base} rows={3} placeholder={`Enter ${f.name.toLowerCase()}...`} value={formData[f.id] || ""} onChange={(e) => handleChange(f.id, e.target.value)} />;
-      case "select":
-        return (
-          <select className={`${base} bg-white`} value={formData[f.id] || ""} onChange={(e) => handleChange(f.id, e.target.value)}>
-            <option value="">Select {f.name.toLowerCase()}</option>
-            {(Array.isArray(f.options) ? f.options : (f.options || "").split(",").map((o) => o.trim()).filter(Boolean)).map((o) => (
-              <option key={o} value={o}>{o}</option>
-            ))}
-          </select>
-        );
-      case "date":
-        return <input type="date" className={base} value={formData[f.id] || ""} onChange={(e) => handleChange(f.id, e.target.value)} />;
-      case "number":
-        return <input type="number" className={base} placeholder={`Enter ${f.name.toLowerCase()}...`} value={formData[f.id] || ""} onChange={(e) => handleChange(f.id, e.target.value)} />;
-      case "url":
-        return <input type="url" className={base} placeholder="https://..." value={formData[f.id] || ""} onChange={(e) => handleChange(f.id, e.target.value)} />;
-      case "file":
-        return (
-          <div className="border-2 border-dashed border-gray-300 rounded-xl p-5 text-center hover:border-indigo-400 transition-colors cursor-pointer">
-            <p className="text-sm text-gray-500"><span className="text-indigo-600 font-semibold">Click to upload</span> or drag and drop</p>
-            <p className="text-xs text-gray-400 mt-1">PDF only (max 10MB)</p>
-          </div>
-        );
-      default:
-        return <input type="text" className={base} placeholder={`Enter ${f.name.toLowerCase()}...`} value={formData[f.id] || ""} onChange={(e) => handleChange(f.id, e.target.value)} />;
+      case "textarea": return <textarea className={base} rows={3} value={val} onChange={(e) => onChange(e.target.value)} placeholder={`Enter ${f.label?.toLowerCase() || "value"}...`} />;
+      case "select":   return (
+        <select className={`${base} bg-white`} value={val} onChange={(e) => onChange(e.target.value)}>
+          <option value="">Select {f.label?.toLowerCase() || "option"}</option>
+          {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
+      );
+      case "date":   return <input type="date"   className={base} value={val} onChange={(e) => onChange(e.target.value)} />;
+      case "number": return <input type="number" className={base} value={val} onChange={(e) => onChange(e.target.value)} placeholder={`Enter ${f.label?.toLowerCase() || "value"}...`} />;
+      case "url":    return <input type="url"    className={base} value={val} onChange={(e) => onChange(e.target.value)} placeholder="https://..." />;
+      case "file":   return (
+        <div className="border-2 border-dashed border-gray-300 rounded-xl p-5 text-center hover:border-indigo-400 cursor-pointer">
+          <p className="text-sm text-gray-500"><span className="text-indigo-600 font-semibold">Click to upload</span> or drag and drop</p>
+          <p className="text-xs text-gray-400 mt-1">PDF only (max 10MB)</p>
+        </div>
+      );
+      default: return <input type="text" className={base} value={val} onChange={(e) => onChange(e.target.value)} placeholder={`Enter ${f.label?.toLowerCase() || "value"}...`} />;
     }
   };
 
-  const customFieldsList = fields.filter((f) => !f.locked);
+  const fixedVisible   = visibleFields.filter((f) => f.is_fixed);
+  const dynamicVisible = visibleFields.filter((f) => !f.is_fixed);
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-5 rounded-t-3xl flex items-center justify-between sticky top-0 z-10">
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center gap-3">
             <span className="text-3xl">💊</span>
-            <h2 className="text-xl font-bold text-white">Add New Drug</h2>
+            <div>
+              <h2 className="text-xl font-bold text-white">{isEdit ? "Edit Drug" : "Add New Drug"}</h2>
+              <p className="text-blue-100 text-xs">{template.template_name}</p>
+            </div>
           </div>
           <button onClick={onClose} className="text-white hover:bg-white/20 rounded-lg p-1.5">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -424,14 +630,16 @@ function DrugModal({ fields, onClose }) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Standard fields */}
+          {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>}
+
+          {/* Fixed fields */}
           <div>
-            <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3">Standard Fields</h3>
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Standard Fields</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {fields.filter((f) => f.locked).map((f) => (
-                <div key={f.id} className={f.type === "textarea" || f.type === "file" ? "md:col-span-2" : ""}>
+              {fixedVisible.map((f) => (
+                <div key={f.field_id} className={f.type === "textarea" || f.type === "file" ? "md:col-span-2" : ""}>
                   <label className="block text-xs font-bold text-gray-700 mb-1.5">
-                    {f.name} {f.required && <span className="text-red-500">*</span>}
+                    {f.label || formatKey(f.key)} {f.required && <span className="text-red-500">*</span>}
                   </label>
                   {renderField(f)}
                 </div>
@@ -439,18 +647,17 @@ function DrugModal({ fields, onClose }) {
             </div>
           </div>
 
-          {/* Custom fields */}
-          {customFieldsList.length > 0 && (
+          {/* Dynamic fields */}
+          {dynamicVisible.length > 0 && (
             <div>
-              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center space-x-2">
-                <span>Custom Fields</span>
-                <span className="bg-indigo-100 text-indigo-600 text-xs px-2 py-0.5 rounded-full">{customFieldsList.length}</span>
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                Custom Fields <span className="bg-indigo-100 text-indigo-600 text-xs px-2 py-0.5 rounded-full normal-case">{dynamicVisible.length}</span>
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-indigo-50 rounded-xl p-4 border border-indigo-100">
-                {customFieldsList.map((f) => (
-                  <div key={f.id} className={f.type === "textarea" ? "md:col-span-2" : ""}>
+                {dynamicVisible.map((f) => (
+                  <div key={f.field_id} className={f.type === "textarea" ? "md:col-span-2" : ""}>
                     <label className="block text-xs font-bold text-gray-700 mb-1.5">
-                      {f.name || f.id} {f.required && <span className="text-red-500">*</span>}
+                      {f.label || formatKey(f.key)} {f.required && <span className="text-red-500">*</span>}
                       <span className="ml-1 text-indigo-400 font-normal">(custom)</span>
                     </label>
                     {renderField(f)}
@@ -460,9 +667,11 @@ function DrugModal({ fields, onClose }) {
             </div>
           )}
 
-          <div className="flex space-x-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-bold hover:bg-gray-200 transition-all text-sm">Cancel</button>
-            <button type="submit" className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-2.5 rounded-xl font-bold hover:shadow-lg transition-all text-sm">Add Drug</button>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-bold hover:bg-gray-200 text-sm">Cancel</button>
+            <button type="submit" disabled={saving} className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-2.5 rounded-xl font-bold hover:shadow-lg text-sm disabled:opacity-50">
+              {saving ? "Saving..." : isEdit ? "Update Drug" : "Add Drug"}
+            </button>
           </div>
         </form>
       </div>
@@ -470,71 +679,26 @@ function DrugModal({ fields, onClose }) {
   );
 }
 
-function BulkUploadModal({ customFields, onClose }) {
-  const allColumns = [
-    "drug_name","brand_name","generic_name","drug_class","specialization",
-    "indications","mechanism_of_action","dosage","side_effects",
-    "contraindications","drug_interactions","launch_date",
-    ...customFields.map((f) => f.id),
-  ];
-
+function BulkUploadModal({ onClose }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-5 rounded-t-3xl flex items-center justify-between sticky top-0 z-10">
-          <div className="flex items-center space-x-3">
-            <span className="text-3xl">📊</span>
-            <h2 className="text-xl font-bold text-white">Bulk Upload Drugs</h2>
-          </div>
-          <button onClick={onClose} className="text-white hover:bg-white/20 rounded-lg p-1.5">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-xl font-bold text-gray-800">📊 Bulk Upload</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
-
-        <div className="p-6 space-y-5">
-          <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-xl p-4 flex items-start space-x-3">
-            <span className="text-2xl">⚠️</span>
-            <p className="text-sm text-yellow-800">Upload the Excel file only. Upload brochure PDFs individually from the drug cards after import.</p>
-          </div>
-
-          <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
-            <h3 className="font-bold text-gray-800 mb-3 flex items-center space-x-2">
-              <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">1</span>
-              <span>Upload Excel File</span>
-            </h3>
-            <div className="border-2 border-dashed border-blue-300 rounded-xl p-6 text-center hover:border-blue-500 transition-colors cursor-pointer">
-              <p className="text-sm text-gray-600"><span className="font-semibold text-blue-600">Click to upload</span> or drag and drop</p>
-              <p className="text-xs text-gray-400 mt-1">XLSX only (max 5MB)</p>
-            </div>
-            <button className="mt-3 bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-600 transition-all flex items-center space-x-2">
-              <span>📥</span><span>Download Template</span>
-            </button>
-          </div>
-
-          <div className="bg-green-50 rounded-xl p-5 border border-green-200">
-            <h3 className="font-bold text-gray-800 mb-3 flex items-center space-x-2">
-              <span className="text-lg">📋</span>
-              <span>Excel Columns</span>
-              {customFields.length > 0 && <span className="bg-indigo-100 text-indigo-600 text-xs px-2 py-0.5 rounded-full">+{customFields.length} custom</span>}
-            </h3>
-            <div className="grid grid-cols-2 gap-1.5 text-sm">
-              {allColumns.map((col) => {
-                const isCustom = customFields.some((f) => f.id === col);
-                return (
-                  <div key={col} className="flex items-center space-x-2">
-                    <span className={isCustom ? "text-indigo-500" : "text-green-500"}>✓</span>
-                    <span className={`font-medium ${isCustom ? "text-indigo-700" : "text-green-800"}`}>{col}</span>
-                    {isCustom && <span className="text-xs text-indigo-400">(custom)</span>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="flex space-x-3">
-            <button onClick={onClose} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-bold hover:bg-gray-200 transition-all text-sm">Cancel</button>
-            <button className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-2.5 rounded-xl font-bold hover:shadow-lg transition-all text-sm">Upload & Import</button>
-          </div>
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-xl p-4 mb-5 text-sm text-yellow-800">
+          Upload Excel only. Add brochure PDFs individually after import.
+        </div>
+        <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-indigo-400 cursor-pointer mb-4">
+          <p className="text-sm text-gray-500"><span className="text-indigo-600 font-semibold">Click to upload</span> or drag and drop</p>
+          <p className="text-xs text-gray-400 mt-1">XLSX only (max 5MB)</p>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-bold text-sm">Cancel</button>
+          <button className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-2.5 rounded-xl font-bold text-sm">Upload & Import</button>
         </div>
       </div>
     </div>

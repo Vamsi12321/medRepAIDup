@@ -41,7 +41,7 @@ export default function Login() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.detail || data.message || "Invalid credentials");
+        setError(data.detail || data.message || "Invalid credentials. Did you select the correct role?");
         setIsLoggingIn(false);
         return;
       }
@@ -145,7 +145,10 @@ export default function Login() {
           {error && (
             <div className="mb-4 flex items-start space-x-3 bg-red-50 border border-red-200 text-red-700 px-3 py-2.5 rounded-xl">
               <span className="text-base mt-0.5">⚠️</span>
-              <p className="text-xs font-medium">{error}</p>
+              <div>
+                <p className="text-xs font-medium">{error}</p>
+                {role && <p className="text-xs text-red-500 mt-1">💡 Make sure you selected the correct role: <span className="font-bold">{role}</span></p>}
+              </div>
             </div>
           )}
 
