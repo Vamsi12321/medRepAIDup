@@ -1,10 +1,138 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
 import Toast from "@/components/Toast";
 import { get, put, post, del } from "@/lib/api";
 import { TableSkeleton } from "@/components/Skeleton";
+import { downloadCSVTemplate } from "@/lib/downloadTemplate";
+
+const MR_HEADERS = ["name","email","phone","territory"];
+const MR_SAMPLE  = [["Rajesh Kumar","rajesh@company.com","+919876543210","Mumbai North"]];
+
+function MRBulkUploadModal({ onClose, onSuccess }) {
+  const fileRef = React.useRef(null);
+  const [file, setFile]           = React.useState(null);
+  const [uploading, setUploading] = React.useState(false);
+  const [result, setResult]       = React.useState(null);
+  const [error, setError]         = React.useState("");
+
+  const handleUpload = async () => {
+    if (!file) return;
+    setUploading(true);
+    setError("");
+    try {
+      const token = localStorage.getItem("access_token");
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/v1/mrs/bulk-upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Upload failed");
+      setResult(data);
+      if (data.successful > 0) onSuccess();
+    } catch (e) {
+      setError(e.message || "Upload failed");
+    }
+    setUploading(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-gray-800">📤 Bulk Upload MRs</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        {result ? (
+          <div className="space-y-4">
+            <div className={`rounded-xl p-4 border ${result.failed === 0 ? "bg-green-50 border-green-200" : result.successful === 0 ? "bg-red-50 border-red-200" : "bg-yellow-50 border-yellow-200"}`}>
+              <p className={`font-bold text-sm mb-1 ${result.failed === 0 ? "text-green-700" : result.successful === 0 ? "text-red-700" : "text-yellow-700"}`}>
+                {result.failed === 0 ? "✅" : result.successful === 0 ? "❌" : "⚠️"} {result.message}
+              </p>
+              <div className="flex gap-4 text-xs mt-2">
+                <span className="text-green-600 font-semibold">✅ {result.successful} added</span>
+                {result.failed > 0 && <span className="text-red-500 font-semibold">❌ {result.failed} failed</span>}
+                <span className="text-gray-500">Total: {result.total_rows}</span>
+              </div>
+            </div>
+
+            {result.errors?.length > 0 && (
+              <div className="bg-red-50 border border-red-100 rounded-xl p-3 max-h-48 overflow-y-auto">
+                <p className="text-xs font-bold text-red-700 mb-2">Failed rows:</p>
+                <div className="space-y-1.5">
+                  {result.errors.map((e, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs bg-white rounded-lg px-2.5 py-1.5 border border-red-100">
+                      <span className="text-red-400 font-bold flex-shrink-0">Row {e.row}</span>
+                      <span className="text-red-600">{e.error}</span>
+                      {(e.email || e.phone || e.name) && (
+                        <span className="text-gray-400 ml-auto flex-shrink-0">{e.email || e.phone || e.name}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button onClick={onClose} className="w-full bg-orange-500 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-orange-600 transition-all">Done</button>
+          </div>
+        ) : (
+          <>
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-4">
+              <p className="text-sm font-bold text-orange-800 mb-1">📥 How to add multiple MRs at once</p>
+              <ol className="text-xs text-orange-700 space-y-1 list-decimal list-inside">
+                <li>Download the template below</li>
+                <li>Fill in MR details — one row per MR</li>
+                <li>Upload the completed file here</li>
+                <li>All MRs will be created with login access</li>
+              </ol>
+              <p className="text-xs text-orange-500 mt-2">Default password <span className="font-mono font-bold">Welcome@123</span> will be assigned to all MRs.</p>
+            </div>
+
+            <button onClick={() => downloadCSVTemplate(MR_HEADERS, MR_SAMPLE, "mrs_template.csv")}
+              className="w-full bg-orange-500 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-orange-600 transition-all mb-3 flex items-center justify-center gap-2 shadow">
+              📥 Download MR Template
+            </button>
+
+            {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-xs mb-3">{error}</div>}
+
+            <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden"
+              onChange={(e) => setFile(e.target.files?.[0] || null)} />
+
+            <div onClick={() => fileRef.current?.click()}
+              className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-orange-400 cursor-pointer transition-colors mb-4">
+              {file ? (
+                <div>
+                  <p className="text-orange-600 font-bold text-sm">📄 {file.name}</p>
+                  <p className="text-xs text-gray-400 mt-1">{(file.size / 1024).toFixed(1)} KB — ready to upload</p>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-sm text-gray-500"><span className="text-orange-600 font-semibold">Click to upload</span> or drag and drop</p>
+                  <p className="text-xs text-gray-400 mt-1">CSV or XLSX (max 5MB, max 100 rows)</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={onClose} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-bold text-sm">Cancel</button>
+              <button onClick={handleUpload} disabled={!file || uploading}
+                className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white py-2.5 rounded-xl font-bold text-sm hover:shadow-lg transition-all disabled:opacity-50">
+                {uploading ? "Uploading..." : "Upload & Import"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function CompanyMedicalReps() {
   const [mrs, setMrs] = useState([]);
@@ -17,13 +145,15 @@ export default function CompanyMedicalReps() {
   const [selectedMR, setSelectedMR] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [visitsMR, setVisitsMR] = useState(null); // MR whose visits panel is open
+  const [visitsMR, setVisitsMR] = useState(null);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [filterTerritory, setFilterTerritory] = useState("");
+  const [filterStatus, setFilterStatus]       = useState("all");
 
   const fetchMRs = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page, page_size: 10 });
-      if (search) params.append("search", search);
       const data = await get(`/api/v1/mrs?${params}`);
       setMrs(data.mrs || []);
       setTotal(data.total || 0);
@@ -32,7 +162,7 @@ export default function CompanyMedicalReps() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchMRs(); }, [fetchMRs]);
 
@@ -63,6 +193,15 @@ export default function CompanyMedicalReps() {
 
   const activeCount = mrs.filter((m) => m.is_active).length;
 
+  const filteredMRs = mrs.filter((m) => {
+    if (filterStatus === "active"   && !m.is_active) return false;
+    if (filterStatus === "inactive" &&  m.is_active) return false;
+    if (filterTerritory && !m.territory?.toLowerCase().includes(filterTerritory.toLowerCase())) return false;
+    if (search && !m.name?.toLowerCase().includes(search.toLowerCase()) &&
+                  !m.email?.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50 overflow-x-hidden">
       <CompanyNavbar />
@@ -77,12 +216,20 @@ export default function CompanyMedicalReps() {
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Medical Representatives 💼</h1>
             <p className="text-gray-600 text-sm">Manage your field force and sales team</p>
           </div>
-          <button
-            onClick={() => { setSelectedMR(null); setShowModal(true); }}
-            className="w-full sm:w-auto bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
-          >
-            <span>➕</span><span>Add MR</span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowBulkModal(true)}
+              className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
+            >
+              <span>📤</span><span>Bulk Upload</span>
+            </button>
+            <button
+              onClick={() => { setSelectedMR(null); setShowModal(true); }}
+              className="w-full sm:w-auto bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
+            >
+              <span>➕</span><span>Add MR</span>
+            </button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -100,15 +247,37 @@ export default function CompanyMedicalReps() {
           ))}
         </div>
 
-        {/* Search */}
-        <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-100 mb-6">
+        {/* Search + Filters */}
+        <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-100 mb-6 flex flex-wrap gap-3">
           <input
             type="text"
-            placeholder="🔍 Search by name, email or territory..."
+            placeholder="🔍 Search by name or email..."
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 focus:border-orange-400 text-sm transition-all outline-none"
+            onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 min-w-[200px] px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 focus:border-orange-400 text-sm transition-all outline-none"
           />
+          <input
+            type="text"
+            placeholder="📍 Filter by territory..."
+            value={filterTerritory}
+            onChange={(e) => setFilterTerritory(e.target.value)}
+            className="flex-1 min-w-[160px] px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 focus:border-orange-400 text-sm transition-all outline-none"
+          />
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 focus:border-orange-400 text-sm bg-white font-semibold text-gray-700 outline-none"
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          {(filterTerritory || filterStatus !== "all") && (
+            <button onClick={() => { setFilterTerritory(""); setFilterStatus("all"); }}
+              className="px-4 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">
+              Clear
+            </button>
+          )}
         </div>
 
         {/* MR List */}
@@ -117,7 +286,7 @@ export default function CompanyMedicalReps() {
         ) : (
           <>
             <div className="space-y-3">
-              {mrs.map((mr) => (
+              {filteredMRs.map((mr) => (
                 <div key={mr.id} className="bg-white rounded-2xl shadow border border-gray-100 hover:shadow-md transition-all p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
@@ -179,11 +348,11 @@ export default function CompanyMedicalReps() {
               ))}
             </div>
 
-            {mrs.length === 0 && (
+            {filteredMRs.length === 0 && (
               <div className="text-center py-16 bg-white rounded-2xl shadow border border-gray-100">
                 <span className="text-5xl">💼</span>
                 <h3 className="text-xl font-bold text-gray-900 mt-4 mb-2">No MRs found</h3>
-                <p className="text-gray-500 text-sm">Add a medical representative to get started</p>
+                <p className="text-gray-500 text-sm">{mrs.length > 0 ? "Try adjusting your filters" : "Add a medical representative to get started"}</p>
               </div>
             )}
 
@@ -207,6 +376,8 @@ export default function CompanyMedicalReps() {
       {visitsMR && (
         <MRVisitsPanel mr={visitsMR} onClose={() => setVisitsMR(null)} />
       )}
+
+      {showBulkModal && <MRBulkUploadModal onClose={() => setShowBulkModal(false)} onSuccess={refetch} />}
 
       {showModal && (
         <MRModal

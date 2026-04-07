@@ -164,35 +164,6 @@ export default function CompanyProfile() {
               </div>
             </div>
 
-            {/* Recent Activity */}
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-              <h3 className="text-xl font-bold text-gray-800 mb-5 flex items-center">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center mr-3">
-                  <span className="text-lg">📊</span>
-                </div>
-                Recent Activity
-              </h3>
-              
-              <div className="space-y-4">
-                {recentActivity.map((activity) => (
-                  <div
-                    key={activity.id}
-                    className="bg-gradient-to-r from-gray-50 to-white rounded-lg p-4 hover:shadow-md transition-all flex items-center justify-between border border-gray-100 group"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className={`w-10 h-10 bg-gradient-to-br ${activity.color} rounded-lg flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
-                        <span className="text-lg">{activity.icon}</span>
-                      </div>
-                      <div>
-                        <p className="font-bold text-gray-800 text-base">{activity.action}</p>
-                        <p className="text-sm text-gray-500 font-semibold">{activity.date}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
             {/* Settings */}
             <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
               <h3 className="text-xl font-bold text-gray-800 mb-5 flex items-center">
