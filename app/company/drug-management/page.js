@@ -1,8 +1,9 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
 import { get, post, put, del } from "@/lib/api";
+import { downloadCSVTemplate } from "@/lib/downloadTemplate";
 
 const FIELD_TYPES = ["text", "textarea", "number", "date", "select", "url"];
 
@@ -157,9 +158,24 @@ export default function CompanyDrugManagement() {
                   const brandName      = getVal(drug, "brand_name");
                   const drugClass      = getVal(drug, "drug_class");
 
-                  const displayFields = visibleFields.length > 0
-                    ? visibleFields.filter((f) => !["brand_name","drug_name","drug_class","specialization","brochure_url"].includes(f.key))
-                    : (drug.field_values || []).filter((fv) => !["brand_name","drug_name","drug_class","specialization","brochure_url"].includes(fv.key)).map((fv) => ({ key: fv.key, label: null, field_id: fv.key }));
+                  const HEADER_KEYS = ["brand_name","drug_name","drug_class","specialization","brochure_url"];
+
+                  // Always use drug's own field_values as source — shows all fields that have values
+                  const allTemplateFields = template?.fields || [];
+                  const displayFields = (drug.field_values || [])
+                    .filter((fv) => {
+                      if (HEADER_KEYS.includes(fv.key)) return false;
+                      if (!fv.value) return false;
+                      // Check template visibility — search ALL template fields (not just visible ones)
+                      const tmplField = allTemplateFields.find((f) => f.key === fv.key);
+                      if (tmplField) return tmplField.visible === true;
+                      // Field not in template yet (newly added via bulk) — show by default
+                      return true;
+                    })
+                    .map((fv) => {
+                      const tmplField = allTemplateFields.find((f) => f.key === fv.key);
+                      return { key: fv.key, label: tmplField?.label || null, field_id: fv.field_id || fv.key, value: fv.value };
+                    });
 
                   // Rotating color palette for field rows
                   const fieldColors = [
@@ -176,43 +192,59 @@ export default function CompanyDrugManagement() {
                   ];
 
                   return (
-                    <div key={drug._id} className="bg-white rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all overflow-hidden">
+                    <div key={drug._id} className="bg-white rounded-2xl shadow-md border border-gray-100 hover:shadow-xl transition-all duration-300 overflow-hidden group">
+
+                      {/* Gradient accent bar */}
+                      <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+
                       {/* Card header */}
-                      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-5 pt-5 pb-4 border-b border-gray-100">
-                        <div className="flex items-start justify-between mb-2">
+                      <div className="px-5 pt-4 pb-3 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full -mr-10 -mt-10 opacity-60" />
+                        <div className="relative flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-bold text-gray-800 truncate">{drugName}</h3>
-                            {brandName && <p className="text-sm text-indigo-600 font-semibold mt-0.5">{brandName}</p>}
-                            {drugClass && <p className="text-xs text-gray-400 mt-0.5">{drugClass}</p>}
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow flex-shrink-0">
+                                {drugName?.charAt(0)?.toUpperCase()}
+                              </div>
+                              <h3 className="text-base font-bold text-gray-800 truncate capitalize">{drugName}</h3>
+                            </div>
+                            {brandName && (
+                              <p className="text-xs text-indigo-600 font-semibold ml-10">{brandName}</p>
+                            )}
+                            {drugClass && (
+                              <p className="text-xs text-gray-400 ml-10 mt-0.5">{drugClass}</p>
+                            )}
                           </div>
                           {specialization && (
-                            <span className="bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-lg text-xs font-bold ml-2 flex-shrink-0">{specialization}</span>
+                            <span className="bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 px-2.5 py-1 rounded-full text-xs font-bold flex-shrink-0 border border-indigo-200">
+                              {specialization}
+                            </span>
                           )}
                         </div>
                       </div>
 
-                      {/* Field rows */}
-                      <div className="p-4 space-y-2">
-                        {displayFields.slice(0, 10).map((f, idx) => {
-                          const val = getVal(drug, f.key);
-                          if (!val) return null;
+                      {/* Divider */}
+                      <div className="mx-4 border-t border-gray-100" />
+
+                      {/* Field rows — compact two-column layout */}
+                      <div className="px-4 py-3 grid grid-cols-2 gap-2">
+                        {displayFields.map((f, idx) => {
                           const c = fieldColors[idx % fieldColors.length];
                           return (
-                            <div key={f.field_id || f.key} className={`${c.bg} rounded-xl p-2.5 border-l-4 ${c.border}`}>
-                              <p className={`text-xs ${c.label} font-bold mb-0.5 flex items-center gap-1`}>
-                                <span>{c.icon}</span>{f.label || formatKey(f.key)}
-                              </p>
-                              <p className="text-gray-700 font-medium text-xs line-clamp-2">{val}</p>
+                            <div key={f.field_id || f.key}
+                              className={`${c.bg} rounded-xl px-3 py-2 border-l-3 ${c.border} border-l-4 ${f.value?.length > 30 ? "col-span-2" : ""}`}>
+                              <p className={`text-xs ${c.label} font-bold mb-0.5`}>{f.label || formatKey(f.key)}</p>
+                              <p className="text-gray-700 font-medium text-xs line-clamp-2">{f.value}</p>
                             </div>
                           );
                         })}
                       </div>
 
                       {/* Actions */}
-                      <div className="px-4 pb-4">
+                      <div className="px-4 pb-4 pt-1">
                         <button onClick={() => { setEditDrug(drug); setShowDrugModal(true); }}
-                          className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-2.5 rounded-xl font-bold text-sm hover:shadow-lg transition-all">
-                          Edit Drug →
+                          className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-2 rounded-xl font-bold text-xs hover:shadow-lg transition-all group-hover:from-indigo-700 group-hover:to-purple-700">
+                          ✏️ Edit Drug
                         </button>
                       </div>
                     </div>
@@ -241,7 +273,10 @@ export default function CompanyDrugManagement() {
           onSaved={refetchDrugs}
         />
       )}
-      {showBulkModal && <BulkUploadModal onClose={() => setShowBulkModal(false)} />}
+      {showBulkModal && <BulkUploadModal onClose={() => setShowBulkModal(false)} onSuccess={(type) => {
+        refetchDrugs();
+        if (type === "template") setTemplateRefresh((k) => k + 1);
+      }} />}
     </div>
   );
 }
@@ -679,27 +714,200 @@ function DrugModal({ template, drug, onClose, onSaved }) {
   );
 }
 
-function BulkUploadModal({ onClose }) {
+function BulkUploadModal({ onClose, onSuccess }) {
+  const fileRef = React.useRef(null);
+  const [file, setFile]           = React.useState(null);
+  const [template, setTemplate]   = React.useState(null);
+  const [loading, setLoading]     = React.useState(true);
+  const [uploading, setUploading] = React.useState(false);
+  const [result, setResult]       = React.useState(null);
+  const [error, setError]         = React.useState("");
+  const [showErrors, setShowErrors] = React.useState(false);
+
+  React.useEffect(() => {
+    get("/api/v1/drugs/templates")
+      .then((data) => setTemplate(data))
+      .catch(() => setError("Could not load drug template."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleDownload = () => {
+    if (!template?.fields) return;
+    const visibleFields = template.fields.filter((f) => f.visible);
+    const headers = visibleFields.map((f) => f.key);
+    // Only header row — fill from row 2 onwards
+    downloadCSVTemplate(headers, [[]], `drugs_template.csv`);
+  };
+
+  const fixedFields   = template?.fields?.filter((f) => f.is_fixed  && f.visible) || [];
+  const customFields  = template?.fields?.filter((f) => !f.is_fixed && f.visible) || [];
+
+  const handleUpload = async () => {
+    if (!file) return;
+    setUploading(true);
+    setError("");
+    try {
+      const token = localStorage.getItem("access_token");
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/v1/drugs/bulk-upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Upload failed");
+      setResult(data);
+      if (data.successful > 0) onSuccess();
+      if (data.custom_fields_added?.length > 0) onSuccess("template"); // signal template refresh too
+    } catch (e) {
+      setError(e.message || "Upload failed");
+    }
+    setUploading(false);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-xl font-bold text-gray-800">📊 Bulk Upload</h2>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-800">📊 Bulk Upload Drugs</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-xl p-4 mb-5 text-sm text-yellow-800">
-          Upload Excel only. Add brochure PDFs individually after import.
+
+        {loading ? (
+          <div className="text-center py-8 text-gray-400 text-sm">Loading template fields...</div>
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-4">{error}</div>
+        ) : (
+          <>
+            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 mb-4">
+              <p className="text-xs font-bold text-indigo-800 mb-2">📥 Download template → fill from Row 2 · one drug per row</p>
+
+              {/* Compact field guide */}
+              {template?.fields && (
+                <div className="bg-white rounded-lg border border-indigo-100 overflow-hidden">
+                  <div className="max-h-28 overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-indigo-100 sticky top-0">
+                        <tr>
+                          <th className="text-left px-2 py-1.5 text-indigo-700 font-bold">Key</th>
+                          <th className="text-left px-2 py-1.5 text-indigo-700 font-bold">Format</th>
+                          <th className="px-2 py-1.5 text-indigo-700 font-bold text-center">Req</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {template.fields.filter((f) => f.visible).map((f) => {
+                          // Fields that accept multiple comma-separated values
+                          const multiKeys = new Set(["indications","side_effects","contraindications","drug_interactions","specialization"]);
+                          let hint = "text";
+                          if (f.type === "select" && f.options?.length) hint = f.options.slice(0,3).join(" | ") + (f.options.length > 3 ? "..." : "");
+                          else if (multiKeys.has(f.key))  hint = "text · multiple: comma,separated";
+                          else if (f.type === "textarea") hint = "free text";
+                          else if (f.type === "date")     hint = "YYYY-MM-DD";
+                          else if (f.type === "number")   hint = "number";
+                          else if (f.type === "url")      hint = "https://...";
+                          return (
+                            <tr key={f.field_id} className="hover:bg-gray-50">
+                              <td className="px-2 py-1 font-mono text-indigo-600 font-semibold">{f.key}</td>
+                              <td className="px-2 py-1 text-gray-500">{hint}</td>
+                              <td className="px-2 py-1 text-center">{f.required ? <span className="text-red-500 font-bold">*</span> : <span className="text-gray-300">—</span>}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button onClick={handleDownload}
+              className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all mb-3 flex items-center justify-center gap-2 shadow">
+              📥 Download Drug Template ({(fixedFields.length + customFields.length)} columns)
+            </button>
+          </>
+        )}
+
+        <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden"
+          onChange={(e) => setFile(e.target.files?.[0] || null)} />
+
+        <div onClick={() => fileRef.current?.click()}
+          className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-indigo-400 cursor-pointer transition-colors mb-4">
+          {file ? (
+            <div>
+              <p className="text-indigo-600 font-bold text-sm">📄 {file.name}</p>
+              <p className="text-xs text-gray-400 mt-1">{(file.size / 1024).toFixed(1)} KB — ready to upload</p>
+            </div>
+          ) : (
+            <div>
+              <p className="text-sm text-gray-500"><span className="text-indigo-600 font-semibold">Click to upload</span> or drag and drop</p>
+              <p className="text-xs text-gray-400 mt-1">CSV or XLSX (max 5MB)</p>
+            </div>
+          )}
         </div>
-        <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-indigo-400 cursor-pointer mb-4">
-          <p className="text-sm text-gray-500"><span className="text-indigo-600 font-semibold">Click to upload</span> or drag and drop</p>
-          <p className="text-xs text-gray-400 mt-1">XLSX only (max 5MB)</p>
-        </div>
+
         <div className="flex gap-3">
           <button onClick={onClose} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-bold text-sm">Cancel</button>
-          <button className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-2.5 rounded-xl font-bold text-sm">Upload & Import</button>
+          <button onClick={handleUpload} disabled={!file || loading || uploading}
+            className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-2.5 rounded-xl font-bold text-sm hover:shadow-lg transition-all disabled:opacity-50">
+            {uploading ? "Uploading..." : "Upload & Import"}
+          </button>
         </div>
+
+        {result && (
+          <>
+            <div className={`mt-3 rounded-xl p-3 border text-xs ${result.failed === 0 ? "bg-green-50 border-green-200 text-green-700" : "bg-yellow-50 border-yellow-200 text-yellow-700"}`}>
+              <p className="font-bold">{result.message}</p>
+              {result.custom_fields_added?.length > 0 && (
+                <p className="mt-1 text-indigo-600">✨ New fields added to template: {result.custom_fields_added.join(", ")}</p>
+              )}
+              {result.errors?.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {result.errors.slice(0, 3).map((e, i) => (
+                    <p key={i} className="text-red-500">Row {e.row}: {e.error}</p>
+                  ))}
+                  {result.errors.length > 3 && (
+                    <button onClick={() => setShowErrors(true)}
+                      className="text-red-600 font-bold underline text-xs mt-1">
+                      Show all {result.errors.length} errors →
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Errors detail modal */}
+            {showErrors && (
+              <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col">
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                    <h3 className="font-bold text-gray-800">❌ Upload Errors ({result.errors.length})</h3>
+                    <button onClick={() => setShowErrors(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">×</button>
+                  </div>
+                  <div className="overflow-y-auto p-4 space-y-2 flex-1">
+                    {result.errors.map((e, i) => (
+                      <div key={i} className="flex items-start gap-3 bg-red-50 border border-red-100 rounded-xl px-3 py-2 text-xs">
+                        <span className="bg-red-200 text-red-700 font-bold px-2 py-0.5 rounded flex-shrink-0">Row {e.row}</span>
+                        <span className="text-red-600">{e.error}</span>
+                        {(e.drug_name || e.brand_name) && (
+                          <span className="text-gray-400 ml-auto flex-shrink-0">{e.drug_name} {e.brand_name ? `/ ${e.brand_name}` : ""}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="px-5 py-3 border-t border-gray-100">
+                    <button onClick={() => setShowErrors(false)}
+                      className="w-full bg-gray-100 text-gray-700 py-2 rounded-xl font-bold text-sm hover:bg-gray-200 transition-all">
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

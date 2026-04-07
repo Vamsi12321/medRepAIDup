@@ -8,20 +8,27 @@ async function forward(req, { params }) {
   const url = `${BACKEND}/api/v1/${path}${query ? "?" + query : ""}`;
 
   const method = req.method;
-  const auth = req.headers.get("authorization") || "";
+  const auth   = req.headers.get("authorization") || "";
+  const contentType = req.headers.get("content-type") || "";
 
   let body;
+  let forwardHeaders = { Authorization: auth };
+
   if (method !== "GET" && method !== "DELETE") {
-    try { body = await req.json(); } catch { body = undefined; }
+    if (contentType.includes("multipart/form-data")) {
+      // Forward FormData as-is — do NOT set Content-Type (browser sets boundary automatically)
+      body = await req.formData();
+    } else {
+      // JSON body
+      try { body = JSON.stringify(await req.json()); } catch { body = undefined; }
+      forwardHeaders["Content-Type"] = "application/json";
+    }
   }
 
   const res = await fetch(url, {
     method,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: auth,
-    },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    headers: forwardHeaders,
+    ...(body !== undefined ? { body } : {}),
   });
 
   const text = await res.text();
@@ -30,8 +37,8 @@ async function forward(req, { params }) {
   return Response.json(data, { status: res.status });
 }
 
-export async function GET(req, ctx) { return forward(req, ctx); }
-export async function POST(req, ctx) { return forward(req, ctx); }
-export async function PUT(req, ctx) { return forward(req, ctx); }
+export async function GET(req, ctx)    { return forward(req, ctx); }
+export async function POST(req, ctx)   { return forward(req, ctx); }
+export async function PUT(req, ctx)    { return forward(req, ctx); }
 export async function DELETE(req, ctx) { return forward(req, ctx); }
-export async function PATCH(req, ctx) { return forward(req, ctx); }
+export async function PATCH(req, ctx)  { return forward(req, ctx); }

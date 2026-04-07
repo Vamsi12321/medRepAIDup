@@ -1,433 +1,441 @@
 "use client";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useCallback } from "react";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
+import { get, post, put } from "@/lib/api";
+
+const STATUS_STYLES = {
+  upcoming:    { bg: "bg-green-100",  text: "text-green-700",  label: "Upcoming" },
+  completed:   { bg: "bg-blue-100",   text: "text-blue-700",   label: "Completed" },
+  cancelled:   { bg: "bg-red-100",    text: "text-red-600",    label: "Cancelled" },
+  rescheduled: { bg: "bg-yellow-100", text: "text-yellow-700", label: "Rescheduled" },
+};
 
 export default function CompanyCMEEvents() {
-  const router = useRouter();
+  const [events, setEvents]       = useState([]);
+  const [total, setTotal]         = useState(0);
+  const [loading, setLoading]     = useState(true);
+  const [activeTab, setActiveTab] = useState("all");
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
-  const [activeTab, setActiveTab] = useState("all");
-  
-  // Enhanced events data with location and recording
-  const [events, setEvents] = useState([
-    {
-      id: 1,
-      title: "Hypertension Management Webinar",
-      description: "Learn the latest guidelines and treatment strategies for hypertension management in clinical practice.",
-      date: "2026-03-25",
-      time: "10:00 AM - 12:00 PM",
-      type: "Webinar",
-      location: "Online - Zoom Platform",
-      speaker: "Dr. John Smith, MD",
-      attendees: 245,
-      maxAttendees: 500,
-      status: "Upcoming",
-      recording_url: null,
-      created_at: "2026-03-10"
-    },
-    {
-      id: 2,
-      title: "Cardiology Advances Summit",
-      description: "Comprehensive review of recent advances in cardiovascular medicine and interventional procedures.",
-      date: "2026-04-02",
-      time: "9:00 AM - 5:00 PM",
-      type: "Conference",
-      location: "Grand Hotel Conference Center, Mumbai",
-      speaker: "Dr. Sarah Johnson, MD",
-      attendees: 180,
-      maxAttendees: 300,
-      status: "Upcoming",
-      recording_url: null,
-      created_at: "2026-02-15"
-    },
-    {
-      id: 3,
-      title: "Diabetes Care Workshop",
-      description: "Hands-on workshop covering latest diabetes management protocols and patient care strategies.",
-      date: "2026-02-20",
-      time: "2:00 PM - 6:00 PM",
-      type: "Workshop",
-      location: "Medical College Auditorium, Delhi",
-      speaker: "Dr. Michael Chen, MD",
-      attendees: 120,
-      maxAttendees: 150,
-      status: "Completed",
-      recording_url: "https://storage.googleapis.com/cme-recordings/diabetes-care-workshop.mp4",
-      created_at: "2026-01-25"
-    },
-    {
-      id: 4,
-      title: "Neurology Update 2026",
-      description: "Latest developments in neurological disorders diagnosis and treatment approaches.",
-      date: "2026-01-15",
-      time: "11:00 AM - 3:00 PM",
-      type: "Seminar",
-      location: "Online - Microsoft Teams",
-      speaker: "Dr. Emily Davis, MD",
-      attendees: 89,
-      maxAttendees: 200,
-      status: "Completed",
-      recording_url: null, // Missing recording
-      created_at: "2025-12-20"
+  const [focusRecording, setFocusRecording] = useState(false);
+  const [refreshKey, setRefreshKey]     = useState(0);
+
+  const fetchEvents = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ limit: 100 });
+      if (activeTab !== "all") params.append("status", activeTab);
+      const data = await get(`/api/v1/cme?${params}`);
+      setEvents(data.events || []);
+      setTotal(data.total || 0);
+    } catch {
+      setEvents([]);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  }, [activeTab, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filteredEvents = events.filter(event => {
-    if (activeTab === "all") return true;
-    if (activeTab === "upcoming") return event.status === "Upcoming";
-    if (activeTab === "completed") return event.status === "Completed";
-    if (activeTab === "with-recording") return event.recording_url;
-    if (activeTab === "missing-recording") return event.status === "Completed" && !event.recording_url;
-    return true;
-  });
+  useEffect(() => { fetchEvents(); }, [fetchEvents]);
 
-  const handleEdit = (event) => {
-    setEditingEvent(event);
-    setShowModal(true);
-  };
+  const refetch = () => setRefreshKey((k) => k + 1);
 
-  const handleDelete = (eventId) => {
-    if (confirm("Are you sure you want to delete this event?")) {
-      setEvents(events.filter(e => e.id !== eventId));
-    }
+  const tabs = [
+    { id: "all",         label: "All" },
+    { id: "upcoming",    label: "Upcoming" },
+    { id: "completed",   label: "Completed" },
+    { id: "cancelled",   label: "Cancelled" },
+    { id: "rescheduled", label: "Rescheduled" },
+  ];
+
+  const stats = {
+    total:       total,
+    upcoming:    events.filter((e) => e.status === "upcoming").length,
+    completed:   events.filter((e) => e.status === "completed").length,
+    withRecording: events.filter((e) => e.event_recording).length,
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50 overflow-x-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50">
       <CompanyNavbar />
-      
       <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8">
         <Breadcrumb />
-        
+
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 sm:mb-8 gap-4">
-          <div className="w-full sm:w-auto">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">CME Events Management</h1>
-            <p className="text-gray-600 text-sm sm:text-base">Create and manage continuing medical education events with recordings</p>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">CME Events</h1>
+            <p className="text-gray-500 text-sm">Manage continuing medical education events</p>
           </div>
-          <button 
-            onClick={() => {
-              setEditingEvent(null);
-              setShowModal(true);
-            }}
-            className="w-full sm:w-auto bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 text-sm sm:text-base"
-          >
-            <span>➕</span>
-            <span>Add Event</span>
+          <button onClick={() => { setEditingEvent(null); setShowModal(true); }}
+            className="w-full sm:w-auto bg-gradient-to-r from-green-500 to-emerald-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm">
+            <span>➕</span><span>Add Event</span>
           </button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-2xl">📅</span>
-              </div>
-            </div>
-            <p className="text-gray-600 mb-1 font-semibold text-base">Total Events</p>
-            <p className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">{events.length}</p>
-          </div>
-          
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-2xl">🔜</span>
-              </div>
-            </div>
-            <p className="text-gray-600 mb-1 font-semibold text-base">Upcoming</p>
-            <p className="text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-              {events.filter(e => e.status === "Upcoming").length}
-            </p>
-          </div>
-          
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-2xl">🎥</span>
-              </div>
-            </div>
-            <p className="text-gray-600 mb-1 font-semibold text-base">With Recordings</p>
-            <p className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-              {events.filter(e => e.recording_url).length}
-            </p>
-          </div>
-          
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-2xl">❌</span>
-              </div>
-            </div>
-            <p className="text-gray-600 mb-1 font-semibold text-base">Missing Recordings</p>
-            <p className="text-4xl font-bold bg-gradient-to-r from-red-600 to-orange-600 bg-clip-text text-transparent">
-              {events.filter(e => e.status === "Completed" && !e.recording_url).length}
-            </p>
-          </div>
-        </div>
-        {/* Filter Tabs */}
-        <div className="flex space-x-2 mb-8 bg-white rounded-xl p-2 shadow-lg border border-gray-100 overflow-x-auto">
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           {[
-            { key: "all", label: "All Events", count: events.length, icon: "📋" },
-            { key: "upcoming", label: "Upcoming", count: events.filter(e => e.status === "Upcoming").length, icon: "🔜" },
-            { key: "completed", label: "Completed", count: events.filter(e => e.status === "Completed").length, icon: "✅" },
-            { key: "with-recording", label: "With Recordings", count: events.filter(e => e.recording_url).length, icon: "🎥" },
-            { key: "missing-recording", label: "Missing Recordings", count: events.filter(e => e.status === "Completed" && !e.recording_url).length, icon: "❌" }
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 px-4 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center space-x-2 whitespace-nowrap ${
-                activeTab === tab.key
-                  ? "bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow-lg"
-                  : "text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              <span className="text-sm">{tab.icon}</span>
-              <span className="text-sm">{tab.label} ({tab.count})</span>
+            { label: "Total",          value: stats.total,         icon: "📅", color: "from-blue-500 to-indigo-600",   text: "from-blue-600 to-indigo-600" },
+            { label: "Upcoming",       value: stats.upcoming,      icon: "🔜", color: "from-green-500 to-emerald-600", text: "from-green-600 to-emerald-600" },
+            { label: "Completed",      value: stats.completed,     icon: "✅", color: "from-purple-500 to-pink-600",   text: "from-purple-600 to-pink-600" },
+            { label: "Cancelled",     value: events.filter((e) => e.status === "cancelled").length,    icon: "❌", color: "from-orange-500 to-red-500",    text: "from-orange-600 to-red-600" },
+          ].map((s) => (
+            <div key={s.label} className="bg-white rounded-2xl p-4 shadow border border-gray-100">
+              <div className={`w-9 h-9 bg-gradient-to-br ${s.color} rounded-xl flex items-center justify-center mb-2 text-lg`}>{s.icon}</div>
+              <p className={`text-2xl font-bold bg-gradient-to-r ${s.text} bg-clip-text text-transparent`}>{s.value}</p>
+              <p className="text-gray-500 text-xs font-semibold">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6 bg-white rounded-xl p-1.5 shadow border border-gray-100 overflow-x-auto">
+          {tabs.map((t) => (
+            <button key={t.id} onClick={() => setActiveTab(t.id)}
+              className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all whitespace-nowrap ${activeTab === t.id ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow" : "text-gray-600 hover:bg-gray-50"}`}>
+              {t.label}
             </button>
           ))}
         </div>
 
-        {/* Events Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredEvents.map((event) => (
-            <div key={event.id} className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all">
-              <div className="flex items-center justify-between mb-4">
-                <span className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-bold">{event.type}</span>
-                <span className={`px-4 py-2 rounded-lg text-sm font-bold ${
-                  event.status === "Upcoming" 
-                    ? 'bg-green-100 text-green-700' 
-                    : 'bg-gray-100 text-gray-700'
-                }`}>
-                  {event.status}
-                </span>
-              </div>
-              
-              <h3 className="text-xl font-bold text-gray-800 mb-2">{event.title}</h3>
-              <p className="text-gray-600 mb-3 text-sm leading-relaxed">{event.description}</p>
-              
-              <div className="space-y-2 mb-4">
-                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-3 border-l-4 border-indigo-500">
-                  <p className="text-sm text-indigo-600 font-semibold mb-1">📅 Date & Time</p>
-                  <p className="text-sm font-bold text-gray-800">{new Date(event.date).toLocaleDateString()} • {event.time}</p>
-                </div>
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border-l-4 border-green-500">
-                  <p className="text-sm text-green-600 font-semibold mb-1">📍 Location</p>
-                  <p className="text-sm font-bold text-gray-800">{event.location}</p>
-                </div>
-                <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-lg p-3 border-l-4 border-orange-500">
-                  <p className="text-sm text-orange-600 font-semibold mb-1">👨‍⚕️ Speaker</p>
-                  <p className="text-sm font-bold text-gray-800">{event.speaker}</p>
-                </div>
-                <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-3 border-l-4 border-blue-500">
-                  <p className="text-sm text-blue-600 font-semibold mb-1">👥 Attendees</p>
-                  <p className="text-sm font-bold text-gray-800">{event.attendees} / {event.maxAttendees}</p>
-                </div>
-                {event.recording_url && (
-                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 border-l-4 border-purple-500">
-                    <p className="text-sm text-purple-600 font-semibold mb-1">🎥 Recording</p>
-                    <p className="text-sm font-bold text-green-700">Available</p>
+        {/* Events grid */}
+        {loading ? (
+          <div className="text-center py-16 text-gray-400 text-sm">Loading events...</div>
+        ) : events.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-2xl shadow border border-gray-100">
+            <span className="text-5xl">📅</span>
+            <p className="text-gray-500 mt-4 text-sm">No events found.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {events.map((event) => {
+              const s = STATUS_STYLES[event.status] || STATUS_STYLES.upcoming;
+              return (
+                <div key={event._id} className="bg-white rounded-2xl shadow border border-gray-100 hover:shadow-xl transition-all overflow-hidden">
+                  <div className={`h-1 w-full ${event.status === "upcoming" ? "bg-green-400" : event.status === "completed" ? "bg-blue-400" : event.status === "cancelled" ? "bg-red-400" : "bg-yellow-400"}`} />
+                  <div className="p-5">
+                    <div className="flex items-start justify-between mb-3">
+                      <span className="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-lg text-xs font-bold">{event.event_type}</span>
+                      <div className="flex items-center gap-1.5">
+                        {event.event_mode && (
+                          <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${event.event_mode === "online" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"}`}>
+                            {event.event_mode === "online" ? "🌐 Online" : "🏢 Offline"}
+                          </span>
+                        )}
+                        <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${s.bg} ${s.text}`}>{s.label}</span>
+                      </div>
+                    </div>
+                    <h3 className="text-base font-bold text-gray-800 mb-1 line-clamp-2">{event.title}</h3>
+                    {event.description && <p className="text-gray-500 text-xs mb-3 line-clamp-2">{event.description}</p>}
+
+                    <div className="space-y-1.5 mb-4 text-xs">
+                      {[
+                        { icon: "📅", label: "Date",     value: event.event_date ? new Date(event.event_date).toLocaleDateString() : "—" },
+                        { icon: "⏰", label: "Time",     value: event.event_time || "—" },
+                        { icon: "👨‍⚕️", label: "Speaker",  value: event.speaker },
+                        { icon: "👥", label: "Attendees", value: event.max_attendees ? `Max ${event.max_attendees}` : null },
+                        // Online fields
+                        event.event_mode === "online" && event.platform
+                          ? { icon: "🖥️", label: "Platform", value: event.platform === "Other" ? event.platform_name : event.platform }
+                          : null,
+                        event.event_mode === "online" && event.meeting_link
+                          ? { icon: "🔗", label: "Meeting Link", value: event.meeting_link }
+                          : null,
+                        // Offline fields
+                        event.event_mode === "offline" && event.venue_name
+                          ? { icon: "🏢", label: "Venue", value: event.venue_name }
+                          : null,
+                        event.event_mode === "offline" && event.address
+                          ? { icon: "📍", label: "Address", value: event.address }
+                          : null,
+                        // Fallback to location string if no mode set
+                        !event.event_mode && event.location
+                          ? { icon: "📍", label: "Location", value: event.location }
+                          : null,
+                      ].filter(Boolean).filter((r) => r.value).map((row) => (
+                        <div key={row.label} className="flex items-start gap-2 bg-gray-50 rounded-lg px-2.5 py-1.5">
+                          <span className="flex-shrink-0">{row.icon}</span>
+                          <span className="text-gray-500 font-medium flex-shrink-0">{row.label}:</span>
+                          <span className="text-gray-700 font-semibold truncate">{row.value}</span>
+                        </div>
+                      ))}
+                      {event.event_recording && (
+                        <div className="flex items-center gap-2 bg-purple-50 rounded-lg px-2.5 py-1.5">
+                          <span>🎥</span>
+                          <span className="text-purple-600 font-semibold">Recording available</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button onClick={() => { setEditingEvent(event); setShowModal(true); }}
+                        disabled={event.status === "cancelled"}
+                        className="flex-1 bg-blue-100 text-blue-600 py-2 rounded-lg font-semibold hover:bg-blue-200 transition-all text-xs disabled:opacity-40 disabled:cursor-not-allowed">Edit</button>
+                      {event.status === "completed" && !event.event_recording && (
+                        <button onClick={() => { setEditingEvent(event); setFocusRecording(true); setShowModal(true); }}
+                          className="flex-1 bg-purple-100 text-purple-600 py-2 rounded-lg font-semibold hover:bg-purple-200 transition-all text-xs">Upload Recording</button>
+                      )}
+                      {event.event_recording && (
+                        <a href={event.event_recording} target="_blank" rel="noreferrer"
+                          className="flex-1 bg-green-100 text-green-600 py-2 rounded-lg font-semibold hover:bg-green-200 transition-all text-xs text-center">View Recording</a>
+                      )}
+                    </div>
                   </div>
-                )}
-                {event.status === "Completed" && !event.recording_url && (
-                  <div className="bg-gradient-to-r from-red-50 to-pink-50 rounded-lg p-3 border-l-4 border-red-500">
-                    <p className="text-sm text-red-600 font-semibold mb-1">🎥 Recording</p>
-                    <p className="text-sm font-bold text-red-700">Missing</p>
-                  </div>
-                )}
-              </div>
-              
-              <div className="flex space-x-2">
-                <button 
-                  onClick={() => handleEdit(event)}
-                  className="flex-1 bg-blue-100 text-blue-600 px-3 py-2 rounded-lg font-semibold hover:bg-blue-200 transition-all text-sm"
-                >
-                  Edit
-                </button>
-                {event.status === "Completed" && !event.recording_url && (
-                  <button className="flex-1 bg-green-100 text-green-600 px-3 py-2 rounded-lg font-semibold hover:bg-green-200 transition-all text-sm">
-                    Upload Recording
-                  </button>
-                )}
-                {event.recording_url && (
-                  <button className="flex-1 bg-purple-100 text-purple-600 px-3 py-2 rounded-lg font-semibold hover:bg-purple-200 transition-all text-sm">
-                    View Recording
-                  </button>
-                )}
-                <button 
-                  onClick={() => handleDelete(event.id)}
-                  className="bg-red-100 text-red-600 px-3 py-2 rounded-lg font-semibold hover:bg-red-200 transition-all text-sm"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </main>
 
-      {showModal && <EventModal setShowModal={setShowModal} editingEvent={editingEvent} />}
+      {showModal && (
+        <EventModal
+          editingEvent={editingEvent}
+          focusRecording={focusRecording}
+          onClose={() => { setShowModal(false); setEditingEvent(null); setFocusRecording(false); }}
+          onSaved={refetch}
+        />
+      )}
     </div>
   );
 }
 
-function EventModal({ setShowModal, editingEvent }) {
-  const isEditing = !!editingEvent;
-  
+function EventModal({ editingEvent, focusRecording, onClose, onSaved }) {
+  const isEdit = !!editingEvent;
+  const recordingRef = React.useRef(null);
+  const [form, setForm] = useState({
+    title:           editingEvent?.title           || "",
+    description:     editingEvent?.description     || "",
+    event_date:      editingEvent?.event_date      ? new Date(editingEvent.event_date).toISOString().split("T")[0] : "",
+    event_time:      editingEvent?.event_time      || "",
+    event_type:      editingEvent?.event_type      || "",
+    max_attendees:   editingEvent?.max_attendees   || "",
+    location:        editingEvent?.location        || "",
+    speaker:         editingEvent?.speaker         || "",
+    status:          editingEvent?.status          || "",
+    event_recording: editingEvent?.event_recording || "",
+    // event mode fields (derived from location if editing)
+    event_mode:      editingEvent?.event_mode      || "",
+    platform:        editingEvent?.platform        || "",
+    meeting_link:    editingEvent?.meeting_link    || "",
+    venue:           editingEvent?.venue_name      || "",
+    address:         editingEvent?.address         || "",
+    custom_platform: editingEvent?.platform_name   || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState("");
+
+  useEffect(() => {
+    if (focusRecording && recordingRef.current) {
+      setTimeout(() => recordingRef.current?.focus(), 100);
+    }
+  }, [focusRecording]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSaving(true);
+    try {
+      const platformName = form.platform === "Other" ? form.custom_platform : null;
+
+      const payload = {
+        title:         form.title,
+        description:   form.description,
+        event_date:    form.event_date,
+        event_time:    form.event_time,
+        event_type:    form.event_type,
+        speaker:       form.speaker,
+        ...(form.max_attendees ? { max_attendees: Number(form.max_attendees) } : {}),
+        ...(form.status        ? { status: form.status }                       : {}),
+        // event_mode fields
+        ...(form.event_mode ? { event_mode: form.event_mode } : {}),
+        ...(form.event_mode === "online" ? {
+          platform:     form.platform,
+          ...(platformName ? { platform_name: platformName } : {}),
+          meeting_link: form.meeting_link,
+        } : {}),
+        ...(form.event_mode === "offline" ? {
+          venue_name: form.venue,
+          address:    form.address,
+        } : {}),
+        // recording only on update when completed
+        ...(isEdit && (editingEvent?.status === "completed" || form.status === "completed") && form.event_recording
+          ? { event_recording: form.event_recording }
+          : {}),
+      };
+      if (isEdit) {
+        await put(`/api/v1/cme/${editingEvent._id}`, payload);
+      } else {
+        await post("/api/v1/cme", payload);
+      }
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(err.message || "Failed to save event");
+    }
+    setSaving(false);
+  };
+
+  const f = (label, key, type = "text", placeholder = "", required = false) => (
+    <div>
+      <label className="block text-xs font-bold text-gray-700 mb-1">{label}{required && <span className="text-red-500 ml-0.5">*</span>}</label>
+      <input type={type} value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+        placeholder={placeholder} required={required}
+        className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-400 outline-none" />
+    </div>
+  );
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 animate-fadeIn">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-6 rounded-t-3xl flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <span className="text-4xl">📅</span>
-            <h2 className="text-2xl font-bold text-white">
-              {isEditing ? 'Edit CME Event' : 'Add CME Event'}
-            </h2>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-5 py-4 rounded-t-2xl flex items-center justify-between sticky top-0 z-10">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">📅</span>
+            <h2 className="text-lg font-bold text-white">{isEdit ? "Edit Event" : "Add CME Event"}</h2>
           </div>
-          <button onClick={() => setShowModal(false)} className="text-white hover:bg-white/20 rounded-lg p-2">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button onClick={onClose} className="text-white hover:bg-white/20 rounded-lg p-1.5">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
-        
-        <div className="p-6">
-          <form className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-bold text-gray-700 mb-2">Event Title *</label>
-                <input 
-                  type="text" 
-                  defaultValue={editingEvent?.title || ""}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent" 
-                  placeholder="e.g., Hypertension Management Webinar" 
-                />
-              </div>
-              
-              <div className="md:col-span-2">
-                <label className="block text-sm font-bold text-gray-700 mb-2">Description</label>
-                <textarea 
-                  rows="3"
-                  defaultValue={editingEvent?.description || ""}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent" 
-                  placeholder="Event description and learning objectives..."
-                ></textarea>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Date *</label>
-                <input 
-                  type="date" 
-                  defaultValue={editingEvent?.date || ""}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent" 
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Time *</label>
-                <input 
-                  type="text" 
-                  defaultValue={editingEvent?.time || ""}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent" 
-                  placeholder="e.g., 10:00 AM - 12:00 PM"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Event Type *</label>
-                <select 
-                  defaultValue={editingEvent?.type || ""}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                >
-                  <option value="">Select Type</option>
-                  <option value="Webinar">Webinar</option>
-                  <option value="Conference">Conference</option>
-                  <option value="Workshop">Workshop</option>
-                  <option value="Seminar">Seminar</option>
-                  <option value="Symposium">Symposium</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Max Attendees</label>
-                <input 
-                  type="number" 
-                  defaultValue={editingEvent?.maxAttendees || ""}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent" 
-                  placeholder="e.g., 500"
-                />
-              </div>
-              
-              <div className="md:col-span-2">
-                <label className="block text-sm font-bold text-gray-700 mb-2">Location *</label>
-                <input 
-                  type="text" 
-                  defaultValue={editingEvent?.location || ""}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent" 
-                  placeholder="e.g., Online - Zoom Platform or Grand Hotel Conference Center, Mumbai"
-                />
-              </div>
-              
-              <div className="md:col-span-2">
-                <label className="block text-sm font-bold text-gray-700 mb-2">Speaker *</label>
-                <input 
-                  type="text" 
-                  defaultValue={editingEvent?.speaker || ""}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent" 
-                  placeholder="e.g., Dr. John Smith, MD"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Status</label>
-                <select 
-                  defaultValue={editingEvent?.status || "Upcoming"}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                >
-                  <option value="Upcoming">Upcoming</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Cancelled">Cancelled</option>
-                </select>
-              </div>
+
+        <form onSubmit={handleSubmit} className="p-5 space-y-3">
+          {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-xs">{error}</div>}
+
+          {f("Event Title", "title", "text", "e.g. Hypertension Management Webinar", true)}
+
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">Description</label>
+            <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
+              rows={2} placeholder="Learning objectives..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-400 outline-none resize-none" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {f("Date", "event_date", "date", "", true)}
+            {f("Time", "event_time", "text", "10:00 AM - 12:00 PM", true)}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">Type<span className="text-red-500 ml-0.5">*</span></label>
+              <select value={form.event_type} onChange={(e) => setForm({ ...form, event_type: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-400 outline-none bg-white">
+                <option value="">Select</option>
+                {["Webinar","Conference","Workshop","Seminar","Symposium"].map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
             </div>
-            
-            {/* Recording Upload Section */}
-            <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-200">
-              <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center">
-                <span className="text-2xl mr-3">🎥</span>
-                Event Recording (Optional)
-              </h3>
-              <p className="text-gray-600 mb-4 text-sm">Upload recording for attendees who missed the event</p>
-              <div className="border-2 border-dashed border-purple-300 rounded-xl p-6 text-center hover:border-purple-500 transition-colors">
-                <svg className="mx-auto h-12 w-12 text-purple-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                  <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <p className="mt-2 text-sm text-gray-600">
-                  <span className="font-semibold text-purple-600 hover:text-purple-500 cursor-pointer">Click to upload recording</span> or drag and drop
-                </p>
-                <p className="text-xs text-gray-500">MP4, AVI, MOV files (MAX. 500MB)</p>
-              </div>
-              {editingEvent?.recording_url && (
-                <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
-                  <p className="text-sm text-green-700 font-semibold">✅ Recording already uploaded</p>
-                  <p className="text-xs text-green-600 mt-1">Click above to replace with new recording</p>
+            {f("Max Attendees", "max_attendees", "number", "500")}
+          </div>
+
+          {/* Event Mode */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5">Event Mode <span className="text-red-500">*</span></label>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              {["online", "offline"].map((mode) => (
+                <button key={mode} type="button"
+                  onClick={() => setForm({ ...form, event_mode: mode, platform: "", meeting_link: "", venue: "", address: "", custom_platform: "" })}
+                  className={`py-2 rounded-xl text-sm font-bold border-2 transition-all flex items-center justify-center gap-2 ${
+                    form.event_mode === mode
+                      ? mode === "online" ? "bg-blue-100 border-blue-400 text-blue-700" : "bg-orange-100 border-orange-400 text-orange-700"
+                      : "bg-gray-50 border-gray-200 text-gray-500 hover:border-gray-300"
+                  }`}>
+                  {mode === "online" ? "🌐 Online" : "🏢 Offline"}
+                </button>
+              ))}
+            </div>
+
+            {/* Online options */}
+            {form.event_mode === "online" && (
+              <div className="space-y-2 bg-blue-50 rounded-xl p-3 border border-blue-100">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Platform</label>
+                  <select value={form.platform} onChange={(e) => setForm({ ...form, platform: e.target.value, custom_platform: "" })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400 bg-white">
+                    <option value="">Select platform</option>
+                    {["Zoom", "Google Meet", "Microsoft Teams", "Other"].map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
                 </div>
-              )}
+                {form.platform === "Other" && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Platform Name</label>
+                    <input type="text" value={form.custom_platform}
+                      onChange={(e) => setForm({ ...form, custom_platform: e.target.value })}
+                      placeholder="e.g. Webex, GoToMeeting..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Meeting Link</label>
+                  <input type="url" value={form.meeting_link}
+                    onChange={(e) => setForm({ ...form, meeting_link: e.target.value })}
+                    placeholder="https://zoom.us/j/..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+                </div>
+              </div>
+            )}
+
+            {/* Offline options */}
+            {form.event_mode === "offline" && (
+              <div className="space-y-2 bg-orange-50 rounded-xl p-3 border border-orange-100">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Venue Name</label>
+                  <input type="text" value={form.venue}
+                    onChange={(e) => setForm({ ...form, venue: e.target.value })}
+                    placeholder="e.g. Grand Hotel Conference Center"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Address</label>
+                  <input type="text" value={form.address}
+                    onChange={(e) => setForm({ ...form, address: e.target.value })}
+                    placeholder="123 Medical Street, Mumbai"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-400" />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {f("Speaker", "speaker", "text", "Dr. John Smith", true)}
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">Status</label>
+              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-400 outline-none bg-white">
+                <option value="">Auto (based on date)</option>
+                {["completed","cancelled","rescheduled"].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+              </select>
             </div>
-            
-            <div className="flex space-x-4 pt-4">
-              <button type="button" onClick={() => setShowModal(false)} className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-300 transition-all">
-                Cancel
-              </button>
-              <button type="submit" className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 rounded-xl font-bold hover:shadow-lg transition-all">
-                {isEditing ? 'Update Event' : 'Create Event'}
-              </button>
+          </div>
+
+          {/* Recording — only for completed */}
+          {(isEdit && editingEvent?.status === "completed") || form.status === "completed" ? (
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">Recording URL</label>
+              <input ref={recordingRef} type="url" value={form.event_recording}
+                onChange={(e) => setForm({ ...form, event_recording: e.target.value })}
+                placeholder="https://..."
+                className={`w-full px-3 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-purple-400 outline-none transition-all ${focusRecording ? "border-purple-400 ring-2 ring-purple-200" : "border-gray-300"}`} />
             </div>
-          </form>
-        </div>
+          ) : (
+            <div className="border-2 border-dashed border-purple-200 rounded-xl p-3 text-center bg-purple-50">
+              <span className="text-lg">🎥</span>
+              <p className="text-xs text-gray-400 mt-1">Recording can be added once event is completed</p>
+              {editingEvent?.event_recording && <p className="text-xs text-green-600 font-semibold mt-1">✅ Recording already uploaded</p>}
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose}
+              className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-bold hover:bg-gray-200 text-sm">Cancel</button>
+            <button type="submit" disabled={saving}
+              className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-2.5 rounded-xl font-bold hover:shadow-lg text-sm disabled:opacity-50">
+              {saving ? "Saving..." : isEdit ? "Update Event" : "Create Event"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

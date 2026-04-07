@@ -1,10 +1,139 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
 import Toast from "@/components/Toast";
 import { get, put, post, del } from "@/lib/api";
 import { TableSkeleton } from "@/components/Skeleton";
+import { downloadCSVTemplate } from "@/lib/downloadTemplate";
+
+const DOCTOR_HEADERS = ["name","email","phone","specialization","hospital","license_number","address"];
+const DOCTOR_SAMPLE  = [["Dr. Sarah Sharma","sharma@gmail.com","+919876543210","Cardiologist","City Hospital","MH12345","123 Medical Street, Mumbai"]];
+
+function BulkUploadModal({ onClose, onSuccess }) {
+  const fileRef = React.useRef(null);
+  const [file, setFile]       = React.useState(null);
+  const [uploading, setUploading] = React.useState(false);
+  const [result, setResult]   = React.useState(null);
+  const [error, setError]     = React.useState("");
+
+  const handleUpload = async () => {
+    if (!file) return;
+    setUploading(true);
+    setError("");
+    try {
+      const token = localStorage.getItem("access_token");
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/v1/doctors/bulk-upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Upload failed");
+      setResult(data);
+      if (data.successful > 0) onSuccess();
+    } catch (e) {
+      setError(e.message || "Upload failed");
+    }
+    setUploading(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-gray-800">📤 Bulk Upload Doctors</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        {/* Result view */}
+        {result ? (
+          <div className="space-y-4">
+            <div className={`rounded-xl p-4 border ${result.failed === 0 ? "bg-green-50 border-green-200" : result.successful === 0 ? "bg-red-50 border-red-200" : "bg-yellow-50 border-yellow-200"}`}>
+              <p className={`font-bold text-sm mb-1 ${result.failed === 0 ? "text-green-700" : result.successful === 0 ? "text-red-700" : "text-yellow-700"}`}>
+                {result.failed === 0 ? "✅" : result.successful === 0 ? "❌" : "⚠️"} {result.message}
+              </p>
+              <div className="flex gap-4 text-xs mt-2">
+                <span className="text-green-600 font-semibold">✅ {result.successful} added</span>
+                {result.failed > 0 && <span className="text-red-500 font-semibold">❌ {result.failed} failed</span>}
+                <span className="text-gray-500">Total: {result.total_rows}</span>
+              </div>
+            </div>
+
+            {result.errors?.length > 0 && (
+              <div className="bg-red-50 border border-red-100 rounded-xl p-3 max-h-48 overflow-y-auto">
+                <p className="text-xs font-bold text-red-700 mb-2">Failed rows:</p>
+                <div className="space-y-1.5">
+                  {result.errors.map((e, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs bg-white rounded-lg px-2.5 py-1.5 border border-red-100">
+                      <span className="text-red-400 font-bold flex-shrink-0">Row {e.row}</span>
+                      <span className="text-red-600">{e.error}</span>
+                      {(e.email || e.phone || e.name) && (
+                        <span className="text-gray-400 ml-auto flex-shrink-0">{e.email || e.phone || e.name}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button onClick={onClose} className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all">Done</button>
+          </div>
+        ) : (
+          <>
+            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4">
+              <p className="text-sm font-bold text-indigo-800 mb-1">📥 How to add multiple doctors at once</p>
+              <ol className="text-xs text-indigo-700 space-y-1 list-decimal list-inside">
+                <li>Download the template below</li>
+                <li>Fill in doctor details — one row per doctor</li>
+                <li>Upload the completed file here</li>
+                <li>All doctors will be created with login access</li>
+              </ol>
+              <p className="text-xs text-indigo-500 mt-2">Default password <span className="font-mono font-bold">Doctor@123</span> will be assigned to all doctors.</p>
+            </div>
+
+            <button onClick={() => downloadCSVTemplate(DOCTOR_HEADERS, DOCTOR_SAMPLE, "doctors_template.csv")}
+              className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all mb-3 flex items-center justify-center gap-2 shadow">
+              📥 Download Doctor Template
+            </button>
+
+            {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-xs mb-3">{error}</div>}
+
+            <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden"
+              onChange={(e) => setFile(e.target.files?.[0] || null)} />
+
+            <div onClick={() => fileRef.current?.click()}
+              className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-indigo-400 cursor-pointer transition-colors mb-4">
+              {file ? (
+                <div>
+                  <p className="text-indigo-600 font-bold text-sm">📄 {file.name}</p>
+                  <p className="text-xs text-gray-400 mt-1">{(file.size / 1024).toFixed(1)} KB — ready to upload</p>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-sm text-gray-500"><span className="text-indigo-600 font-semibold">Click to upload</span> or drag and drop</p>
+                  <p className="text-xs text-gray-400 mt-1">CSV or XLSX (max 5MB, max 100 rows)</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={onClose} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-bold text-sm">Cancel</button>
+              <button onClick={handleUpload} disabled={!file || uploading}
+                className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-2.5 rounded-xl font-bold text-sm hover:shadow-lg transition-all disabled:opacity-50">
+                {uploading ? "Uploading..." : "Upload & Import"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function CompanyDoctors() {
   const [doctors, setDoctors] = useState([]);
@@ -17,13 +146,15 @@ export default function CompanyDoctors() {
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [filterHospital, setFilterHospital]             = useState("");
+  const [filterStatus, setFilterStatus]                 = useState("all");
+  const [filterSpecialization, setFilterSpecialization] = useState(""); // "all" | "active" | "inactive"
 
   const fetchDoctors = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page, page_size: 10 });
-      if (search) params.append("search", search);
-      const data = await get(`/api/v1/doctors/?${params}`);
+      const data = await get(`/api/v1/doctors/?page_size=1000`);
       setDoctors(data.doctors || []);
       setTotal(data.total || 0);
     } catch {
@@ -31,7 +162,7 @@ export default function CompanyDoctors() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchDoctors(); }, [fetchDoctors]);
 
@@ -63,6 +194,21 @@ export default function CompanyDoctors() {
 
   const activeCount = doctors.filter((d) => d.is_active).length;
 
+  // Client-side filters
+  // Unique specializations from loaded doctors for dropdown
+  const specializations = [...new Set(doctors.map((d) => d.specialization).filter(Boolean))].sort();
+
+  const filteredDoctors = doctors.filter((d) => {
+    if (filterStatus === "active"   && !d.is_active) return false;
+    if (filterStatus === "inactive" &&  d.is_active) return false;
+    if (filterHospital && !d.hospital?.toLowerCase().includes(filterHospital.toLowerCase())) return false;
+    if (search && !d.name?.toLowerCase().includes(search.toLowerCase()) &&
+                  !d.email?.toLowerCase().includes(search.toLowerCase()) &&
+                  !d.hospital?.toLowerCase().includes(search.toLowerCase()) &&
+                  !d.specialization?.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50 overflow-x-hidden">
       <CompanyNavbar />
@@ -77,12 +223,20 @@ export default function CompanyDoctors() {
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Doctors Management 👨‍⚕️</h1>
             <p className="text-gray-600 text-sm">Manage healthcare professionals on your platform</p>
           </div>
-          <button
-            onClick={() => { setSelectedDoctor(null); setShowModal(true); }}
-            className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
-          >
-            <span>➕</span><span>Add Doctor</span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowBulkModal(true)}
+              className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
+            >
+              <span>📤</span><span>Bulk Upload</span>
+            </button>
+            <button
+              onClick={() => { setSelectedDoctor(null); setShowModal(true); }}
+              className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
+            >
+              <span>➕</span><span>Add Doctor</span>
+            </button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -100,15 +254,30 @@ export default function CompanyDoctors() {
           ))}
         </div>
 
-        {/* Search */}
-        <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-100 mb-6">
+        {/* Search + Filters */}
+        <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-100 mb-6 flex flex-wrap gap-3">
           <input
             type="text"
-            placeholder="🔍 Search by name or email..."
+            placeholder="🔍 Search by name, email, hospital or specialization..."
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-200 focus:border-purple-500 text-sm transition-all"
+            onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 min-w-[220px] px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-200 focus:border-purple-500 text-sm transition-all"
           />
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-200 focus:border-purple-500 text-sm bg-white font-semibold text-gray-700"
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          {(filterStatus !== "all") && (
+            <button onClick={() => { setFilterStatus("all"); }}
+              className="px-4 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">
+              Clear
+            </button>
+          )}
         </div>
 
         {/* Table */}
@@ -130,7 +299,7 @@ export default function CompanyDoctors() {
                     </tr>
                   </thead>
                   <tbody>
-                    {doctors.map((doctor, i) => (
+                    {filteredDoctors.map((doctor, i) => (
                       <tr key={doctor.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-all ${i % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}>
                         <td className="px-5 py-4">
                           <p className="font-bold text-gray-800">{doctor.name}</p>
@@ -210,6 +379,8 @@ export default function CompanyDoctors() {
           onSaved={(msg) => { refetch(); setToast({ message: msg, type: "success" }); }}
         />
       )}
+
+      {showBulkModal && <BulkUploadModal onClose={() => setShowBulkModal(false)} onSuccess={refetch} />}
 
       {confirmDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
