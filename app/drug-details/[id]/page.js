@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import DoctorNavbar from "@/components/doctor/DoctorNavbar";
 import MRNavbar from "@/components/mr/MRNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
@@ -28,8 +29,6 @@ export default function DrugDetails() {
   const params  = useParams();
   const drugId  = params.id;
 
-  const [drug, setDrug]         = useState(null);
-  const [loading, setLoading]   = useState(true);
   const [userRole, setUserRole] = useState("doctor");
   const [question, setQuestion]       = useState("");
   const [chatHistory, setChatHistory] = useState([]);
@@ -40,13 +39,12 @@ export default function DrugDetails() {
     if (role) setUserRole(role);
   }, []);
 
-  useEffect(() => {
-    if (!drugId) return;
-    get(`/api/v1/drugs/${drugId}`)
-      .then((data) => setDrug(data))
-      .catch(() => setDrug(null))
-      .finally(() => setLoading(false));
-  }, [drugId]);
+ const { data: drug, isLoading: loading } = useQuery({
+  queryKey: ["drug", drugId],
+  queryFn:  () => get(`/api/v1/drugs/${drugId}`),
+  enabled:  !!drugId,
+  staleTime: 10 * 60 * 1000,
+});
 
   const handleAsk = () => {
     if (!question.trim() || !drug) return;

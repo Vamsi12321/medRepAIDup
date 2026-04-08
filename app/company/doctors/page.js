@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
 import Toast from "@/components/Toast";
@@ -136,44 +137,34 @@ function BulkUploadModal({ onClose, onSuccess }) {
 }
 
 export default function CompanyDoctors() {
-  const [doctors, setDoctors] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState(null);
-  const [showModal, setShowModal] = useState(false);
+  const queryClient = useQueryClient();
+  const [search, setSearch]             = useState("");
+  const [toast, setToast]               = useState(null);
+  const [showModal, setShowModal]       = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [confirmDelete, setConfirmDelete]   = useState(null);
+  const [showBulkModal, setShowBulkModal]   = useState(false);
   const [filterHospital, setFilterHospital]             = useState("");
   const [filterStatus, setFilterStatus]                 = useState("all");
-  const [filterSpecialization, setFilterSpecialization] = useState(""); // "all" | "active" | "inactive"
+  const [filterSpecialization, setFilterSpecialization] = useState("");
 
-  const fetchDoctors = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await get(`/api/v1/doctors/?page_size=1000`);
-      setDoctors(data.doctors || []);
-      setTotal(data.total || 0);
-    } catch {
-      setToast({ message: "Failed to load doctors.", type: "error" });
-    } finally {
-      setLoading(false);
-    }
-  }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { data, isLoading ,refetch} = useQuery({
+    queryKey: ["doctors"],
+    queryFn:  () => get("/api/v1/doctors/?page_size=1000").then((d) => d.doctors || []),
+  });
 
-  useEffect(() => { fetchDoctors(); }, [fetchDoctors]);
+  const doctors = data || [];
+  const total   = doctors.length;
+  const loading = isLoading;
 
-  const refetch = () => setRefreshKey((k) => k + 1);
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["doctors"] });
 
   const handleDelete = async () => {
     try {
       await del(`/api/v1/doctors/${confirmDelete.id}`);
       setConfirmDelete(null);
       setToast({ message: "Doctor removed successfully.", type: "success" });
-      refetch();
+      invalidate();
     } catch {
       setConfirmDelete(null);
       setToast({ message: "Failed to remove doctor.", type: "error" });
@@ -354,20 +345,6 @@ export default function CompanyDoctors() {
                 </div>
               )}
             </div>
-
-            {total > 10 && (
-              <div className="flex justify-center items-center space-x-4 mt-6">
-                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-                  className="px-4 py-2 bg-white border-2 border-gray-200 rounded-xl font-semibold text-gray-600 hover:border-purple-400 disabled:opacity-40 transition-all">
-                  ← Prev
-                </button>
-                <span className="text-gray-600 font-medium">Page {page} of {Math.ceil(total / 10)}</span>
-                <button onClick={() => setPage((p) => p + 1)} disabled={page >= Math.ceil(total / 10)}
-                  className="px-4 py-2 bg-white border-2 border-gray-200 rounded-xl font-semibold text-gray-600 hover:border-purple-400 disabled:opacity-40 transition-all">
-                  Next →
-                </button>
-              </div>
-            )}
           </>
         )}
       </main>
@@ -376,7 +353,7 @@ export default function CompanyDoctors() {
         <DoctorModal
           doctor={selectedDoctor}
           onClose={() => setShowModal(false)}
-          onSaved={(msg) => { refetch(); setToast({ message: msg, type: "success" }); }}
+          onSaved={(msg) => { invalidate(); setToast({ message: msg, type: "success" }); }}
         />
       )}
 

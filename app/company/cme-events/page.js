@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState,useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
 import { get, post, put } from "@/lib/api";
@@ -12,33 +13,26 @@ const STATUS_STYLES = {
 };
 
 export default function CompanyCMEEvents() {
-  const [events, setEvents]       = useState([]);
-  const [total, setTotal]         = useState(0);
-  const [loading, setLoading]     = useState(true);
-  const [activeTab, setActiveTab] = useState("all");
-  const [showModal, setShowModal] = useState(false);
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab]       = useState("all");
+  const [showModal, setShowModal]       = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [focusRecording, setFocusRecording] = useState(false);
-  const [refreshKey, setRefreshKey]     = useState(0);
 
-  const fetchEvents = useCallback(async () => {
-    setLoading(true);
-    try {
+  const { data, isLoading ,refetch} = useQuery({
+    queryKey: ["cme", activeTab],
+    queryFn: () => {
       const params = new URLSearchParams({ limit: 100 });
       if (activeTab !== "all") params.append("status", activeTab);
-      const data = await get(`/api/v1/cme?${params}`);
-      setEvents(data.events || []);
-      setTotal(data.total || 0);
-    } catch {
-      setEvents([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [activeTab, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
+      return get(`/api/v1/cme?${params}`).then((d) => d.events || []);
+    },
+  });
 
-  useEffect(() => { fetchEvents(); }, [fetchEvents]);
+  const events  = data || [];
+  const total   = events.length;
+  const loading = isLoading;
 
-  const refetch = () => setRefreshKey((k) => k + 1);
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["cme"] });
 
   const tabs = [
     { id: "all",         label: "All" },

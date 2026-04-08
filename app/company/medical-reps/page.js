@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
 import Toast from "@/components/Toast";
@@ -135,45 +136,34 @@ function MRBulkUploadModal({ onClose, onSuccess }) {
 }
 
 export default function CompanyMedicalReps() {
-  const [mrs, setMrs] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState(null);
-  const [showModal, setShowModal] = useState(false);
-  const [selectedMR, setSelectedMR] = useState(null);
+  const queryClient = useQueryClient();
+  const [search, setSearch]             = useState("");
+  const [toast, setToast]               = useState(null);
+  const [showModal, setShowModal]       = useState(false);
+  const [selectedMR, setSelectedMR]     = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [visitsMR, setVisitsMR] = useState(null);
+  const [visitsMR, setVisitsMR]         = useState(null);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [filterTerritory, setFilterTerritory] = useState("");
   const [filterStatus, setFilterStatus]       = useState("all");
 
-  const fetchMRs = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ page, page_size: 10 });
-      const data = await get(`/api/v1/mrs?${params}`);
-      setMrs(data.mrs || []);
-      setTotal(data.total || 0);
-    } catch {
-      setToast({ message: "Failed to load MRs.", type: "error" });
-    } finally {
-      setLoading(false);
-    }
-  }, [page, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { data, isLoading } = useQuery({
+    queryKey: ["mrs"],
+    queryFn:  () => get("/api/v1/mrs?page_size=1000").then((d) => d.mrs || []),
+  });
 
-  useEffect(() => { fetchMRs(); }, [fetchMRs]);
+  const mrs     = data || [];
+  const total   = mrs.length;
+  const loading = isLoading;
 
-  const refetch = () => setRefreshKey((k) => k + 1);
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["mrs"] });
 
   const handleDelete = async () => {
     try {
       await del(`/api/v1/mrs/${confirmDelete.id}`);
       setConfirmDelete(null);
       setToast({ message: "MR removed successfully.", type: "success" });
-      refetch();
+      invalidate();
     } catch {
       setConfirmDelete(null);
       setToast({ message: "Failed to remove MR.", type: "error" });
@@ -181,12 +171,11 @@ export default function CompanyMedicalReps() {
   };
 
   const handleToggleStatus = async (mr) => {
-    setMrs((prev) => prev.map((m) => m.id === mr.id ? { ...m, is_active: !m.is_active } : m));
     try {
       await put(`/api/v1/mrs/${mr.id}`, { is_active: !mr.is_active });
       setToast({ message: `MR marked as ${!mr.is_active ? "active" : "inactive"}.`, type: "success" });
+      invalidate();
     } catch {
-      setMrs((prev) => prev.map((m) => m.id === mr.id ? { ...m, is_active: mr.is_active } : m));
       setToast({ message: "Failed to update status.", type: "error" });
     }
   };
@@ -356,19 +345,6 @@ export default function CompanyMedicalReps() {
               </div>
             )}
 
-            {total > 10 && (
-              <div className="flex justify-center items-center space-x-4 mt-6">
-                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-                  className="px-4 py-2 bg-white border-2 border-gray-200 rounded-xl font-semibold text-gray-600 hover:border-orange-400 disabled:opacity-40 transition-all">
-                  ← Prev
-                </button>
-                <span className="text-gray-600 font-medium">Page {page} of {Math.ceil(total / 10)}</span>
-                <button onClick={() => setPage((p) => p + 1)} disabled={page >= Math.ceil(total / 10)}
-                  className="px-4 py-2 bg-white border-2 border-gray-200 rounded-xl font-semibold text-gray-600 hover:border-orange-400 disabled:opacity-40 transition-all">
-                  Next →
-                </button>
-              </div>
-            )}
           </>
         )}
       </main>
@@ -377,13 +353,13 @@ export default function CompanyMedicalReps() {
         <MRVisitsPanel mr={visitsMR} onClose={() => setVisitsMR(null)} />
       )}
 
-      {showBulkModal && <MRBulkUploadModal onClose={() => setShowBulkModal(false)} onSuccess={refetch} />}
+      {showBulkModal && <MRBulkUploadModal onClose={() => setShowBulkModal(false)} onSuccess={invalidate} />}
 
       {showModal && (
         <MRModal
           mr={selectedMR}
           onClose={() => setShowModal(false)}
-          onSaved={(msg) => { refetch(); setToast({ message: msg, type: "success" }); }}
+          onSaved={(msg) => { invalidate(); setToast({ message: msg, type: "success" }); }}
         />
       )}
 

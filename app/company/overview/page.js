@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
 import Link from "next/link";
@@ -25,24 +26,17 @@ function timeAgo(ts) {
 }
 
 export default function CompanyOverview() {
-  const [userName, setUserName]     = useState("");
-  const [companyName, setCompanyName] = useState("My Company");
-  const [stats, setStats]           = useState(null);
-  const [activity, setActivity]     = useState([]);
-  const [loading, setLoading]       = useState(true);
+  const [userName, setUserName]       = useState(() => typeof window !== "undefined" ? localStorage.getItem("userName") || "Admin" : "Admin");
+  const [companyName, setCompanyName] = useState(() => typeof window !== "undefined" ? localStorage.getItem("companyName") || "My Company" : "My Company");
 
-  useEffect(() => {
-    setUserName(localStorage.getItem("userName") || "Admin");
-    setCompanyName(localStorage.getItem("companyName") || "My Company");
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ["dashboard"],
+    queryFn:  () => get("/api/v1/dashboard"),
+    staleTime: 2 * 60 * 1000, // dashboard refreshes every 2 min
+  });
 
-    get("/api/v1/dashboard")
-      .then((data) => {
-        setStats(data.statistics || null);
-        setActivity(data.recent_activity || []);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const stats    = data?.statistics    || null;
+  const activity = data?.recent_activity || [];
 
   const statCards = [
     { label: "Total Drugs",    value: stats?.total_drugs        ?? "—", icon: "💊", color: "from-blue-500 to-cyan-500",    link: "/company/drug-management" },
@@ -80,29 +74,7 @@ export default function CompanyOverview() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Quick Actions */}
-          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100">
-            <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2">
-              <span>⚡</span> Quick Actions
-            </h2>
-            <div className="grid grid-cols-2 gap-2 sm:gap-3">
-              {[
-                { href: "/company/drug-management", icon: "💊", label: "Add New Drug",  color: "from-blue-500 to-cyan-500" },
-                { href: "/company/cme-events",      icon: "📅", label: "Create Event",  color: "from-green-500 to-emerald-500" },
-                { href: "/company/doctors",         icon: "👨‍⚕️", label: "Add Doctor",   color: "from-purple-500 to-pink-500" },
-                { href: "/company/medical-reps",    icon: "💼", label: "Add MR",        color: "from-orange-500 to-red-500" },
-              ].map((a) => (
-                <Link key={a.href} href={a.href}>
-                  <button className={`w-full bg-gradient-to-r ${a.color} text-white p-3 sm:p-4 rounded-xl font-bold shadow-md hover:shadow-lg transition-all`}>
-                    <span className="text-xl sm:text-2xl block mb-1">{a.icon}</span>
-                    <span className="text-xs sm:text-sm">{a.label}</span>
-                  </button>
-                </Link>
-              ))}
-            </div>
-          </div>
-
+        <div className="grid grid-cols-1 gap-6">
           {/* Recent Activity */}
           <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100">
             <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2">

@@ -1,5 +1,6 @@
 import "./globals.css";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import QueryProvider from "@/components/QueryProvider";
 
 export const metadata = {
   title: "MedAware - Drug Awareness Platform",
@@ -10,7 +11,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className="antialiased bg-white min-h-screen">
-        <ErrorBoundary>{children}</ErrorBoundary>
+        <ErrorBoundary>
+          <QueryProvider>{children}</QueryProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

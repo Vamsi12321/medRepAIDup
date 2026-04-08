@@ -1,25 +1,26 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import DoctorNavbar from "@/components/doctor/DoctorNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
 import { get } from "@/lib/api";
 
 export default function DoctorCMEEvents() {
   const [activeTab, setActiveTab]       = useState("upcoming");
-  const [events, setEvents]             = useState([]);
-  const [loading, setLoading]           = useState(true);
   const [registered, setRegistered]     = useState(new Set());
   const [confirmEvent, setConfirmEvent] = useState(null);
   const [successEvent, setSuccessEvent] = useState(null);
 
-  useEffect(() => {
-    const status = activeTab === "upcoming" ? "upcoming" : "completed";
-    setLoading(true);
-    get(`/api/v1/cme?status=${status}&limit=100`)
-      .then((data) => setEvents(data.events || []))
-      .catch(() => setEvents([]))
-      .finally(() => setLoading(false));
-  }, [activeTab]);
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ["cme-doctor", activeTab],
+    queryFn: () => {
+      const status = activeTab === "upcoming" ? "upcoming" : "completed";
+      return get(`/api/v1/cme?status=${status}&limit=100`).then((d) => d.events || []);
+    },
+    staleTime: 3 * 60 * 1000,
+  });
+
+  const events = data || [];
 
   const handleConfirm = () => {
     setRegistered((prev) => new Set([...prev, confirmEvent._id]));
@@ -267,4 +268,4 @@ export default function DoctorCMEEvents() {
     </div>
   );
 }
-
+

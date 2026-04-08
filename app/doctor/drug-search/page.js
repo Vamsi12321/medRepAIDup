@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import DoctorNavbar from "@/components/doctor/DoctorNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
 import Link from "next/link";
@@ -9,18 +10,18 @@ const formatKey = (key) => key?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toU
 const getVal = (drug, key) => drug.field_values?.find((f) => f.key === key)?.value || "";
 
 export default function DoctorDrugSearch() {
-  const [drugs, setDrugs]       = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState(false);
   const [search, setSearch]     = useState("");
   const [viewMode, setViewMode] = useState("grid");
 
-  useEffect(() => {
-    get("/api/v1/drugs?limit=200")
-      .then((data) => setDrugs(data.drugs || []))
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  }, []);
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["drugs-public"],
+    queryFn:  () => get("/api/v1/drugs?limit=200").then((d) => d.drugs || []),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const drugs   = data || [];
+  const loading = isLoading;
+  const error   = isError;
 
   const filtered = drugs.filter((drug) => {
     if (!search.trim()) return true;
