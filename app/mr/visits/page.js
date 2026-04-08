@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import MRNavbar from "@/components/mr/MRNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
 import { get, post, put } from "@/lib/api";
@@ -33,54 +34,42 @@ const OUTCOMES = [
 ];
 
 export default function MRVisits() {
-  const [visits, setVisits] = useState([]);
-  const [activeTab, setActiveTab] = useState("upcoming");
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab]       = useState("upcoming");
   const [showScheduleForm, setShowScheduleForm] = useState(false);
-  const [updateVisit, setUpdateVisit] = useState(null);
-
-  // filters
+  const [updateVisit, setUpdateVisit]   = useState(null);
   const [filterDoctor, setFilterDoctor] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
-  const [filterDateTo, setFilterDateTo] = useState("");
-
-  const [assignedDoctors, setAssignedDoctors] = useState([]);
-  const [loadingData, setLoadingData] = useState(true);
-  const [loadingVisits, setLoadingVisits] = useState(false);
+  const [filterDateTo, setFilterDateTo]     = useState("");
 
   const mrId = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
 
-  // Load assigned doctors once
-  useEffect(() => {
-    if (!mrId) { setLoadingData(false); return; }
-    get(`/api/v1/mrs/${mrId}`)
-      .then((mrData) => setAssignedDoctors(mrData.assigned_doctors || []))
-      .catch(() => {})
-      .finally(() => setLoadingData(false));
-  }, [mrId]);
+  // Assigned doctors — cached, rarely changes
+  const { data: mrData, isLoading: loadingData } = useQuery({
+    queryKey: ["mr-profile", mrId],
+    queryFn:  () => get(`/api/v1/mrs/${mrId}`),
+    enabled:  !!mrId,
+    staleTime: 10 * 60 * 1000,
+  });
+  const assignedDoctors = mrData?.assigned_doctors || [];
 
-  // Fetch visits whenever filters change
-  useEffect(() => {
-    if (!mrId) return;
-    setLoadingVisits(true);
-    const params = new URLSearchParams();
-    if (filterDoctor)   params.append("doctor_id", filterDoctor);
-    if (filterDateFrom) params.append("date_from",  filterDateFrom);
-    if (filterDateTo)   params.append("date_to",    filterDateTo);
-    get(`/api/v1/visits?${params}`)
-      .then((data) => setVisits(data.visits || []))
-      .catch(() => setVisits([]))   // silently clear on 500 — backend date filter issue
-      .finally(() => setLoadingVisits(false));
-  }, [mrId, filterDoctor, filterDateFrom, filterDateTo]);
+  // Visits — refetch when filters change
+  const visitsQueryKey = ["visits", mrId, filterDoctor, filterDateFrom, filterDateTo];
+  const { data: visitsData, isLoading: loadingVisits } = useQuery({
+    queryKey: visitsQueryKey,
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (filterDoctor)   params.append("doctor_id", filterDoctor);
+      if (filterDateFrom) params.append("date_from",  filterDateFrom);
+      if (filterDateTo)   params.append("date_to",    filterDateTo);
+      return get(`/api/v1/visits?${params}`).then((d) => d.visits || []);
+    },
+    enabled:  !!mrId,
+    staleTime: 0, // always fresh for visits
+  });
+  const visits = visitsData || [];
 
-  const refetchVisits = () => {
-    const params = new URLSearchParams();
-    if (filterDoctor)   params.append("doctor_id", filterDoctor);
-    if (filterDateFrom) params.append("date_from",  filterDateFrom);
-    if (filterDateTo)   params.append("date_to",    filterDateTo);
-    get(`/api/v1/visits?${params}`)
-      .then((data) => setVisits(data.visits || []))
-      .catch(() => {});
-  };
+  const invalidateVisits = () => queryClient.invalidateQueries({ queryKey: ["visits", mrId] });
 
   // Add a new visit — real API
   const handleSchedule = async (formData) => {
@@ -93,7 +82,7 @@ export default function MRVisits() {
         location:       formData.location,
         notes:          formData.notes,
       });
-      refetchVisits();
+      invalidateVisits();
     } catch (err) {
       alert(err.message || "Failed to schedule visit");
     }
@@ -120,7 +109,7 @@ export default function MRVisits() {
           reason:         updates.reason,
         });
       }
-      refetchVisits();
+      invalidateVisits();
     } catch (err) {
       alert(err.message || "Failed to update visit");
     }

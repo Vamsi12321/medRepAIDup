@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
 import { get, post, put, del } from "@/lib/api";
@@ -7,61 +8,35 @@ import { downloadCSVTemplate } from "@/lib/downloadTemplate";
 
 const FIELD_TYPES = ["text", "textarea", "number", "date", "select", "url"];
 
-// "mechanism_of_action" → "Mechanism Of Action"
 const formatKey = (key) => key?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "";
-
-// Get field value from drug field_values array by key
 const getVal = (drug, key) => drug?.field_values?.find((f) => f.key === key)?.value || "";
 
 export default function CompanyDrugManagement() {
-  const [activeTab, setActiveTab] = useState("drugs");
-  const [drugTab, setDrugTab]     = useState("all");
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab]       = useState("drugs");
+  const [showDrugModal, setShowDrugModal] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [editDrug, setEditDrug]           = useState(null);
 
-  // Template state
-  const [template, setTemplate]         = useState(null);
-  const [loadingTemplate, setLoadingTemplate] = useState(true);
-  const [templateError, setTemplateError]     = useState("");
+  const { data: template, isLoading: loadingTemplate } = useQuery({
+    queryKey: ["drug-template"],
+    queryFn:  () => get("/api/v1/drugs/templates"),
+    staleTime: 10 * 60 * 1000,
+  });
 
-  // Drugs state
-  const [drugs, setDrugs]           = useState([]);
-  const [loadingDrugs, setLoadingDrugs] = useState(true);
-  const [drugsTotal, setDrugsTotal] = useState(0);
+  const { data: drugsData, isLoading: loadingDrugs } = useQuery({
+    queryKey: ["drugs"],
+    queryFn:  () => get("/api/v1/drugs?limit=100"),
+    enabled:  activeTab === "drugs",
+  });
 
-  // Modals
-  const [showDrugModal, setShowDrugModal]   = useState(false);
-  const [showBulkModal, setShowBulkModal]   = useState(false);
-  const [editDrug, setEditDrug]             = useState(null);
-  const [templateRefresh, setTemplateRefresh] = useState(0);
+  const drugs      = drugsData?.drugs || [];
+  const drugsTotal = drugsData?.total || 0;
 
-  // Fetch template
-  useEffect(() => {
-    setLoadingTemplate(true);
-    get("/api/v1/drugs/templates")
-      .then((data) => setTemplate(data))
-      .catch(() => setTemplate(null))
-      .finally(() => setLoadingTemplate(false));
-  }, [templateRefresh]);
-
-  // Fetch drugs
-  useEffect(() => {
-    if (activeTab !== "drugs") return;
-    setLoadingDrugs(true);
-    get("/api/v1/drugs?limit=100")
-      .then((data) => { setDrugs(data.drugs || []); setDrugsTotal(data.total || 0); })
-      .catch(() => {})
-      .finally(() => setLoadingDrugs(false));
-  }, [activeTab]);
-
-  const refetchDrugs = () => {
-    get("/api/v1/drugs?limit=100")
-      .then((data) => { setDrugs(data.drugs || []); setDrugsTotal(data.total || 0); })
-      .catch(() => {});
-  };
-
-  // Helper: get value from drug field_values by key — defined at module level above
+  const invalidateDrugs    = () => queryClient.invalidateQueries({ queryKey: ["drugs"] });
+  const invalidateTemplate = () => queryClient.invalidateQueries({ queryKey: ["drug-template"] });
 
   const filteredDrugs = drugs;
-
   const visibleFields = template?.fields?.filter((f) => f.visible) || [];
 
   return (
@@ -125,20 +100,6 @@ export default function CompanyDrugManagement() {
                   <p className="text-gray-600 text-sm font-semibold mb-1">{s.label}</p>
                   <p className={`text-3xl font-bold bg-gradient-to-r ${s.text} bg-clip-text text-transparent`}>{s.value}</p>
                 </div>
-              ))}
-            </div>
-
-            {/* Filter tabs */}
-            <div className="flex space-x-2 mb-6 bg-white rounded-xl p-1.5 shadow border border-gray-100">
-              {[
-                { id: "all",             label: `📋 All (${drugsTotal})` },
-                { id: "with-brochure",   label: `✅ With Brochures (${drugs.filter((d) => !!getVal(d,"brochure_url")).length})` },
-                { id: "missing-brochure",label: `❌ Missing (${drugs.filter((d) => !getVal(d,"brochure_url")).length})` },
-              ].map((t) => (
-                <button key={t.id} onClick={() => setDrugTab(t.id)}
-                  className={`flex-1 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${drugTab === t.id ? "bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow" : "text-gray-600 hover:bg-gray-50"}`}>
-                  {t.label}
-                </button>
               ))}
             </div>
 
@@ -260,7 +221,7 @@ export default function CompanyDrugManagement() {
           <TemplateManager
             template={template}
             loading={loadingTemplate}
-            onRefresh={() => setTemplateRefresh((k) => k + 1)}
+            onRefresh={() => invalidateTemplate()}
           />
         )}
       </main>
@@ -270,12 +231,12 @@ export default function CompanyDrugManagement() {
           template={template}
           drug={editDrug}
           onClose={() => { setShowDrugModal(false); setEditDrug(null); }}
-          onSaved={refetchDrugs}
+          onSaved={invalidateDrugs}
         />
       )}
       {showBulkModal && <BulkUploadModal onClose={() => setShowBulkModal(false)} onSuccess={(type) => {
-        refetchDrugs();
-        if (type === "template") setTemplateRefresh((k) => k + 1);
+        invalidateDrugs();
+        if (type === "template") invalidateTemplate();
       }} />}
     </div>
   );
