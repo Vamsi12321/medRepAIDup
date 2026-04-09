@@ -15,7 +15,7 @@ export default function MRNavbar() {
     { name: "My Doctors",  path: "/mr/doctors",     icon: "👨‍⚕️" },
     { name: "Visits",      path: "/mr/visits",      icon: "📅" },
     { name: "Drug Search", path: "/mr/drug-search", icon: "🔍" },
-    { name: "MR Network",  path: "/mr/network",     icon: "🤝" },
+    { name: "Network",    path: "/mr/network",     icon: "🤝" },
     { name: "Profile",     path: "/mr/profile",     icon: "👤" },
   ];
 
