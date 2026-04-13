@@ -2,13 +2,14 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import DoctorNavbar from "@/components/doctor/DoctorNavbar";
+import { Icons } from "@/components/network/Icons";
 
 const tabs = [
-  { href: "/doctor/network/feed",       label: "Feed" },
-  { href: "/doctor/network/my-posts",   label: "My Posts" },
-  { href: "/doctor/network/my-network", label: "My Network" },
-  { href: "/doctor/network/messages",   label: "Messages" },
-  { href: "/doctor/network/discover",   label: "Discover" },
+  { href: "/doctor/network/feed",       label: "Feed",       icon: Icons.feed },
+  { href: "/doctor/network/my-posts",   label: "My Posts",   icon: Icons.myPosts },
+  { href: "/doctor/network/my-network", label: "My Network", icon: Icons.network },
+  { href: "/doctor/network/messages",   label: "Messages",   icon: Icons.messages },
+  { href: "/doctor/network/discover",   label: "Discover",   icon: Icons.discover },
 ];
 
 export default function DoctorNetworkLayout({ children }) {
@@ -22,15 +23,19 @@ export default function DoctorNetworkLayout({ children }) {
           <p className="text-indigo-100 text-base sm:text-lg">Connect, share knowledge, and collaborate with medical professionals</p>
         </div>
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 mb-6 sm:mb-8 overflow-x-auto">
-          <div className="flex items-center space-x-2 p-2 min-w-max">
-            {tabs.map((tab) => (
-              <Link key={tab.href} href={tab.href}
-                className={`px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold transition-all whitespace-nowrap text-sm sm:text-base ${
-                  pathname === tab.href ? "bg-indigo-600 text-white shadow-lg" : "text-gray-700 hover:bg-gray-50"
-                }`}>
-                {tab.label}
-              </Link>
-            ))}
+          <div className="flex items-center space-x-1 p-2 min-w-max">
+            {tabs.map((tab) => {
+              const active = pathname === tab.href;
+              return (
+                <Link key={tab.href} href={tab.href}
+                  className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl font-semibold transition-all whitespace-nowrap text-sm sm:text-base ${
+                    active ? "bg-indigo-600 text-white shadow-lg" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  }`}>
+                  <tab.icon />
+                  {tab.label}
+                </Link>
+              );
+            })}
           </div>
         </div>
         {children}

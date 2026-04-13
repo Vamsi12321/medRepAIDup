@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { get, post as apiPost } from "@/lib/api";
+import { Icons } from "@/components/network/Icons";
 
 export default function DiscoverPage() {
   const queryClient = useQueryClient();
@@ -29,21 +30,18 @@ export default function DiscoverPage() {
     queryClient.invalidateQueries({ queryKey: ["requests-sent"] });
   };
 
-  const connectMutation = useMutation({
-    mutationFn: (userId) => apiPost(`/api/v1/network/connections/request/${userId}`, {}),
-    onSuccess: invalidateAll,
-  });
-  const blockMutation = useMutation({
-    mutationFn: (userId) => apiPost(`/api/v1/network/connections/${userId}/block`, {}),
-    onSuccess: invalidateAll,
-  });
+  const connectMutation = useMutation({ mutationFn: (uid) => apiPost(`/api/v1/network/connections/request/${uid}`, {}), onSuccess: invalidateAll });
+  const blockMutation   = useMutation({ mutationFn: (uid) => apiPost(`/api/v1/network/connections/${uid}/block`, {}), onSuccess: invalidateAll });
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-200 flex flex-col sm:flex-row gap-3">
-        <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          placeholder="Search by name..."
-          className="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-200" />
+        <div className="relative flex-1">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><Icons.discover /></span>
+          <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            placeholder="Search by name..."
+            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-200" />
+        </div>
         <div className="flex gap-2">
           {[{ v: "", l: "All" }, { v: "DOCTOR", l: "Doctors" }, { v: "MR", l: "MRs" }].map((f) => (
             <button key={f.v} onClick={() => { setRole(f.v); setPage(1); }}
@@ -75,9 +73,13 @@ export default function DiscoverPage() {
                 <span className={`text-xs px-2 py-1 rounded-lg font-bold ${u.role === "MR" ? "bg-orange-100 text-orange-700" : "bg-indigo-100 text-indigo-700"}`}>{u.role}</span>
                 <div className="flex gap-2">
                   <button onClick={() => connectMutation.mutate(u.user_id)} disabled={connectMutation.isPending}
-                    className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">Connect</button>
+                    className="flex items-center gap-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                    <Icons.connect /> Connect
+                  </button>
                   <button onClick={() => { if (confirm("Block this user?")) blockMutation.mutate(u.user_id); }}
-                    className="text-xs border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 font-semibold px-2 py-1.5 rounded-lg transition-colors">Block</button>
+                    className="flex items-center gap-1 text-xs border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 font-semibold px-2 py-1.5 rounded-lg transition-colors">
+                    <Icons.block /> Block
+                  </button>
                 </div>
               </div>
             ))}
