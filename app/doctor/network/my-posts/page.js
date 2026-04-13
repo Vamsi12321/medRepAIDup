@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { get, post as apiPost, del } from "@/lib/api";
+import { Icons } from "@/components/network/Icons";
+import { CommentsSection } from "@/app/doctor/network/feed/page";
 
 const timeAgo = (ts) => {
   if (!ts) return "";
@@ -49,7 +51,7 @@ export default function MyPostsPage() {
             <p className="text-gray-500 mt-4 font-medium">You have not posted anything yet.</p>
           </div>
         ) : (
-          posts.map((p) => <MyPostCard key={p.post_id} post={p} currentUserId={userId} onDeleted={invalidate} />)
+          posts.map((p) => <MyPostCard key={p.post_id} post={p} currentUserId={userId} accentColor="indigo" onDeleted={invalidate} />)
         )}
       </div>
       <div className="space-y-4 sm:space-y-6">
@@ -69,10 +71,10 @@ export default function MyPostsPage() {
   );
 }
 
-function MyPostCard({ post, currentUserId, onDeleted }) {
-  const queryClient = useQueryClient();
+function MyPostCard({ post, currentUserId, accentColor = "indigo", onDeleted }) {
   const [showComments, setShowComments]   = useState(false);
   const [commentsCount, setCommentsCount] = useState(post.comments_count || 0);
+  const accent = accentColor;
 
   const deleteMutation = useMutation({
     mutationFn: () => del(`/api/v1/network/posts/${post.post_id}`),
@@ -85,84 +87,21 @@ function MyPostCard({ post, currentUserId, onDeleted }) {
         <p className="text-xs text-gray-400">{timeAgo(post.created_at)}</p>
         <button onClick={() => { if (confirm("Delete this post?")) deleteMutation.mutate(); }}
           disabled={deleteMutation.isPending}
-          className="text-xs text-red-400 hover:text-red-600 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50">
-          {deleteMutation.isPending ? "Deleting..." : "Delete"}
+          className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50">
+          <Icons.trash /> {deleteMutation.isPending ? "Deleting..." : "Delete"}
         </button>
       </div>
       <p className="text-gray-800 leading-relaxed mb-4">{post.content}</p>
       <div className="flex gap-4 text-xs text-gray-500 border-t border-gray-100 pt-3 mb-2">
-        <span>{post.likes_count || 0} likes</span>
+        <span className="flex items-center gap-1"><Icons.likedFill /> {post.likes_count || 0} likes</span>
         <button onClick={() => setShowComments((s) => !s)}
-          className={`font-semibold transition-colors ${showComments ? "text-indigo-600" : "hover:text-indigo-500"}`}>
-          {commentsCount} comments
+          className={`flex items-center gap-1 font-semibold transition-colors ${showComments ? `text-${accent}-600` : "hover:text-gray-700"}`}>
+          <Icons.comment /> {commentsCount} comments
         </button>
       </div>
       {showComments && (
-        <CommentsSection postId={post.post_id} currentUserId={currentUserId} onCountChange={setCommentsCount} />
+        <CommentsSection postId={post.post_id} currentUserId={currentUserId} accentColor={accent} onCountChange={setCommentsCount} />
       )}
-    </div>
-  );
-}
-
-function CommentsSection({ postId, currentUserId, onCountChange }) {
-  const queryClient = useQueryClient();
-  const [newComment, setNewComment] = useState("");
-  const { data, isLoading } = useQuery({
-    queryKey: ["comments", postId],
-    queryFn: () => get(`/api/v1/network/posts/${postId}/comments?limit=50&sort=asc`),
-    staleTime: 30000,
-  });
-  const comments = data?.comments || [];
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ["comments", postId] });
-    if (data?.total !== undefined) onCountChange(data.total);
-  };
-  const addMutation = useMutation({
-    mutationFn: () => apiPost(`/api/v1/network/posts/${postId}/comments`, { content: newComment }),
-    onSuccess: () => { setNewComment(""); invalidate(); },
-  });
-  const deleteMutation = useMutation({
-    mutationFn: (commentId) => del(`/api/v1/network/posts/${postId}/comments/${commentId}`),
-    onSuccess: invalidate,
-  });
-  return (
-    <div className="mt-3 pt-3 border-t border-indigo-100">
-      {isLoading ? (
-        <div className="text-xs text-gray-400 py-2">Loading comments...</div>
-      ) : comments.length === 0 ? (
-        <p className="text-xs text-gray-400 py-2">No comments yet. Be the first!</p>
-      ) : (
-        <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
-          {comments.map((c) => (
-            <div key={c.comment_id} className="bg-indigo-50 rounded-xl px-3 py-2 flex items-start gap-2">
-              <div className="w-7 h-7 bg-gradient-to-br from-gray-400 to-gray-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                {c.author_name?.charAt(0)?.toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-gray-800">{c.author_name}</span>
-                  <span className="text-xs text-gray-400">{c.created_at ? new Date(c.created_at).toLocaleDateString() : ""}</span>
-                </div>
-                <p className="text-xs text-gray-700 mt-0.5">{c.content}</p>
-              </div>
-              {c.author_id === currentUserId && (
-                <button onClick={() => deleteMutation.mutate(c.comment_id)}
-                  className="text-gray-300 hover:text-red-400 text-xs flex-shrink-0 transition-colors">x</button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="flex gap-2">
-        <input type="text" value={newComment} onChange={(e) => setNewComment(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && newComment.trim() && addMutation.mutate()}
-          placeholder="Write a comment..." maxLength={1000}
-          className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-200" />
-        <button onClick={() => addMutation.mutate()} disabled={!newComment.trim() || addMutation.isPending}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-50">
-          {addMutation.isPending ? "..." : "Post"}
-        </button>
-      </div>
     </div>
   );
 }
