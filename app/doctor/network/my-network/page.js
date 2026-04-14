@@ -4,11 +4,13 @@ import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { get, post as apiPost, del } from "@/lib/api";
 import { Icons } from "@/components/network/Icons";
+import UserProfileModal from "@/components/network/UserProfileModal";
 
 export default function MyNetworkPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const [subTab, setSubTab] = useState("connections");
+  const [viewingUserId, setViewingUserId] = useState(null);
 
   const { data: connData, isLoading: connLoading } = useQuery({ queryKey: ["my-connections"], queryFn: () => get("/api/v1/network/connections?limit=50"), staleTime: 30000 });
   const { data: recvData, isLoading: recvLoading } = useQuery({ queryKey: ["requests-received"], queryFn: () => get("/api/v1/network/connections/requests/received?limit=50"), staleTime: 30000 });
@@ -67,12 +69,14 @@ export default function MyNetworkPage() {
             </div>
           ) : connections.map((c) => (
             <div key={c.user_id} className="bg-white rounded-2xl p-4 shadow-lg border border-gray-200 flex items-center gap-4">
-              <Avatar name={c.name} role={c.role} />
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-900 truncate">{c.name}</p>
-                <p className="text-xs text-gray-500">{c.specialization || c.territory || c.role}</p>
-              </div>
-              <span className={`text-xs px-2 py-1 rounded-lg font-bold ${c.role === "MR" ? "bg-orange-100 text-orange-700" : "bg-indigo-100 text-indigo-700"}`}>{c.role}</span>
+              <button onClick={() => setViewingUserId(c.user_id)} className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity">
+                <Avatar name={c.name} role={c.role} />
+                <div className="min-w-0">
+                  <p className="font-bold text-gray-900 truncate hover:text-indigo-600 transition-colors">{c.name}</p>
+                  <p className="text-xs text-gray-500">{c.specialization || c.territory || c.role}</p>
+                </div>
+              </button>
+              <span className={`text-xs px-2 py-1 rounded-lg font-bold flex-shrink-0 ${c.role === "MR" ? "bg-orange-100 text-orange-700" : "bg-indigo-100 text-indigo-700"}`}>{c.role}</span>
               <div className="flex gap-2">
                 <button onClick={() => messageMutation.mutate(c.user_id)} disabled={messageMutation.isPending}
                   className="flex items-center gap-1 text-xs border border-indigo-200 text-indigo-600 hover:bg-indigo-50 font-semibold px-2 py-1.5 rounded-lg transition-colors disabled:opacity-50">
@@ -140,6 +144,7 @@ export default function MyNetworkPage() {
           ))}
         </div>
       )}
+      {viewingUserId && <UserProfileModal userId={viewingUserId} onClose={() => setViewingUserId(null)} />}
     </div>
   );
 }

@@ -124,13 +124,20 @@ export default function FeedPage() {
   );
 }
 
-export function PostCard({ post: postData, currentUserId, accentColor = "orange" }) {
+export function PostCard({ post: postData, currentUserId, accentColor = "orange", highlight = false }) {
   const [liked, setLiked]                 = useState(false);
   const [likesCount, setLikesCount]       = useState(postData.likes_count || 0);
   const [showComments, setShowComments]   = useState(false);
   const [commentsCount, setCommentsCount] = useState(postData.comments_count || 0);
   const [showShare, setShowShare]         = useState(false);
   const accent = accentColor;
+  const cardRef = useRef(null);
+
+  useEffect(() => {
+    if (highlight && cardRef.current) {
+      cardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlight]);
 
   const likeMutation = useMutation({
     mutationFn: () => apiPost(`/api/v1/network/posts/${postData.post_id}/like`, {}),

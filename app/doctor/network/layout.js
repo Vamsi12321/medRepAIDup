@@ -9,7 +9,8 @@ const tabs = [
   { href: "/doctor/network/my-posts",   label: "My Posts",   icon: Icons.myPosts },
   { href: "/doctor/network/my-network", label: "My Network", icon: Icons.network },
   { href: "/doctor/network/messages",   label: "Messages",   icon: Icons.messages },
-  { href: "/doctor/network/discover",   label: "Discover",   icon: Icons.discover },
+  { href: "/doctor/network/discover", label: "Discover", icon: Icons.discover },
+  { href: "/doctor/network/groups",   label: "Groups",   icon: Icons.groups },
 ];
 
 export default function DoctorNetworkLayout({ children }) {
