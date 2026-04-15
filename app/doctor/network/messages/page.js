@@ -60,7 +60,6 @@ export default function MessagesPage() {
           <div className="p-4 border-b border-gray-100 flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2"><Icons.messages /> Messages</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Live updates every 3s</p>
             </div>
             <button onClick={() => setShowNewChat(true)}
               className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors">

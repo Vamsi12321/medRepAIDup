@@ -1,215 +1,304 @@
-"use client";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+﻿"use client";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
-import Breadcrumb from "@/components/Breadcrumb";
+import { get, put } from "@/lib/api";
 
-const companyData = {
-  name: "XYZ Pharma Ltd.",
-  email: "contact@xyzpharma.com",
-  phone: "+91 98765 43210",
-  website: "www.xyzpharma.com",
-  address: "123 Pharma Street, Medical District, Mumbai, Maharashtra 400001",
-  license: "DL-MH-2024-001234",
-  established: "1995",
-  employees: "500-1000",
-  specialization: ["Cardiology", "Diabetology", "Neurology"],
-  description: "Leading pharmaceutical company focused on innovative drug development and healthcare solutions."
-};
-
-const companyStats = [
-  { label: "Drugs Launched", value: 24, icon: "💊", color: "from-blue-500 to-cyan-500" },
-  { label: "Active MRs", value: 45, icon: "💼", color: "from-green-500 to-emerald-500" },
-  { label: "CME Events", value: 12, icon: "📅", color: "from-orange-500 to-red-500" },
-  { label: "Registered Doctors", value: 1250, icon: "👨‍⚕️", color: "from-purple-500 to-pink-500" },
-];
-
-const recentActivity = [
-  { id: 1, action: "Launched Tirzepatide (Mounjaro)", date: "2 days ago", icon: "💊", color: "from-blue-500 to-cyan-500" },
-  { id: 2, action: "Conducted Cardiology Summit", date: "1 week ago", icon: "📅", color: "from-purple-500 to-pink-500" },
-  { id: 3, action: "Added 15 new doctors", date: "2 weeks ago", icon: "👨‍⚕️", color: "from-green-500 to-emerald-500" },
-  { id: 4, action: "Uploaded CME recording", date: "3 weeks ago", icon: "🎥", color: "from-orange-500 to-red-500" },
-  { id: 5, action: "Hired 5 new MRs", date: "1 month ago", icon: "💼", color: "from-indigo-500 to-purple-500" },
-];
+const ADMIN_ONLY = ["company_name","company_address","company_pincode","company_gst_number","company_pan_number"];
 
 export default function CompanyProfile() {
-  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [editMode, setEditMode]       = useState(null); // "personal" | "company"
+  const [form, setForm]               = useState({});
+  const [error, setError]             = useState("");
+  const [success, setSuccess]         = useState("");
+
+  // Personal profile (GET /profile/me)
+  const { data: me, isLoading: meLoading } = useQuery({
+    queryKey: ["admin-me"],
+    queryFn: () => get("/api/v1/profile/me"),
+    staleTime: 60000,
+  });
+
+  // Company profile (GET /profile/company)
+  const { data: company, isLoading: companyLoading } = useQuery({
+    queryKey: ["company-profile"],
+    queryFn: () => get("/api/v1/profile/company"),
+    staleTime: 60000,
+  });
+
+  const role = me?.role; // "ADMIN" or "MANAGER"
+
+  // PUT /profile/me — personal fields only
+  const personalMutation = useMutation({
+    mutationFn: (data) => {
+      const clean = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== "" && v !== undefined));
+      return put("/api/v1/profile/me", clean);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-me"] });
+      setEditMode(null);
+      setSuccess("Personal profile updated");
+      setTimeout(() => setSuccess(""), 3000);
+    },
+    onError: (err) => setError(err.message || "Failed to update"),
+  });
+
+  // PUT /profile/company — company fields only
+  const companyMutation = useMutation({
+    mutationFn: (data) => {
+      const clean = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== "" && v !== undefined));
+      if (clean.company_founded_year) clean.company_founded_year = parseInt(clean.company_founded_year, 10);
+      return put("/api/v1/profile/company", clean);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["company-profile"] });
+      setEditMode(null);
+      setSuccess("Company profile updated");
+      setTimeout(() => setSuccess(""), 3000);
+    },
+    onError: (err) => setError(err.message || "Failed to update"),
+  });
+
+  const openPersonal = () => {
+    setForm({ full_name: me?.full_name || "", phone: me?.phone || "", admin_bio: me?.admin_bio || "", admin_avatar_url: me?.admin_avatar_url || "" });
+    setError(""); setEditMode("personal");
+  };
+
+  const openCompany = () => {
+    setForm({
+      company_name:         company?.company_name || "",
+      company_description:  company?.company_description || "",
+      company_logo_url:     company?.company_logo_url || "",
+      company_city:         company?.company_city || "",
+      company_state:        company?.company_state || "",
+      company_country:      company?.company_country || "",
+      company_website:      company?.company_website || "",
+      company_industry:     company?.company_industry || "",
+      company_founded_year: company?.company_founded_year || "",
+      company_size:         company?.company_size || "",
+      // Admin-only fields
+      company_address:      company?.company_address || "",
+      company_pincode:      company?.company_pincode || "",
+      company_gst_number:   company?.company_gst_number || "",
+      company_pan_number:   company?.company_pan_number || "",
+    });
+    setError(""); setEditMode("company");
+  };
+
+  const isLoading = meLoading || companyLoading;
+  const initial   = company?.company_name?.charAt(0)?.toUpperCase() || "C";
+
+  if (isLoading) return (
+    <div className="min-h-screen bg-gray-50">
+      <CompanyNavbar />
+      <main className="max-w-4xl mx-auto px-4 py-10 space-y-4">
+        {[1,2,3].map((i) => <div key={i} className="h-24 bg-gray-100 rounded-2xl animate-pulse" />)}
+      </main>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50 overflow-x-hidden">
+    <div className="min-h-screen bg-gray-50">
       <CompanyNavbar />
-      
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8">
-        <Breadcrumb />
-        
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center mb-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center mr-4 shadow-lg">
-              <span className="text-2xl">🏢</span>
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {success && <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm font-medium">{success}</div>}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          {/* Left — Admin personal card */}
+          <div className="lg:col-span-1 space-y-4">
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-200 text-center">
+              <div className="relative inline-block mb-4">
+                {me?.admin_avatar_url ? (
+                  <img src={me.admin_avatar_url} alt="avatar" className="w-32 h-16 rounded-xl object-contain mx-auto bg-white p-1 shadow-lg border border-gray-100" />
+                ) : (
+                  <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mx-auto shadow-lg">
+                    {me?.full_name?.charAt(0)?.toUpperCase() || "A"}
+                  </div>
+                )}
+                <div className="absolute bottom-1 right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white" />
+              </div>
+              <h2 className="text-lg font-bold text-gray-900">{me?.full_name || "—"}</h2>
+              <p className="text-purple-600 font-semibold text-xs mt-0.5">{me?.role}</p>
+              <p className="text-gray-400 text-xs mt-0.5">{me?.email}</p>
+              {me?.phone && <p className="text-gray-500 text-xs mt-0.5">{me.phone}</p>}
+              {me?.admin_bio && <p className="text-gray-600 text-sm mt-3 leading-relaxed">{me.admin_bio}</p>}
+              <button onClick={openPersonal}
+                className="mt-4 w-full border border-purple-200 text-purple-700 hover:bg-purple-50 py-2 rounded-xl font-semibold text-sm transition-all">
+                Edit Profile
+              </button>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 bg-clip-text text-transparent">
-                Company Profile
-              </h1>
-              <p className="text-gray-600 text-base">Manage your company information and view business metrics</p>
+
+            {/* Company logo card */}
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-200 text-center">
+              {company?.company_logo_url ? (
+                <div className="bg-white rounded-xl border border-gray-100 shadow p-2 inline-flex items-center justify-center mb-3 mx-auto" style={{minWidth:"80px",maxWidth:"200px"}}>
+                  <img src={company.company_logo_url} alt="logo" className="max-h-12 w-auto object-contain" style={{maxWidth:"180px"}} />
+                </div>
+              ) : (
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mx-auto shadow-lg mb-3">
+                  {initial}
+                </div>
+              )}
+              <h3 className="font-bold text-gray-900">{company?.company_name || "—"}</h3>
+              <p className="text-blue-600 text-xs font-semibold mt-0.5">{company?.company_industry || "Pharmaceutical"}</p>
+              {company?.company_city && (
+                <p className="text-gray-400 text-xs mt-1">{[company.company_city, company.company_state, company.company_country].filter(Boolean).join(", ")}</p>
+              )}
+              <button onClick={openCompany}
+                className="mt-4 w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-2 rounded-xl font-semibold text-sm transition-all">
+                Manage Company
+              </button>
             </div>
+          </div>
+
+          {/* Right — Company details */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-200">
+              <h3 className="font-bold text-gray-900 mb-4">Company Details</h3>
+              {company?.company_description && (
+                <p className="text-gray-600 text-sm leading-relaxed mb-4 pb-4 border-b border-gray-100">{company.company_description}</p>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  { label: "Industry",     value: company?.company_industry || "—",     color: "purple" },
+                  { label: "Founded",      value: company?.company_founded_year || "—", color: "blue" },
+                  { label: "Size",         value: company?.company_size || "—",         color: "green" },
+                  { label: "City",         value: company?.company_city || "—",         color: "orange" },
+                  { label: "State",        value: company?.company_state || "—",        color: "teal" },
+                  { label: "Country",      value: company?.company_country || "—",      color: "indigo" },
+                ].map((f) => (
+                  <div key={f.label} className={`bg-${f.color}-50 border border-${f.color}-100 rounded-xl p-3`}>
+                    <p className={`text-xs text-${f.color}-600 font-semibold mb-1`}>{f.label}</p>
+                    <p className="text-sm font-bold text-gray-800">{f.value}</p>
+                  </div>
+                ))}
+              </div>
+              {company?.company_website && (
+                <div className="mt-3 bg-gray-50 border border-gray-100 rounded-xl p-3">
+                  <p className="text-xs text-gray-500 font-semibold mb-1">Website</p>
+                  <a href={company.company_website?.startsWith("http") ? company.company_website : `https://${company.company_website}`}
+                    target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-blue-600 hover:underline">
+                    {company.company_website}
+                  </a>
+                </div>
+              )}
+            </div>
+
+            {/* Admin-only private fields */}
+            {role === "ADMIN" && (
+              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-200">
+                <h3 className="font-bold text-gray-900 mb-4">Private Information (Admin Only)</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    { label: "Address",    value: company?.company_address || "—",    color: "gray" },
+                    { label: "Pincode",    value: company?.company_pincode || "—",    color: "gray" },
+                    { label: "GST Number", value: company?.company_gst_number || "—", color: "red" },
+                    { label: "PAN Number", value: company?.company_pan_number || "—", color: "red" },
+                  ].map((f) => (
+                    <div key={f.label} className={`bg-${f.color}-50 border border-${f.color}-100 rounded-xl p-3`}>
+                      <p className={`text-xs text-${f.color}-600 font-semibold mb-1`}>{f.label}</p>
+                      <p className="text-sm font-bold text-gray-800">{f.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Company Profile Card */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl p-6 shadow-lg text-center border border-gray-100 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-purple-500 to-pink-600 opacity-10 rounded-full -mr-20 -mt-20"></div>
-              
-              <div className="relative z-10">
-                <div className="relative inline-block mb-5">
-                  <div className="w-24 h-24 bg-gradient-to-br from-purple-600 via-pink-600 to-rose-600 rounded-2xl flex items-center justify-center text-white text-3xl font-bold mx-auto shadow-lg">
-                    XYZ
+        {/* Edit Personal Modal */}
+        {editMode === "personal" && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]">
+              <div className="flex items-center justify-between p-4 border-b border-gray-100 flex-shrink-0">
+                <h3 className="font-bold text-gray-900">Edit Profile</h3>
+                <button onClick={() => setEditMode(null)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm">{error}</div>}
+                {[
+                  { key: "full_name",        label: "Full Name",       type: "text" },
+                  { key: "phone",            label: "Phone",           type: "text" },
+                  { key: "admin_avatar_url", label: "Avatar URL",      type: "text" },
+                ].map((f) => (
+                  <div key={f.key}>
+                    <label className="text-xs font-semibold text-gray-600 mb-1 block">{f.label}</label>
+                    <input type={f.type} value={form[f.key] || ""} onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-200" />
                   </div>
-                  <div className="absolute bottom-1 right-1 w-6 h-6 bg-green-500 rounded-full border-3 border-white"></div>
+                ))}
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 mb-1 block">Bio</label>
+                  <textarea value={form.admin_bio || ""} onChange={(e) => setForm((p) => ({ ...p, admin_bio: e.target.value }))}
+                    rows={3} maxLength={500}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-200 resize-none" />
+                  <p className="text-xs text-gray-400 text-right">{(form.admin_bio || "").length}/500</p>
                 </div>
-                
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">{companyData.name}</h2>
-                <p className="text-purple-600 font-bold text-base mb-5">Pharmaceutical Company</p>
-                
-                <div className="space-y-3 text-left mb-5">
-                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 border-l-4 border-purple-500">
-                    <p className="text-sm text-purple-600 font-semibold mb-1">📧 Email</p>
-                    <p className="text-sm font-bold text-gray-800">{companyData.email}</p>
-                  </div>
-                  <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-3 border-l-4 border-blue-500">
-                    <p className="text-sm text-blue-600 font-semibold mb-1">📱 Phone</p>
-                    <p className="text-sm font-bold text-gray-800">{companyData.phone}</p>
-                  </div>
-                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border-l-4 border-green-500">
-                    <p className="text-sm text-green-600 font-semibold mb-1">🌐 Website</p>
-                    <p className="text-sm font-bold text-gray-800">{companyData.website}</p>
-                  </div>
-                  <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-lg p-3 border-l-4 border-orange-500">
-                    <p className="text-sm text-orange-600 font-semibold mb-1">🏢 Address</p>
-                    <p className="text-sm font-bold text-gray-800">{companyData.address}</p>
-                  </div>
-                  <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-3 border-l-4 border-indigo-500">
-                    <p className="text-sm text-indigo-600 font-semibold mb-1">🎫 License</p>
-                    <p className="text-sm font-bold text-gray-800">{companyData.license}</p>
-                  </div>
-                </div>
-
-                <button className="w-full bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all duration-300 transform hover:scale-105 shadow-md text-base">
-                  Edit Profile →
+              </div>
+              <div className="p-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+                <button onClick={() => setEditMode(null)} className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-50">Cancel</button>
+                <button onClick={() => personalMutation.mutate(form)} disabled={personalMutation.isPending}
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-xl text-sm font-bold disabled:opacity-50">
+                  {personalMutation.isPending ? "Saving..." : "Save"}
                 </button>
               </div>
             </div>
           </div>
+        )}
 
-          {/* Business Metrics Section */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 gap-5">
-              {companyStats.map((stat, index) => (
-                <div key={index} className="bg-white rounded-2xl p-5 shadow-lg card-hover border border-gray-100 relative overflow-hidden">
-                  <div className={`absolute top-0 right-0 w-20 h-20 bg-gradient-to-br ${stat.color} opacity-10 rounded-full -mr-10 -mt-10`}></div>
-                  
-                  <div className="relative z-10">
-                    <div className={`w-10 h-10 bg-gradient-to-br ${stat.color} rounded-lg flex items-center justify-center text-xl mb-3 shadow-lg`}>
-                      {stat.icon}
-                    </div>
-                    <p className="text-3xl font-bold text-gray-800 mb-2">{stat.value}</p>
-                    <p className="text-gray-600 font-semibold text-base">{stat.label}</p>
+        {/* Edit Company Modal */}
+        {editMode === "company" && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+              <div className="flex items-center justify-between p-4 border-b border-gray-100 flex-shrink-0">
+                <h3 className="font-bold text-gray-900">Manage Company</h3>
+                <button onClick={() => setEditMode(null)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm">{error}</div>}
+                {[
+                  { key: "company_name",         label: "Company Name",    type: "text",   adminOnly: true },
+                  { key: "company_logo_url",      label: "Logo URL",        type: "text",   adminOnly: false },
+                  { key: "company_industry",      label: "Industry",        type: "text",   adminOnly: false },
+                  { key: "company_city",          label: "City",            type: "text",   adminOnly: false },
+                  { key: "company_state",         label: "State",           type: "text",   adminOnly: false },
+                  { key: "company_country",       label: "Country",         type: "text",   adminOnly: false },
+                  { key: "company_website",       label: "Website",         type: "text",   adminOnly: false },
+                  { key: "company_founded_year",  label: "Founded Year",    type: "number", adminOnly: false },
+                  { key: "company_size",          label: "Company Size",    type: "text",   adminOnly: false },
+                  { key: "company_address",       label: "Address",         type: "text",   adminOnly: true },
+                  { key: "company_pincode",       label: "Pincode",         type: "text",   adminOnly: true },
+                  { key: "company_gst_number",    label: "GST Number",      type: "text",   adminOnly: true },
+                  { key: "company_pan_number",    label: "PAN Number",      type: "text",   adminOnly: true },
+                ].filter((f) => !f.adminOnly || role === "ADMIN").map((f) => (
+                  <div key={f.key}>
+                    <label className="text-xs font-semibold text-gray-600 mb-1 block">
+                      {f.label} {f.adminOnly && <span className="text-red-400 text-xs">(Admin only)</span>}
+                    </label>
+                    <input type={f.type} value={form[f.key] || ""} onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-200" />
                   </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Company Information */}
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-              <h3 className="text-xl font-bold text-gray-800 mb-5 flex items-center">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center mr-3">
-                  <span className="text-lg">ℹ️</span>
-                </div>
-                Company Information
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
-                  <p className="text-sm text-blue-600 font-semibold mb-1">📅 Established</p>
-                  <p className="text-lg font-bold text-gray-800">{companyData.established}</p>
-                </div>
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border border-green-100">
-                  <p className="text-sm text-green-600 font-semibold mb-1">👥 Employees</p>
-                  <p className="text-lg font-bold text-gray-800">{companyData.employees}</p>
+                ))}
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 mb-1 block">Description</label>
+                  <textarea value={form.company_description || ""} onChange={(e) => setForm((p) => ({ ...p, company_description: e.target.value }))}
+                    rows={3} maxLength={1000}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-200 resize-none" />
+                  <p className="text-xs text-gray-400 text-right">{(form.company_description || "").length}/1000</p>
                 </div>
               </div>
-              
-              <div className="mt-4">
-                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4 border border-purple-100">
-                  <p className="text-sm text-purple-600 font-semibold mb-2">🎯 Specializations</p>
-                  <div className="flex flex-wrap gap-2">
-                    {companyData.specialization.map((spec, index) => (
-                      <span key={index} className="bg-purple-100 text-purple-700 px-3 py-1 rounded-lg text-sm font-semibold">
-                        {spec}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mt-4">
-                <div className="bg-gradient-to-r from-gray-50 to-white rounded-lg p-4 border border-gray-100">
-                  <p className="text-sm text-gray-600 font-semibold mb-2">📝 Description</p>
-                  <p className="text-gray-800 leading-relaxed">{companyData.description}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Settings */}
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-              <h3 className="text-xl font-bold text-gray-800 mb-5 flex items-center">
-                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center mr-3">
-                  <span className="text-lg">⚙️</span>
-                </div>
-                Company Settings
-              </h3>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
-                  <div>
-                    <p className="font-bold text-gray-800 text-base">Email Notifications</p>
-                    <p className="text-sm text-gray-600">Receive updates about platform activities</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-12 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-blue-600 peer-checked:to-indigo-600"></div>
-                  </label>
-                </div>
-                
-                <div className="flex items-center justify-between bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border border-green-100">
-                  <div>
-                    <p className="font-bold text-gray-800 text-base">SMS Alerts</p>
-                    <p className="text-sm text-gray-600">Get SMS for important updates</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" />
-                    <div className="w-12 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-green-600 peer-checked:to-emerald-600"></div>
-                  </label>
-                </div>
-                
-                <div className="flex items-center justify-between bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4 border border-purple-100">
-                  <div>
-                    <p className="font-bold text-gray-800 text-base">Monthly Reports</p>
-                    <p className="text-sm text-gray-600">Receive monthly business analytics</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-12 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-purple-600 peer-checked:to-pink-600"></div>
-                  </label>
-                </div>
+              <div className="p-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+                <button onClick={() => setEditMode(null)} className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-50">Cancel</button>
+                <button onClick={() => companyMutation.mutate(form)} disabled={companyMutation.isPending}
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2.5 rounded-xl text-sm font-bold disabled:opacity-50">
+                  {companyMutation.isPending ? "Saving..." : "Save Company"}
+                </button>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </main>
     </div>
   );

@@ -52,7 +52,6 @@ export default function GroupsPage() {
                 <Icons.groups /> Groups
                 {unreadTotal > 0 && <span className="bg-indigo-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{unreadTotal}</span>}
               </h2>
-              <p className="text-xs text-gray-400 mt-0.5">Live updates every 3s</p>
             </div>
             <button onClick={() => setShowCreate(true)}
               className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors">

@@ -125,6 +125,46 @@ export default function MRProfile() {
                 </div>
               </div>
             )}
+
+            {/* Company info */}
+            {company && (
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-orange-600 to-red-600 px-5 py-3 flex items-center gap-3">
+                  {company.company_logo_url ? (
+                    <div className="bg-white rounded-lg px-2 py-1 flex items-center">
+                      <img src={company.company_logo_url} alt="logo" className="h-7 w-auto object-contain" style={{maxWidth:"100px"}} />
+                    </div>
+                  ) : (
+                    <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center text-white font-bold">
+                      {company.company_name?.charAt(0)}
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-white font-bold text-sm">{company.company_name}</p>
+                    {company.company_industry && <p className="text-orange-200 text-xs">{company.company_industry}</p>}
+                  </div>
+                </div>
+                <div className="p-4 space-y-2">
+                  {company.company_description && <p className="text-gray-500 text-sm leading-relaxed">{company.company_description}</p>}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {(company.company_city || company.company_state) && (
+                      <span className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">
+                         {[company.company_city, company.company_state, company.company_country].filter(Boolean).join(", ")}
+                      </span>
+                    )}
+                    {company.company_founded_year && <span className="text-xs bg-orange-50 text-orange-600 px-2.5 py-1 rounded-full"> Est. {company.company_founded_year}</span>}
+                    {company.company_size && <span className="text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-full">👥 {company.company_size}</span>}
+                    {company.company_website && (
+                      <a href={company.company_website?.startsWith("http") ? company.company_website : `https://${company.company_website}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="text-xs bg-green-50 text-green-600 px-2.5 py-1 rounded-full hover:bg-green-100 transition-colors">
+                         {company.company_website}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
