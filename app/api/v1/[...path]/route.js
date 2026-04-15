@@ -30,7 +30,6 @@ async function forward(req, { params }) {
     headers: forwardHeaders,
     ...(body !== undefined ? { body } : {}),
   });
-
   const text = await res.text();
   let data;
   try { data = JSON.parse(text); } catch { data = { detail: text }; }
