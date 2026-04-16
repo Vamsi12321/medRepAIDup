@@ -17,6 +17,12 @@ export default function MRProfile() {
     staleTime: 60000,
   });
 
+  const { data: company } = useQuery({
+    queryKey: ["company-profile"],
+    queryFn: () => get("/api/v1/profile/company"),
+    staleTime: 300000,
+  });
+
   const updateMutation = useMutation({
         mutationFn: (data) => {
       const clean = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== "" && v !== undefined));

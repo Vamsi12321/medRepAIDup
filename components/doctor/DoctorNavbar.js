@@ -3,12 +3,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { logout } from "@/lib/auth";
+import NotificationBell from "@/components/NotificationBell";
 
 export default function DoctorNavbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navItems = [
@@ -18,14 +18,6 @@ export default function DoctorNavbar() {
     { name: "Network",     path: "/doctor/network",     icon: "🤝" },
     { name: "Profile",     path: "/doctor/profile",     icon: "👤" },
   ];
-
-  const notifications = [
-    { id: 1, type: "drug", title: "New Drug Launch", message: "CardioSafe has been launched by XYZ Pharma", time: "5 min ago", icon: "💊", color: "from-blue-500 to-cyan-500", unread: true },
-    { id: 2, type: "event", title: "Event Reminder", message: "Hypertension Management Webinar starts in 2 hours", time: "1 hour ago", icon: "📅", color: "from-green-500 to-emerald-500", unread: true },
-    { id: 3, type: "message", title: "New Message", message: "Dr. Patel sent you a message", time: "2 hours ago", icon: "💬", color: "from-purple-500 to-pink-500", unread: true },
-  ];
-
-  const unreadCount = notifications.filter(n => n.unread).length;
 
   const handleLogout = () => {
     setIsLoggingOut(true);
@@ -76,55 +68,7 @@ export default function DoctorNavbar() {
             </div>
 
             <div className="flex items-center space-x-4">
-              <div className="relative">
-                <button 
-                  onClick={() => setShowNotifications(!showNotifications)}
-                  className="relative p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-xl transition-all"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
-                  {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white">
-                      {unreadCount}
-                    </span>
-                  )}
-                </button>
-
-                {showNotifications && (
-                  <div className="absolute right-0 mt-3 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 max-h-[600px] overflow-hidden">
-                    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-5 rounded-t-2xl">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-xl font-bold text-white flex items-center">
-                          <span className="mr-2">🔔</span>
-                          Notifications
-                        </h3>
-                        <button onClick={() => setShowNotifications(false)} className="text-white hover:bg-white/20 rounded-lg p-1">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                    <div className="max-h-[500px] overflow-y-auto">
-                      {notifications.map((notification) => (
-                        <div key={notification.id} className={`p-4 border-b border-gray-100 hover:bg-gray-50 ${notification.unread ? 'bg-indigo-50/50' : ''}`}>
-                          <div className="flex items-start space-x-3">
-                            <div className={`w-12 h-12 bg-gradient-to-br ${notification.color} rounded-xl flex items-center justify-center shadow-lg`}>
-                              <span className="text-2xl">{notification.icon}</span>
-                            </div>
-                            <div className="flex-1">
-                              <h4 className="font-bold text-gray-900 text-sm">{notification.title}</h4>
-                              <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
-                              <p className="text-xs text-gray-400 mt-2">{notification.time}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <NotificationBell accentColor="indigo" />
               <button 
                 onClick={handleLogout}
                 className="hidden md:flex items-center space-x-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-xl font-semibold transition-all"
