@@ -4,17 +4,8 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { get, post as apiPost, del } from "@/lib/api";
 import { Icons } from "@/components/network/Icons";
+import { timeAgoIST as timeAgo, formatIST } from "@/lib/time";
 
-const timeAgo = (ts) => {
-  if (!ts) return "";
-  const diff = Date.now() - new Date(ts).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-};
 
 export default function FeedPage() {
   const queryClient = useQueryClient();
@@ -226,7 +217,7 @@ export function CommentsSection({ postId, currentUserId, accentColor = "orange",
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-gray-800">{c.author_name}</span>
-                  <span className="text-xs text-gray-400">{c.created_at ? new Date(c.created_at).toLocaleDateString() : ""}</span>
+                  <span className="text-xs text-gray-400">{c.created_at ? formatIST(c.created_at, { day: "2-digit", month: "short", year: "numeric" }) : ""}</span>
                 </div>
                 <p className="text-xs text-gray-700 mt-0.5">{c.content}</p>
               </div>

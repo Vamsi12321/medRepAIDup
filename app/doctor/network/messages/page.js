@@ -3,17 +3,8 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { get, post as apiPost, del } from "@/lib/api";
 import { Icons } from "@/components/network/Icons";
+import { timeAgoIST as timeAgo, formatIST } from "@/lib/time";
 
-const timeAgo = (ts) => {
-  if (!ts) return "";
-  const diff = Date.now() - new Date(ts).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-};
 
 export default function MessagesPage() {
   const queryClient = useQueryClient();
@@ -318,7 +309,7 @@ function InboxTabs({ conversations, activeConvId, onSelect, isLoading, accentCol
                     <p className={`text-sm truncate ${c.unread_count > 0 ? "font-bold text-gray-900" : "font-medium text-gray-700"}`}>
                       {c.other_user?.name}
                     </p>
-                    <span className="text-xs text-gray-400 flex-shrink-0 ml-1">{c.last_message_at ? new Date(c.last_message_at).toLocaleDateString() : ""}</span>
+                    <span className="text-xs text-gray-400 flex-shrink-0 ml-1">{c.last_message_at ? formatIST(c.last_message_at, { day: "2-digit", month: "short" }) : ""}</span>
                   </div>
                   <p className={`text-xs truncate mt-0.5 ${c.unread_count > 0 ? "text-gray-700 font-medium" : "text-gray-400"}`}>
                     {c.last_message || "No messages yet"}

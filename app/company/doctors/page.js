@@ -161,7 +161,8 @@ export default function CompanyDoctors() {
 
   const handleDelete = async () => {
     try {
-      await del(`/api/v1/doctors/${confirmDelete.id}`);
+      const doctorId = confirmDelete.doctor_id || confirmDelete.id;
+      await del(`/api/v1/doctors/${doctorId}`);
       setConfirmDelete(null);
       setToast({ message: "Doctor removed successfully.", type: "success" });
       invalidate();
@@ -172,13 +173,12 @@ export default function CompanyDoctors() {
   };
 
   const handleToggleStatus = async (doctor) => {
-    // Optimistic update
-    setDoctors((prev) => prev.map((d) => d.id === doctor.id ? { ...d, is_active: !d.is_active } : d));
+    const doctorId = doctor.doctor_id || doctor.id;
     try {
-      await put(`/api/v1/doctors/${doctor.id}`, { is_active: !doctor.is_active });
+      await put(`/api/v1/doctors/${doctorId}`, { is_active: !doctor.is_active });
       setToast({ message: `Doctor marked as ${!doctor.is_active ? "active" : "inactive"}.`, type: "success" });
+      invalidate();
     } catch {
-      setDoctors((prev) => prev.map((d) => d.id === doctor.id ? { ...d, is_active: doctor.is_active } : d));
       setToast({ message: "Failed to update status.", type: "error" });
     }
   };

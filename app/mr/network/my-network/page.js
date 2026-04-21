@@ -12,18 +12,21 @@ export default function MyNetworkPage() {
   const [subTab, setSubTab] = useState("connections");
   const [viewingUserId, setViewingUserId] = useState(null);
 
-  const { data: connData, isLoading: connLoading } = useQuery({ queryKey: ["my-connections"], queryFn: () => get("/api/v1/network/connections?limit=50"), staleTime: 30000 });
-  const { data: recvData, isLoading: recvLoading } = useQuery({ queryKey: ["requests-received"], queryFn: () => get("/api/v1/network/connections/requests/received?limit=50"), staleTime: 30000 });
-  const { data: sentData, isLoading: sentLoading } = useQuery({ queryKey: ["requests-sent"], queryFn: () => get("/api/v1/network/connections/requests/sent?limit=50"), staleTime: 30000 });
+  const { data: connData, isLoading: connLoading }    = useQuery({ queryKey: ["my-connections"], queryFn: () => get("/api/v1/network/connections?limit=50"), staleTime: 0 });
+  const { data: recvData, isLoading: recvLoading }    = useQuery({ queryKey: ["requests-received"], queryFn: () => get("/api/v1/network/connections/requests/received?limit=50"), staleTime: 0 });
+  const { data: sentData, isLoading: sentLoading }    = useQuery({ queryKey: ["requests-sent"], queryFn: () => get("/api/v1/network/connections/requests/sent?limit=50"), staleTime: 0 });
+  const { data: blockedData, isLoading: blockedLoading } = useQuery({ queryKey: ["blocked-users"], queryFn: () => get("/api/v1/network/connections?status=blocked&limit=50"), staleTime: 0 });
 
-  const connections = connData?.connections || [];
-  const received    = recvData?.requests    || [];
-  const sent        = sentData?.requests    || [];
+  const connections = connData?.connections   || [];
+  const received    = recvData?.requests      || [];
+  const sent        = sentData?.requests      || [];
+  const blocked     = blockedData?.connections || [];
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ["my-connections"] });
     queryClient.invalidateQueries({ queryKey: ["requests-received"] });
     queryClient.invalidateQueries({ queryKey: ["requests-sent"] });
+    queryClient.invalidateQueries({ queryKey: ["blocked-users"] });
     queryClient.invalidateQueries({ queryKey: ["discover-users"] });
   };
 
@@ -31,12 +34,15 @@ export default function MyNetworkPage() {
   const rejectMutation  = useMutation({ mutationFn: (id) => apiPost(`/api/v1/network/connections/requests/${id}/reject`, {}), onSuccess: invalidateAll });
   const cancelMutation  = useMutation({ mutationFn: (id) => del(`/api/v1/network/connections/requests/${id}/cancel`), onSuccess: invalidateAll });
   const removeMutation  = useMutation({ mutationFn: (id) => del(`/api/v1/network/connections/${id}`), onSuccess: invalidateAll });
+  const blockMutation   = useMutation({ mutationFn: (uid) => apiPost(`/api/v1/network/connections/${uid}/block`, {}), onSuccess: invalidateAll });
+  const unblockMutation = useMutation({ mutationFn: (uid) => del(`/api/v1/network/connections/${uid}/unblock`), onSuccess: invalidateAll });
   const messageMutation = useMutation({ mutationFn: (uid) => apiPost(`/api/v1/network/chat/conversations/${uid}`, {}), onSuccess: () => router.push("/mr/network/messages") });
 
   const subTabs = [
     { id: "connections", label: "My Connections", count: connections.length },
     { id: "received",    label: "Received",        count: received.length },
     { id: "sent",        label: "Sent",             count: sent.length },
+    { id: "blocked",     label: "Blocked",          count: blocked.length },
   ];
 
   const Avatar = ({ name, role }) => (
@@ -86,6 +92,11 @@ export default function MyNetworkPage() {
                   className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors">
                   <Icons.trash /> Remove
                 </button>
+                <button onClick={() => { if (confirm(`Block ${c.name}?`)) blockMutation.mutate(c.user_id); }}
+                  disabled={blockMutation.isPending}
+                  className="flex items-center gap-1 text-xs border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 font-semibold px-2 py-1 rounded-lg transition-colors disabled:opacity-50">
+                  <Icons.block /> Block
+                </button>
               </div>
             </div>
           ))}
@@ -115,6 +126,11 @@ export default function MyNetworkPage() {
                   className="flex items-center gap-1 text-xs border border-gray-200 text-gray-600 hover:bg-gray-50 font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
                   <Icons.close /> Reject
                 </button>
+                <button onClick={() => { if (confirm(`Block ${r.requester_name}?`)) blockMutation.mutate(r.requester_id); }}
+                  disabled={blockMutation.isPending}
+                  className="flex items-center gap-1 text-xs border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 font-semibold px-2 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                  <Icons.block /> Block
+                </button>
               </div>
             </div>
           ))}
@@ -139,6 +155,33 @@ export default function MyNetworkPage() {
               <button onClick={() => cancelMutation.mutate(r.connection_id)} disabled={cancelMutation.isPending}
                 className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50">
                 <Icons.close /> Cancel
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {viewingUserId && <UserProfileModal userId={viewingUserId} onClose={() => setViewingUserId(null)} />}
+      {subTab === "blocked" && (
+        <div className="space-y-3">
+          {blockedLoading ? [1,2].map((i) => <div key={i} className="h-20 bg-gray-100 rounded-2xl animate-pulse" />) :
+           blocked.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-2xl shadow border border-gray-200">
+              <p className="text-gray-500 font-medium">No blocked users.</p>
+            </div>
+          ) : blocked.map((u) => (
+            <div key={u.user_id} className="bg-white rounded-2xl p-4 shadow-lg border border-gray-200 flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 ${u.role === "MR" ? "bg-gradient-to-br from-orange-500 to-red-500" : "bg-gradient-to-br from-gray-400 to-gray-500"}`}>
+                {u.name?.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-gray-900 truncate">{u.name}</p>
+                <p className="text-xs text-gray-500">{u.specialization || u.territory || u.role}</p>
+              </div>
+              <span className="text-xs bg-red-50 text-red-500 border border-red-200 px-2 py-1 rounded-lg font-semibold">Blocked</span>
+              <button onClick={() => { if (confirm(`Unblock ${u.name}?`)) unblockMutation.mutate(u.user_id); }}
+                disabled={unblockMutation.isPending}
+                className="flex items-center gap-1 text-xs border border-orange-200 text-orange-600 hover:bg-orange-50 font-semibold px-2 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                Unblock
               </button>
             </div>
           ))}
