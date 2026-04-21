@@ -3,18 +3,9 @@ import { useState } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { get, post as apiPost, del } from "@/lib/api";
 import { Icons } from "@/components/network/Icons";
+import { timeAgoIST as timeAgo, formatIST } from "@/lib/time";
 import { CommentsSection } from "@/app/doctor/network/feed/page";
 
-const timeAgo = (ts) => {
-  if (!ts) return "";
-  const diff = Date.now() - new Date(ts).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-};
 
 export default function MyPostsPage() {
   const queryClient = useQueryClient();

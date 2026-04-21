@@ -30,6 +30,20 @@ async function forward(req, { params }) {
     headers: forwardHeaders,
     ...(body !== undefined ? { body } : {}),
   });
+
+  // Forward CSV/binary responses as-is without JSON parsing
+  const resContentType = res.headers.get("content-type") || "";
+  if (resContentType.includes("text/csv") || resContentType.includes("application/octet-stream") || resContentType.includes("text/plain")) {
+    const blob = await res.blob();
+    return new Response(blob, {
+      status: res.status,
+      headers: {
+        "Content-Type": resContentType,
+        "Content-Disposition": res.headers.get("content-disposition") || "attachment",
+      },
+    });
+  }
+
   const text = await res.text();
   let data;
   try { data = JSON.parse(text); } catch { data = { detail: text }; }

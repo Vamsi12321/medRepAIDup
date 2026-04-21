@@ -21,6 +21,7 @@ export default function CompanyNavbar() {
     { name: "CME Events",      path: "/company/cme-events",      icon: "📅" },
     { name: "Doctors",         path: "/company/doctors",         icon: "👨‍⚕️" },
     { name: "Medical Reps",    path: "/company/medical-reps",    icon: "💼" },
+    { name: "Activity Logs",   path: "/company/activity-logs",   icon: "📋" },
     { name: "Profile",         path: "/company/profile",         icon: "👤" },
   ];
 
