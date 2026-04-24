@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import DoctorNavbar from "@/components/doctor/DoctorNavbar";
@@ -8,7 +8,7 @@ import { useParams } from "next/navigation";
 import { get } from "@/lib/api";
 
 const formatKey = (key) => key?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "";
-const getVal = (drug, key) => drug?.field_values?.find((f) => f.key === key)?.value || "";
+const getVal = (drug, key) => { const v = drug?.field_values?.find((f) => f.key === key)?.value; if (Array.isArray(v)) return v.join(", "); return v || ""; };
 
 const HEADER_KEYS = ["brand_name","drug_name","drug_class","specialization","brochure_url"];
 
@@ -140,7 +140,7 @@ export default function DrugDetails() {
                   return (
                     <div key={fv.field_id || fv.key} className={`${c.bg} rounded-xl p-3.5 border-l-4 ${c.border}`}>
                       <p className={`text-xs font-bold ${c.label} mb-1`}>{formatKey(fv.key)}</p>
-                      <p className="text-gray-800 font-medium text-sm">{fv.value}</p>
+                      <p className="text-gray-800 font-medium text-sm">{Array.isArray(fv.value) ? fv.value.join(", ") : fv.value}</p>
                     </div>
                   );
                 })}

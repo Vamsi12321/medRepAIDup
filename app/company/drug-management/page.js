@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
@@ -9,7 +9,7 @@ import { downloadCSVTemplate } from "@/lib/downloadTemplate";
 const FIELD_TYPES = ["text", "textarea", "number", "date", "select", "url"];
 
 const formatKey = (key) => key?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "";
-const getVal = (drug, key) => drug?.field_values?.find((f) => f.key === key)?.value || "";
+const getVal = (drug, key) => { const v = drug?.field_values?.find((f) => f.key === key)?.value; if (Array.isArray(v)) return v.join(", "); return v || ""; };
 
 export default function CompanyDrugManagement() {
   const queryClient = useQueryClient();
@@ -17,6 +17,7 @@ export default function CompanyDrugManagement() {
   const [showDrugModal, setShowDrugModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [editDrug, setEditDrug]           = useState(null);
+  const [drugSearch, setDrugSearch]       = useState("");
 
   const { data: template, isLoading: loadingTemplate } = useQuery({
     queryKey: ["drug-template"],
@@ -36,7 +37,12 @@ export default function CompanyDrugManagement() {
   const invalidateDrugs    = () => queryClient.invalidateQueries({ queryKey: ["drugs"] });
   const invalidateTemplate = () => queryClient.invalidateQueries({ queryKey: ["drug-template"] });
 
-  const filteredDrugs = drugs;
+  const filteredDrugs = drugSearch.trim()
+    ? drugs.filter((d) => d.field_values?.some((fv) => {
+        const v = Array.isArray(fv.value) ? fv.value.join(" ") : (fv.value || "");
+        return v.toLowerCase().includes(drugSearch.toLowerCase());
+      }))
+    : drugs;
   const visibleFields = template?.fields?.filter((f) => f.visible) || [];
 
   return (
@@ -86,6 +92,18 @@ export default function CompanyDrugManagement() {
               </div>
             )}
 
+            {/* Search bar */}
+            <div className="mb-4">
+              <div className="relative">
+                <input type="text" value={drugSearch} onChange={(e) => setDrugSearch(e.target.value)}
+                  placeholder="Search drugs by name, indication, class..."
+                  className="w-full pl-4 pr-10 py-2.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 text-sm outline-none transition-all" />
+                {drugSearch && (
+                  <button onClick={() => setDrugSearch("")} className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 text-sm">✕</button>
+                )}
+              </div>
+            </div>
+
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4 mb-6">
               {[
@@ -126,16 +144,16 @@ export default function CompanyDrugManagement() {
                   const displayFields = (drug.field_values || [])
                     .filter((fv) => {
                       if (HEADER_KEYS.includes(fv.key)) return false;
-                      if (!fv.value) return false;
-                      // Check template visibility — search ALL template fields (not just visible ones)
+                      const v = fv.value;
+                      if (!v || (Array.isArray(v) && v.length === 0)) return false;
                       const tmplField = allTemplateFields.find((f) => f.key === fv.key);
                       if (tmplField) return tmplField.visible === true;
-                      // Field not in template yet (newly added via bulk) — show by default
                       return true;
                     })
                     .map((fv) => {
                       const tmplField = allTemplateFields.find((f) => f.key === fv.key);
-                      return { key: fv.key, label: tmplField?.label || null, field_id: fv.field_id || fv.key, value: fv.value };
+                      const displayVal = Array.isArray(fv.value) ? fv.value.join(", ") : fv.value;
+                      return { key: fv.key, label: tmplField?.label || null, field_id: fv.field_id || fv.key, value: displayVal };
                     });
 
                   // Rotating color palette for field rows
@@ -193,9 +211,9 @@ export default function CompanyDrugManagement() {
                           const c = fieldColors[idx % fieldColors.length];
                           return (
                             <div key={f.field_id || f.key}
-                              className={`${c.bg} rounded-xl px-3 py-2 border-l-3 ${c.border} border-l-4 ${f.value?.length > 30 ? "col-span-2" : ""}`}>
+                              className={`${c.bg} rounded-xl px-3 py-2 border-l-3 ${c.border} border-l-4 ${String(f.value).length > 30 ? "col-span-2" : ""}`}>
                               <p className={`text-xs ${c.label} font-bold mb-0.5`}>{f.label || formatKey(f.key)}</p>
-                              <p className="text-gray-700 font-medium text-xs line-clamp-2">{f.value}</p>
+                              <p className="text-gray-700 font-medium text-xs line-clamp-2">{String(f.value)}</p>
                             </div>
                           );
                         })}
@@ -548,7 +566,11 @@ function DrugModal({ template, drug, onClose, onSaved }) {
   // Build initial form from existing drug field_values
   const initForm = () => {
     if (!drug) return {};
-    return Object.fromEntries((drug.field_values || []).map((fv) => [fv.key, fv.value]));
+    return Object.fromEntries((drug.field_values || []).map((fv) => {
+      const v = fv.value;
+      // Convert arrays to comma-separated string for editing
+      return [fv.key, Array.isArray(v) ? v.join(", ") : v];
+    }));
   };
   const [formData, setFormData] = useState(initForm);
   const [saving, setSaving]     = useState(false);
@@ -560,11 +582,14 @@ function DrugModal({ template, drug, onClose, onSaved }) {
     e.preventDefault();
     setSaving(true);
     setError("");
-    const field_values = visibleFields.map((f) => ({
-      field_id: f.field_id,
-      key:      f.key,
-      value:    formData[f.key] || "",
-    }));
+    const field_values = visibleFields.map((f) => {
+      let value = formData[f.key] || "";
+      // Convert comma-separated string back to array for array-type fields
+      if (f.type === "array" && typeof value === "string" && value.trim()) {
+        value = value.split(",").map((v) => v.trim()).filter(Boolean);
+      }
+      return { field_id: f.field_id, key: f.key, value };
+    });
 
     try {
       if (isEdit) {
@@ -586,6 +611,13 @@ function DrugModal({ template, drug, onClose, onSaved }) {
     const onChange = (v) => setFormData((p) => ({ ...p, [f.key]: v }));
 
     switch (f.type) {
+      case "array":    return (
+        <div>
+          <textarea className={base} rows={2} value={val} onChange={(e) => onChange(e.target.value)}
+            placeholder={`Enter comma-separated values (e.g. fever, headache, cough)`} />
+          <p className="text-xs text-gray-400 mt-1">Separate multiple values with commas</p>
+        </div>
+      );
       case "textarea": return <textarea className={base} rows={3} value={val} onChange={(e) => onChange(e.target.value)} placeholder={`Enter ${f.label?.toLowerCase() || "value"}...`} />;
       case "select":   return (
         <select className={`${base} bg-white`} value={val} onChange={(e) => onChange(e.target.value)}>
@@ -760,15 +792,15 @@ function BulkUploadModal({ onClose, onSuccess }) {
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {template.fields.filter((f) => f.visible).map((f) => {
-                          // Fields that accept multiple comma-separated values
                           const multiKeys = new Set(["indications","side_effects","contraindications","drug_interactions","specialization"]);
                           let hint = "text";
-                          if (f.type === "select" && f.options?.length) hint = f.options.slice(0,3).join(" | ") + (f.options.length > 3 ? "..." : "");
-                          else if (multiKeys.has(f.key))  hint = "text · multiple: comma,separated";
-                          else if (f.type === "textarea") hint = "free text";
-                          else if (f.type === "date")     hint = "YYYY-MM-DD";
-                          else if (f.type === "number")   hint = "number";
-                          else if (f.type === "url")      hint = "https://...";
+                          if (f.type === "array")                              hint = "comma, separated values";
+                          else if (f.type === "select" && f.options?.length)  hint = f.options.slice(0,3).join(" | ") + (f.options.length > 3 ? "..." : "");
+                          else if (multiKeys.has(f.key))                      hint = "text · multiple: comma,separated";
+                          else if (f.type === "textarea")                     hint = "free text";
+                          else if (f.type === "date")                         hint = "YYYY-MM-DD";
+                          else if (f.type === "number")                       hint = "number";
+                          else if (f.type === "url")                          hint = "https://...";
                           return (
                             <tr key={f.field_id} className="hover:bg-gray-50">
                               <td className="px-2 py-1 font-mono text-indigo-600 font-semibold">{f.key}</td>

@@ -1,17 +1,19 @@
-"use client";
+﻿"use client";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import DoctorNavbar from "@/components/doctor/DoctorNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
 import Link from "next/link";
 import { get } from "@/lib/api";
+import SmartSearch from "@/components/SmartSearch";
 
 const formatKey = (key) => key?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "";
-const getVal = (drug, key) => drug.field_values?.find((f) => f.key === key)?.value || "";
+const getVal = (drug, key) => { const v = drug?.field_values?.find((f) => f.key === key)?.value; if (Array.isArray(v)) return v.join(", "); return v || ""; };
 
 export default function DoctorDrugSearch() {
-  const [search, setSearch]     = useState("");
-  const [viewMode, setViewMode] = useState("grid");
+  const [search, setSearch]         = useState("");
+  const [viewMode, setViewMode]     = useState("grid");
+  const [smartSearch, setSmartSearch] = useState({ mode: "keyword", chips: [], query: "" });
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["drugs-public"],
@@ -24,9 +26,16 @@ export default function DoctorDrugSearch() {
   const error   = isError;
 
   const filtered = drugs.filter((drug) => {
+    // Smart search — keyword/chip mode
+    if (smartSearch.mode === "keyword" && smartSearch.chips.length > 0) {
+      const allText = drug.field_values?.map((fv) => Array.isArray(fv.value) ? fv.value.join(" ") : (fv.value || "")).join(" ").toLowerCase() || "";
+      const matches = smartSearch.chips.some((chip) => allText.includes(chip));
+      if (!matches) return false;
+    }
+    // Regular text search
     if (!search.trim()) return true;
     const q = search.toLowerCase();
-    return drug.field_values?.some((fv) => fv.value?.toLowerCase().includes(q));
+    return drug.field_values?.some((fv) => { const v = Array.isArray(fv.value) ? fv.value.join(" ") : (fv.value || ""); return v.toLowerCase().includes(q); });
   });
 
   return (
@@ -39,6 +48,9 @@ export default function DoctorDrugSearch() {
           <h1 className="text-xl sm:text-2xl font-bold mb-1">💊 Drug Database</h1>
           <p className="text-indigo-100 text-xs sm:text-sm">Comprehensive medication library with detailed information</p>
         </div>
+
+        {/* Smart Search */}
+        <SmartSearch onSearch={setSmartSearch} accentColor="indigo" />
 
         {/* Search */}
         <div className="bg-white rounded-2xl p-4 shadow-lg border border-indigo-100 mb-6 flex items-center gap-3">
