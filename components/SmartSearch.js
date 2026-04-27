@@ -1,7 +1,8 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { post as apiPost } from "@/lib/api";
 
-// Common symptom/condition keywords for autosuggestion
 const SYMPTOM_SUGGESTIONS = [
   "fever","headache","cough","cold","nausea","vomiting","diarrhea","constipation",
   "chest pain","shortness of breath","fatigue","dizziness","back pain","joint pain",
@@ -10,40 +11,33 @@ const SYMPTOM_SUGGESTIONS = [
   "infection","inflammation","hypertension","asthma","migraine","acidity",
   "stomach pain","weight loss","weight gain","hair loss","eye pain","ear pain",
   "urinary infection","kidney pain","liver disease","thyroid","anemia","cholesterol",
-  "heart disease","stroke","epilepsy","arthritis","osteoporosis","cancer",
+  "heart disease","stroke","epilepsy","arthritis","osteoporosis",
 ];
 
-export default function SmartSearch({ onSearch, accentColor = "indigo" }) {
-  const [mode, setMode]               = useState("keyword"); // "keyword" | "natural"
+export default function SmartSearch({ onSearch, onSmartResults, accentColor = "indigo" }) {
+  const [mode, setMode]               = useState("keyword");
   const [chips, setChips]             = useState([]);
   const [inputVal, setInputVal]       = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [naturalQuery, setNaturalQuery] = useState("");
   const [showInfo, setShowInfo]       = useState(false);
+  const [smartResults, setSmartResults] = useState(null);
   const inputRef = useRef(null);
   const accent = accentColor;
 
-  // Notify parent whenever chips or natural query changes
-  useEffect(() => {
-    if (mode === "keyword") {
-      onSearch({ mode: "keyword", chips });
-    }
-  }, [chips, mode]);
-
-  useEffect(() => {
-    if (mode === "natural") {
-      onSearch({ mode: "natural", query: naturalQuery });
-    }
-  }, [naturalQuery, mode]);
+  const searchMutation = useMutation({
+    mutationFn: (query) => apiPost("/api/v1/search/drugs", { query, skip: 0, limit: 20 }),
+    onSuccess: (data) => {
+      setSmartResults(data);
+      if (onSmartResults) onSmartResults(data);
+    },
+  });
 
   const handleInput = (val) => {
     setInputVal(val);
     if (!val.trim()) { setSuggestions([]); return; }
     const q = val.toLowerCase();
-    const matches = SYMPTOM_SUGGESTIONS.filter(
-      (s) => s.includes(q) && !chips.includes(s)
-    ).slice(0, 6);
-    setSuggestions(matches);
+    setSuggestions(SYMPTOM_SUGGESTIONS.filter((s) => s.includes(q) && !chips.includes(s)).slice(0, 6));
   };
 
   const addChip = (val) => {
@@ -53,33 +47,41 @@ export default function SmartSearch({ onSearch, accentColor = "indigo" }) {
     setChips(newChips);
     setInputVal("");
     setSuggestions([]);
+    if (onSearch) onSearch({ mode: "keyword", chips: newChips });
     inputRef.current?.focus();
   };
 
-  const removeChip = (chip) => setChips(chips.filter((c) => c !== chip));
+  const removeChip = (chip) => {
+    const newChips = chips.filter((c) => c !== chip);
+    setChips(newChips);
+    if (onSearch) onSearch({ mode: "keyword", chips: newChips });
+  };
 
   const handleKeyDown = (e) => {
-    if ((e.key === "Enter" || e.key === ",") && inputVal.trim()) {
-      e.preventDefault();
-      addChip(inputVal);
-    }
+    if ((e.key === "Enter" || e.key === ",") && inputVal.trim()) { e.preventDefault(); addChip(inputVal); }
     if (e.key === "Backspace" && !inputVal && chips.length > 0) {
-      setChips(chips.slice(0, -1));
+      const newChips = chips.slice(0, -1);
+      setChips(newChips);
+      if (onSearch) onSearch({ mode: "keyword", chips: newChips });
     }
   };
 
   const switchMode = (m) => {
     setMode(m);
-    setChips([]);
-    setInputVal("");
-    setNaturalQuery("");
-    setSuggestions([]);
-    onSearch({ mode: m, chips: [], query: "" });
+    setChips([]); setInputVal(""); setNaturalQuery(""); setSuggestions([]);
+    setSmartResults(null);
+    if (onSearch) onSearch({ mode: m, chips: [], query: "" });
+    if (onSmartResults) onSmartResults(null);
+  };
+
+  const handleNaturalSearch = () => {
+    if (!naturalQuery.trim()) return;
+    searchMutation.mutate(naturalQuery);
   };
 
   return (
     <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 mb-6">
-      {/* Header row */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className="text-sm font-bold text-gray-700">Smart Search</span>
@@ -88,8 +90,6 @@ export default function SmartSearch({ onSearch, accentColor = "indigo" }) {
             ?
           </button>
         </div>
-
-        {/* Mode toggle */}
         <div className="flex items-center bg-gray-100 rounded-xl p-1 gap-1">
           <button onClick={() => switchMode("keyword")}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${mode === "keyword" ? `bg-${accent}-600 text-white shadow` : "text-gray-500 hover:text-gray-700"}`}>
@@ -102,39 +102,30 @@ export default function SmartSearch({ onSearch, accentColor = "indigo" }) {
         </div>
       </div>
 
-      {/* Info tooltip */}
+      {/* Info */}
       {showInfo && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-3 text-xs text-blue-800 space-y-1.5">
-          <p><span className="font-bold">Symptoms mode:</span> Type symptoms one by one (e.g. "fever", "headache") — each becomes a chip. Drugs matching any symptom will show.</p>
-          <p><span className="font-bold">Ask AI mode:</span> Describe your case naturally — "patient has fever and joint pain" — and get AI-powered drug suggestions.</p>
+          <p><span className="font-bold">Symptoms mode:</span> Add symptoms as chips — drugs matching any are shown.</p>
+          <p><span className="font-bold">Ask AI mode:</span> Describe naturally — "I have fever and headache" — AI extracts symptoms and finds matching drugs.</p>
         </div>
       )}
 
-      {/* Keyword / chip mode */}
+      {/* Keyword chip mode */}
       {mode === "keyword" && (
         <div className="relative">
-          <div
-            onClick={() => inputRef.current?.focus()}
+          <div onClick={() => inputRef.current?.focus()}
             className={`min-h-[46px] flex flex-wrap items-center gap-2 px-3 py-2 border-2 rounded-xl cursor-text transition-all ${inputVal || chips.length > 0 ? `border-${accent}-400 ring-2 ring-${accent}-100` : "border-gray-200"}`}>
             {chips.map((chip) => (
-              <span key={chip}
-                className={`flex items-center gap-1 bg-${accent}-100 text-${accent}-700 text-xs font-semibold px-2.5 py-1 rounded-full`}>
+              <span key={chip} className={`flex items-center gap-1 bg-${accent}-100 text-${accent}-700 text-xs font-semibold px-2.5 py-1 rounded-full`}>
                 {chip}
                 <button onClick={() => removeChip(chip)} className="hover:text-red-500 transition-colors leading-none">×</button>
               </span>
             ))}
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputVal}
-              onChange={(e) => handleInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={chips.length === 0 ? "Type a symptom (e.g. fever, headache)..." : "Add more..."}
-              className="flex-1 min-w-[140px] outline-none text-sm bg-transparent text-gray-700 placeholder-gray-400"
-            />
+            <input ref={inputRef} type="text" value={inputVal}
+              onChange={(e) => handleInput(e.target.value)} onKeyDown={handleKeyDown}
+              placeholder={chips.length === 0 ? "Type a symptom or condition..." : "Add more..."}
+              className="flex-1 min-w-[140px] outline-none text-sm bg-transparent text-gray-700 placeholder-gray-400" />
           </div>
-
-          {/* Autosuggestions */}
           {suggestions.length > 0 && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden">
               {suggestions.map((s) => (
@@ -146,13 +137,11 @@ export default function SmartSearch({ onSearch, accentColor = "indigo" }) {
               ))}
             </div>
           )}
-
           {chips.length > 0 && (
             <div className="flex items-center justify-between mt-2">
-              <p className="text-xs text-gray-400">
-                Searching for drugs matching: <span className={`text-${accent}-600 font-semibold`}>{chips.join(", ")}</span>
-              </p>
-              <button onClick={() => setChips([])} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Clear all</button>
+              <p className="text-xs text-gray-400">Matching drugs for: <span className={`text-${accent}-600 font-semibold`}>{chips.join(", ")}</span></p>
+              <button onClick={() => { setChips([]); if (onSearch) onSearch({ mode: "keyword", chips: [] }); }}
+                className="text-xs text-gray-400 hover:text-red-500 transition-colors">Clear all</button>
             </div>
           )}
         </div>
@@ -160,18 +149,46 @@ export default function SmartSearch({ onSearch, accentColor = "indigo" }) {
 
       {/* Natural query mode */}
       {mode === "natural" && (
-        <div className="space-y-2">
-          <textarea
-            value={naturalQuery}
-            onChange={(e) => setNaturalQuery(e.target.value)}
-            placeholder="Describe the condition naturally... e.g. 'Patient has high fever, joint pain and fatigue for 3 days'"
-            rows={3}
-            className={`w-full px-4 py-3 border-2 rounded-xl text-sm outline-none resize-none transition-all placeholder-gray-400 ${naturalQuery ? `border-${accent}-400 ring-2 ring-${accent}-100` : "border-gray-200"}`}
-          />
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-400">AI-powered search — coming soon. Results will show below.</p>
-            <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full font-semibold">Beta</span>
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <textarea value={naturalQuery} onChange={(e) => setNaturalQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleNaturalSearch())}
+              placeholder="Describe symptoms naturally... e.g. 'I have fever, headache and diabetes'"
+              rows={2}
+              className={`flex-1 px-4 py-3 border-2 rounded-xl text-sm outline-none resize-none transition-all placeholder-gray-400 ${naturalQuery ? `border-${accent}-400 ring-2 ring-${accent}-100` : "border-gray-200"}`} />
+            <button onClick={handleNaturalSearch} disabled={!naturalQuery.trim() || searchMutation.isPending}
+              className={`px-4 py-2 bg-${accent}-600 hover:bg-${accent}-700 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 self-end`}>
+              {searchMutation.isPending ? "..." : "Search"}
+            </button>
           </div>
+
+          {/* Extracted entities */}
+          {smartResults?.entities_extracted && (
+            <div className="bg-gray-50 rounded-xl p-3 text-xs space-y-1.5">
+              <p className="font-bold text-gray-600">AI extracted:</p>
+              {smartResults.entities_extracted.symptoms?.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-gray-400 font-semibold">Symptoms:</span>
+                  {smartResults.entities_extracted.symptoms.map((s) => (
+                    <span key={s} className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">{s}</span>
+                  ))}
+                </div>
+              )}
+              {smartResults.entities_extracted.indications?.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-gray-400 font-semibold">Conditions:</span>
+                  {smartResults.entities_extracted.indications.map((i) => (
+                    <span key={i} className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">{i}</span>
+                  ))}
+                </div>
+              )}
+              <p className="text-gray-400">{smartResults.total_results} drug{smartResults.total_results !== 1 ? "s" : ""} found</p>
+            </div>
+          )}
+
+          {searchMutation.isError && (
+            <p className="text-xs text-red-500">Search failed. Please try again.</p>
+          )}
         </div>
       )}
     </div>

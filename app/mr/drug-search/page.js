@@ -13,6 +13,7 @@ export default function MRDrugSearch() {
   const [search, setSearch]           = useState("");
   const [viewMode, setViewMode]       = useState("grid");
   const [smartSearch, setSmartSearch] = useState({ mode: "keyword", chips: [], query: "" });
+  const [smartResults, setSmartResults] = useState(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["drugs-public"],
@@ -42,7 +43,10 @@ export default function MRDrugSearch() {
           <p className="text-orange-100 text-xs sm:text-sm">Comprehensive medication library for medical representatives</p>
         </div>
 
-        <SmartSearch onSearch={setSmartSearch} accentColor="orange" />
+        <SmartSearch
+          onSearch={(s) => { setSmartSearch(s); if (s.mode === "keyword") setSmartResults(null); }}
+          onSmartResults={setSmartResults}
+          accentColor="orange" />
 
         <div className="bg-white rounded-2xl p-4 shadow-lg border border-orange-100 mb-6 flex items-center gap-3">
           <div className="relative flex-1">
@@ -58,7 +62,11 @@ export default function MRDrugSearch() {
         </div>
 
         <p className="text-sm text-gray-500 font-semibold mb-4">
-          Showing <span className="text-orange-600 font-bold">{filtered.length}</span> drugs
+          {smartResults ? (
+            <>Showing <span className="font-bold text-purple-600">{smartResults.total_results}</span> AI results</>
+          ) : (
+            <>Showing <span className="font-bold">{filtered.length}</span> drugs</>
+          )}
         </p>
 
         {isLoading ? (
@@ -68,33 +76,41 @@ export default function MRDrugSearch() {
             <span className="text-5xl">⚠️</span>
             <p className="text-gray-500 mt-4 text-sm">Could not load drugs.</p>
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-2xl shadow border border-gray-100">
-            <span className="text-5xl">💊</span>
-            <p className="text-gray-500 mt-4 text-sm">No drugs found.</p>
-          </div>
-        ) : viewMode === "grid" ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filtered.map((drug) => <DrugCard key={drug._id} drug={drug} />)}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filtered.map((drug) => <DrugListRow key={drug._id} drug={drug} />)}
-          </div>
-        )}
+        ) : (() => {
+          const displayDrugs = smartResults ? smartResults.results : filtered;
+          if (displayDrugs.length === 0) return (
+            <div className="text-center py-16 bg-white rounded-2xl shadow border border-gray-100">
+              <span className="text-5xl">💊</span>
+              <p className="text-gray-500 mt-4 text-sm">No drugs found.</p>
+            </div>
+          );
+          return viewMode === "grid" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {displayDrugs.map((drug) => (
+                <DrugCard key={drug._id} drug={drug}
+                  matchScore={drug.match_score}
+                  matchedEntities={drug.matched_entities} />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {displayDrugs.map((drug) => <DrugListRow key={drug._id} drug={drug} />)}
+            </div>
+          );
+        })()}
       </main>
     </div>
   );
 }
 
-function DrugCard({ drug }) {
-  const name           = getVal(drug, "brand_name") || getVal(drug, "drug_name") || drug.field_values?.[0]?.value || "Drug";
-  const genericName    = getVal(drug, "drug_name");
-  const drugClass      = getVal(drug, "drug_class");
-  const manufacturer   = getVal(drug, "manufacturer");
-  const indications    = getVal(drug, "indications");
-  const dosage         = getVal(drug, "dosage_strength") || getVal(drug, "dosage");
-  const specialization = getVal(drug, "specialization");
+function DrugCard({ drug, matchScore, matchedEntities }) {
+  const name           = drug.brand_name || getVal(drug, "brand_name") || drug.drug_name || getVal(drug, "drug_name") || "Drug";
+  const genericName    = drug.drug_name  || getVal(drug, "drug_name");
+  const drugClass      = drug.drug_class || getVal(drug, "drug_class");
+  const manufacturer   = drug.manufacturer || getVal(drug, "manufacturer");
+  const indications    = Array.isArray(drug.indications) ? drug.indications.join(", ") : (drug.indications || getVal(drug, "indications"));
+  const dosage         = drug.dosage_strength || getVal(drug, "dosage_strength") || getVal(drug, "dosage");
+  const specialization = drug.specialization || getVal(drug, "specialization");
 
   return (
     <Link href={`/drug-details/${drug._id}`}>
@@ -131,6 +147,15 @@ function DrugCard({ drug }) {
           <button className="w-full bg-gradient-to-r from-orange-600 to-red-600 text-white py-2.5 rounded-xl font-bold text-sm group-hover:shadow-lg transition-all">
             View Details →
           </button>
+          {matchScore !== undefined && (
+            <div className="mt-2 flex items-center justify-between text-xs">
+              <span className="text-gray-400">Match: <span className="font-bold text-orange-600">{matchScore.toFixed(0)}%</span></span>
+              <div className="flex gap-1 flex-wrap justify-end">
+                {matchedEntities?.symptoms?.map((s) => <span key={s} className="bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full">{s}</span>)}
+                {matchedEntities?.indications?.map((i) => <span key={i} className="bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">{i}</span>)}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Link>
