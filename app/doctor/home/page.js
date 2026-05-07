@@ -43,10 +43,10 @@ export default function DoctorHome() {
               <p className="text-indigo-100 text-sm sm:text-base mb-4">Stay updated with the latest drug launches and CME events</p>
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <Link href="/doctor/drug-search">
-                  <button className="w-full sm:w-auto bg-white text-indigo-600 px-4 sm:px-6 py-2.5 rounded-lg font-bold hover:shadow-lg transition-all text-sm">Search Drugs</button>
+                  <button className="w-full sm:w-auto bg-white text-indigo-600 px-4 sm:px-6 py-2.5 rounded-lg font-bold hover:shadow-lg transition-all text-sm cursor-pointer">Search Drugs</button>
                 </Link>
                 <Link href="/doctor/cme-events">
-                  <button className="w-full sm:w-auto bg-white text-purple-600 px-4 sm:px-6 py-2.5 rounded-lg font-bold hover:shadow-lg transition-all text-sm">View Events</button>
+                  <button className="w-full sm:w-auto bg-white text-purple-600 px-4 sm:px-6 py-2.5 rounded-lg font-bold hover:shadow-lg transition-all text-sm cursor-pointer">View Events</button>
                 </Link>
               </div>
             </div>
@@ -83,25 +83,28 @@ export default function DoctorHome() {
             ) : (
               <div className="space-y-3">
                 {upcomingEvents.map((event) => (
-                  <div key={event.event_id} className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-3 border border-indigo-100">
-                    <div className="flex items-start justify-between mb-1.5">
-                      <p className="font-bold text-gray-800 text-sm line-clamp-1">{event.title}</p>
-                      <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg text-xs font-bold flex-shrink-0 ml-2">{event.event_type}</span>
+                  <Link key={event.event_id} href="/doctor/cme-events">
+                    <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-3 border border-indigo-100 hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer group">
+                      <div className="flex items-start justify-between mb-1.5">
+                        <p className="font-bold text-gray-800 text-sm line-clamp-1 group-hover:text-indigo-700 transition-colors pr-2">{event.title}</p>
+                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg text-xs font-bold flex-shrink-0">{event.event_type}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+                        <span>📆 {fmtDate(event.event_date)}</span>
+                        <span>⏰ {event.event_time}</span>
+                        {event.event_mode === "online" && event.platform && <span>🖥️ {event.platform}</span>}
+                        {event.event_mode === "offline" && event.venue_name && <span>📍 {event.venue_name}</span>}
+                      </div>
+                      {event.speaker && <p className="text-xs text-indigo-600 font-semibold mt-1">👨‍⚕️ {event.speaker}</p>}
+                      {event.event_mode === "online" && event.meeting_link && (
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(event.meeting_link, "_blank", "noopener,noreferrer"); }}
+                          className="inline-block mt-2 bg-green-100 text-green-700 px-3 py-1 rounded-lg text-xs font-bold hover:bg-green-200 transition-all">
+                          Join Meeting →
+                        </button>
+                      )}
                     </div>
-                    <div className="flex flex-wrap gap-2 text-xs text-gray-500">
-                      <span>📆 {fmtDate(event.event_date)}</span>
-                      <span>⏰ {event.event_time}</span>
-                      {event.event_mode === "online" && event.platform && <span>🖥️ {event.platform}</span>}
-                      {event.event_mode === "offline" && event.venue_name && <span>📍 {event.venue_name}</span>}
-                    </div>
-                    {event.speaker && <p className="text-xs text-indigo-600 font-semibold mt-1">👨‍⚕️ {event.speaker}</p>}
-                    {event.event_mode === "online" && event.meeting_link && (
-                      <a href={event.meeting_link} target="_blank" rel="noreferrer"
-                        className="inline-block mt-2 bg-green-100 text-green-700 px-3 py-1 rounded-lg text-xs font-bold hover:bg-green-200 transition-all">
-                        Join Meeting →
-                      </a>
-                    )}
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}

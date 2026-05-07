@@ -19,7 +19,7 @@ export function middleware(request) {
   const userRole = request.cookies.get("userRole")?.value;
 
   // Public routes — let through
-  if (pathname === "/" || pathname.startsWith("/login") || pathname.startsWith("/api") || pathname.startsWith("/drug-details")) {
+  if (pathname === "/" || pathname.startsWith("/login") || pathname.startsWith("/forgot-password") || pathname.startsWith("/change-password") || pathname.startsWith("/api") || pathname.startsWith("/drug-details")) {
     // If already logged in, redirect to their dashboard
     if (token && userRole && (pathname === "/" || pathname === "/login")) {
       const dest = dashboards[userRole];

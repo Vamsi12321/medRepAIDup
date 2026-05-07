@@ -8,28 +8,104 @@ import { useParams } from "next/navigation";
 import { get } from "@/lib/api";
 
 const formatKey = (key) => key?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "";
-const getVal = (drug, key) => { const v = drug?.field_values?.find((f) => f.key === key)?.value; if (Array.isArray(v)) return v.join(", "); return v || ""; };
+const getVal = (drug, key) => {
+  // Primary: field_values array (official GET /api/v1/drugs/{id} format)
+  if (Array.isArray(drug?.field_values)) {
+    const fv = drug.field_values.find((f) => f.key === key);
+    if (fv !== undefined) {
+      if (Array.isArray(fv.value)) return fv.value.join(", ");
+      return fv.value ?? "";
+    }
+  }
+  // Fallback: top-level field (list endpoint format)
+  if (drug?.[key] !== undefined && drug?.[key] !== null) {
+    const v = drug[key];
+    if (Array.isArray(v)) return v.join(", ");
+    return String(v);
+  }
+  return "";
+};
 
-const HEADER_KEYS = ["brand_name","drug_name","drug_class","specialization","brochure_url"];
+// Helper — fetch with auth, get blob, trigger download using server-provided filename
+async function downloadBrochure(url, fallbackName) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "ngrok-skip-browser-warning": "true",
+    },
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.detail || "Download failed");
+  }
+  // Extract filename from Content-Disposition header
+  const disposition = res.headers.get("content-disposition") || "";
+  const match = disposition.match(/filename[^;=\n]*=["']?([^"'\n;]+)["']?/i);
+  const filename = match?.[1]?.trim() || fallbackName;
+  const blob = await res.blob();
+  const objUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(objUrl);
+}
 
-const FIELD_COLORS = [
-  { border: "border-indigo-400", label: "text-indigo-600", bg: "bg-indigo-50" },
-  { border: "border-blue-400",   label: "text-blue-600",   bg: "bg-blue-50" },
-  { border: "border-green-400",  label: "text-green-600",  bg: "bg-green-50" },
-  { border: "border-yellow-400", label: "text-yellow-600", bg: "bg-yellow-50" },
-  { border: "border-red-400",    label: "text-red-600",    bg: "bg-red-50" },
-  { border: "border-pink-400",   label: "text-pink-600",   bg: "bg-pink-50" },
-  { border: "border-purple-400", label: "text-purple-600", bg: "bg-purple-50" },
-  { border: "border-orange-400", label: "text-orange-600", bg: "bg-orange-50" },
-  { border: "border-teal-400",   label: "text-teal-600",   bg: "bg-teal-50" },
-  { border: "border-cyan-400",   label: "text-cyan-600",   bg: "bg-cyan-50" },
+// Brochure download — uses fetch with auth token so the backend accepts the request
+function BrochureDownloadButton({ drugId }) {
+  const [downloading, setDownloading] = useState(false);
+  const [err, setErr] = useState("");
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    setErr("");
+    try {
+      await downloadBrochure(
+        `/api/v1/drugs/${drugId}/brochure/download`,
+        `drug-${drugId}-brochure.pdf`
+      );
+    } catch (e) {
+      setErr(e.message || "Download failed");
+    }
+    setDownloading(false);
+  };
+
+  return (
+    <div>
+      <button onClick={handleDownload} disabled={downloading}
+        className="w-full flex items-center gap-3 bg-gray-50 rounded-xl p-3 border border-gray-200 hover:shadow-md hover:border-indigo-300 transition-all group disabled:opacity-50">
+        <div className="w-9 h-9 bg-gradient-to-br from-red-500 to-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
+          <span className="text-sm">📄</span>
+        </div>
+        <div className="flex-1 min-w-0 text-left">
+          <p className="font-semibold text-gray-800 text-xs group-hover:text-indigo-600 transition-colors">Drug Brochure</p>
+          <p className="text-xs text-gray-400">{downloading ? "Downloading..." : "PDF · Click to download"}</p>
+        </div>
+        <span className="text-xs text-indigo-600 font-bold flex-shrink-0">{downloading ? "..." : "↓"}</span>
+      </button>
+      {err && <p className="text-xs text-red-500 mt-1 px-1">{err}</p>}
+    </div>
+  );
+}
+
+// Ordered sections with labels, icons, colors
+const SECTIONS = [
+  { key: "indications",         label: "Indications",          icon: "🩺", bg: "bg-blue-50",   border: "border-blue-200",   text: "text-blue-700",   isList: true  },
+  { key: "symptoms",            label: "Symptoms",             icon: "🤒", bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700", isList: true  },
+  { key: "side_effects",        label: "Side Effects",         icon: "⚠️", bg: "bg-red-50",    border: "border-red-200",    text: "text-red-700",    isList: true  },
+  { key: "mechanism_of_action", label: "Mechanism of Action",  icon: "🔬", bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-700", isList: false },
+  { key: "dosage_strength",     label: "Dosage Strength",      icon: "💊", bg: "bg-green-50",  border: "border-green-200",  text: "text-green-700",  isList: false },
+  { key: "dosage_form",         label: "Dosage Form",          icon: "💉", bg: "bg-teal-50",   border: "border-teal-200",   text: "text-teal-700",   isList: false },
+  { key: "route",               label: "Route",                icon: "🔄", bg: "bg-cyan-50",   border: "border-cyan-200",   text: "text-cyan-700",   isList: false },
 ];
 
 export default function DrugDetails() {
-  const params  = useParams();
-  const drugId  = params.id;
-
-  const [userRole, setUserRole] = useState("doctor");
+  const params = useParams();
+  const drugId = params.id;
+  const [userRole, setUserRole]       = useState("doctor");
   const [question, setQuestion]       = useState("");
   const [chatHistory, setChatHistory] = useState([]);
   const [isAsking, setIsAsking]       = useState(false);
@@ -39,28 +115,33 @@ export default function DrugDetails() {
     if (role) setUserRole(role);
   }, []);
 
- const { data: drug, isLoading: loading } = useQuery({
-  queryKey: ["drug", drugId],
-  queryFn:  () => get(`/api/v1/drugs/${drugId}`),
-  enabled:  !!drugId,
-  staleTime: 10 * 60 * 1000,
-});
+  const { data: drug, isLoading: loading } = useQuery({
+    queryKey: ["drug", drugId],
+    queryFn:  () => get(`/api/v1/drugs/${drugId}`),
+    enabled:  !!drugId,
+    staleTime: 10 * 60 * 1000,
+  });
 
   const handleAsk = () => {
     if (!question.trim() || !drug) return;
     setChatHistory((p) => [...p, { type: "user", text: question }]);
     setIsAsking(true);
     const q   = question.toLowerCase();
-    const ctx = (drug.field_values || []).map((fv) => `${formatKey(fv.key)}: ${fv.value}`).join(". ");
+    const ctx = (drug.field_values?.length > 0
+      ? drug.field_values
+      : Object.entries(drug)
+          .filter(([k, v]) => v && typeof v !== "object")
+          .map(([k, v]) => ({ key: k, value: v }))
+    ).map((fv) => `${formatKey(fv.key)}: ${fv.value}`).join(". ");
     setTimeout(() => {
-      const sideEffects = getVal(drug, "side_effects");
-      const mechanism   = getVal(drug, "mechanism_of_action");
-      const dosage      = getVal(drug, "dosage_strength") || getVal(drug, "dosage");
-      const name        = getVal(drug, "brand_name") || getVal(drug, "drug_name");
+      const sideEffects = drug.side_effects     || getVal(drug, "side_effects");
+      const mechanism   = drug.mechanism_of_action || getVal(drug, "mechanism_of_action");
+      const dosage      = drug.dosage_strength  || getVal(drug, "dosage_strength") || drug.dosage || getVal(drug, "dosage");
+      const name        = drug.drug_name || getVal(drug, "drug_name") || drug.brand_name || getVal(drug, "brand_name") || "this drug";
       let answer = "";
-      if (q.includes("side effect"))           answer = sideEffects ? `Side effects of ${name}: ${sideEffects}.` : "No side effects data available.";
-      else if (q.includes("mechanism") || q.includes("action")) answer = mechanism ? `${name} works by: ${mechanism}.` : "Mechanism not available.";
-      else if (q.includes("dose") || q.includes("dosage"))      answer = dosage ? `Dosage for ${name}: ${dosage}.` : "Dosage not available.";
+      if (q.includes("side effect"))                              answer = sideEffects ? `Side effects of ${name}: ${sideEffects}.` : "No side effects data available.";
+      else if (q.includes("mechanism") || q.includes("action"))  answer = mechanism ? `${name} works by: ${mechanism}.` : "Mechanism not available.";
+      else if (q.includes("dose") || q.includes("dosage"))       answer = dosage ? `Dosage for ${name}: ${dosage}.` : "Dosage not available.";
       else answer = `Here is what I know about ${name}: ${ctx}`;
       setChatHistory((p) => [...p, { type: "ai", text: answer }]);
       setIsAsking(false);
@@ -70,151 +151,217 @@ export default function DrugDetails() {
 
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p className="text-gray-400 text-sm">Loading drug details...</p>
+      <p className="text-gray-400 text-sm">Loading...</p>
     </div>
   );
-
   if (!drug) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <p className="text-gray-500 text-sm">Drug not found.</p>
     </div>
   );
 
-  const name           = getVal(drug, "brand_name") || getVal(drug, "drug_name") || "Drug";
-  const genericName    = getVal(drug, "drug_name");
-  const drugClass      = getVal(drug, "drug_class");
-  const manufacturer   = getVal(drug, "manufacturer");
-  const specialization = getVal(drug, "specialization");
-
-  // All fields except header ones
-  const detailFields = (drug.field_values || []).filter((fv) => !HEADER_KEYS.includes(fv.key) && fv.value);
+  const drugName       = getVal(drug, "drug_name")     || drug.drug_name     || drug.name || "Drug";
+  const brandName      = getVal(drug, "brand_name")    || drug.brand_name;
+  const drugClass      = getVal(drug, "drug_class")    || drug.drug_class;
+  const manufacturer   = getVal(drug, "manufacturer")  || drug.manufacturer;
+  const specialization = getVal(drug, "specialization") || drug.specialization;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gray-50">
       {userRole === "mr" ? <MRNavbar /> : <DoctorNavbar />}
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Breadcrumb customItems={[
-          { label: userRole === "mr" ? "💼 MR Portal" : "👨‍⚕️ Doctor", href: userRole === "mr" ? "/mr/dashboard" : "/doctor/home" },
-          { label: "🔍 Drug Search", href: userRole === "mr" ? "/mr/drug-search" : "/doctor/drug-search" },
-          { label: `💊 ${name}`, href: null },
+          { label: userRole === "mr" ? "MR Portal" : "Doctor", href: userRole === "mr" ? "/mr/dashboard" : "/doctor/home" },
+          { label: "Drug Search", href: userRole === "mr" ? "/mr/drug-search" : "/doctor/drug-search" },
+          { label: drugName, href: null },
         ]} />
 
-        {/* Header */}
-        <div className="bg-white rounded-3xl p-7 shadow-xl mb-8 border border-gray-100 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-br from-indigo-400 to-purple-500 opacity-10 rounded-full -mr-36 -mt-36" />
-          <div className="h-1 absolute top-0 left-0 right-0 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-t-3xl" />
-          <div className="relative flex items-start justify-between gap-6 mt-2">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-                  {name?.charAt(0)?.toUpperCase()}
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-800 capitalize">{name}</h1>
-                  {genericName && name !== genericName && <p className="text-sm text-gray-400 capitalize">{genericName}</p>}
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2 mt-3">
-                {drugClass      && <span className="bg-indigo-100 text-indigo-700 px-4 py-1.5 rounded-xl font-semibold text-sm">{drugClass}</span>}
-                {specialization && <span className="bg-blue-100 text-blue-700 px-4 py-1.5 rounded-xl font-semibold text-sm">{specialization}</span>}
-                {manufacturer   && <span className="bg-gray-100 text-gray-700 px-4 py-1.5 rounded-xl font-semibold text-sm">🏢 {manufacturer}</span>}
-              </div>
+        {/* Compact header */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 mb-5 overflow-hidden">
+          <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+          <div className="px-5 py-4 flex items-center gap-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow flex-shrink-0">
+              {drugName?.charAt(0)?.toUpperCase()}
             </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Drug info — all fields */}
-          <div className="bg-white rounded-3xl p-7 shadow-xl border border-gray-100">
-            <h2 className="text-xl font-bold text-gray-800 mb-5 flex items-center gap-3">
-              <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center"><span>💊</span></div>
-              Drug Information
-            </h2>
-            {detailFields.length === 0 ? (
-              <p className="text-gray-400 text-sm">No additional information available.</p>
-            ) : (
-              <div className="space-y-3">
-                {detailFields.map((fv, i) => {
-                  const c = FIELD_COLORS[i % FIELD_COLORS.length];
-                  return (
-                    <div key={fv.field_id || fv.key} className={`${c.bg} rounded-xl p-3.5 border-l-4 ${c.border}`}>
-                      <p className={`text-xs font-bold ${c.label} mb-1`}>{formatKey(fv.key)}</p>
-                      <p className="text-gray-800 font-medium text-sm">{Array.isArray(fv.value) ? fv.value.join(", ") : fv.value}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Documents */}
-          <div className="bg-white rounded-3xl p-7 shadow-xl border border-gray-100">
-            <h2 className="text-xl font-bold text-gray-800 mb-5 flex items-center gap-3">
-              <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center"><span>📁</span></div>
-              Documents & Resources
-            </h2>
-            <div className="space-y-3">
-              {getVal(drug, "brochure_url") ? (
-                <a href={getVal(drug, "brochure_url")} target="_blank" rel="noreferrer"
-                  className="flex items-center gap-4 bg-gradient-to-r from-gray-50 to-white rounded-2xl p-4 border border-gray-200 hover:shadow-lg transition-all group">
-                  <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-orange-500 rounded-xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
-                    <span className="text-xl">📄</span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-800 group-hover:text-indigo-600 transition-colors">Drug Brochure</p>
-                    <p className="text-sm text-gray-500">PDF · Click to view</p>
-                  </div>
-                  <span className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-xl font-bold text-sm">View</span>
-                </a>
-              ) : (
-                <div className="text-center py-8 text-gray-400 text-sm">No documents available yet.</div>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl font-bold text-gray-900 capitalize leading-tight">{drugName}</h1>
+              {brandName && drugName !== brandName && (
+                <p className="text-sm text-indigo-500 font-semibold capitalize">{brandName}</p>
               )}
             </div>
+            <div className="flex flex-wrap gap-1.5 justify-end">
+              {drugClass      && <span className="bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-lg text-xs font-semibold">{drugClass}</span>}
+              {specialization && <span className="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-lg text-xs font-semibold">{specialization}</span>}
+              {manufacturer   && <span className="bg-gray-100 text-gray-600 px-2.5 py-1 rounded-lg text-xs font-semibold">{manufacturer}</span>}
+            </div>
           </div>
         </div>
 
-        {/* AI Chat */}
-        <div className="bg-white rounded-3xl p-7 shadow-xl border border-gray-100">
-          <h2 className="text-xl font-bold text-gray-800 mb-5 flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center"><span>🤖</span></div>
-            Ask AI About This Drug
-          </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
+          {/* Drug info — 2/3 width */}
+          <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+            <h2 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2 uppercase tracking-wide">
+              <span className="w-5 h-5 bg-indigo-100 rounded-lg flex items-center justify-center text-xs">💊</span>
+              Drug Information
+            </h2>
+            <div className="space-y-3">
+              {SECTIONS.map(({ key, label, icon, bg, border, text, isList }) => {
+                // Use getVal — reads field_values first, then top-level fallback
+                const rawVal = drug.field_values?.length > 0
+                  ? drug.field_values.find((f) => f.key === key)?.value ?? drug[key] ?? null
+                  : drug[key] ?? null;
+                const isEmpty = rawVal === null || rawVal === undefined || (Array.isArray(rawVal) && rawVal.length === 0) || rawVal === "";
+                const items = Array.isArray(rawVal) ? rawVal : (rawVal ? [String(rawVal)] : []);
+                return (
+                  <div key={key} className={`${bg} border ${border} rounded-xl p-3`}>
+                    <p className={`text-xs font-bold ${text} mb-1.5 flex items-center gap-1.5`}>
+                      <span>{icon}</span>{label}
+                    </p>
+                    {isEmpty ? (
+                      <p className="text-gray-400 text-xs italic">No {label.toLowerCase()} found</p>
+                    ) : isList ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {items.map((item, i) => (
+                          <span key={i} className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${bg} ${text} border ${border}`}>
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-800 text-xs leading-relaxed">{items.join(", ")}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
-          <div className="overflow-y-auto space-y-3 mb-4 max-h-64">
-            {chatHistory.length === 0 && (
-              <div className="flex flex-wrap gap-2">
-                {["What are the side effects?","What is the mechanism of action?","What is the dosage?","What are the indications?"].map((q) => (
-                  <button key={q} onClick={() => setQuestion(q)}
-                    className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl text-xs font-semibold hover:bg-indigo-100 border border-indigo-200 transition-all">
-                    {q}
-                  </button>
+          {/* Right column — docs + brochure */}
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+              <h2 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2 uppercase tracking-wide">
+                <span className="w-5 h-5 bg-blue-100 rounded-lg flex items-center justify-center text-xs">📁</span>
+                Documents
+              </h2>
+              {drug.has_brochure ? (
+                <div className="space-y-2">
+                  <BrochureDownloadButton drugId={drugId} />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 py-3 px-1">
+                  <span className="text-gray-300 text-lg">📄</span>
+                  <p className="text-gray-400 text-xs">No brochure available for this drug</p>
+                </div>
+              )}
+            </div>
+
+            {/* Quick facts */}
+            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100 p-4">
+              <p className="text-xs font-bold text-indigo-700 mb-2 uppercase tracking-wide">Quick Facts</p>
+              <div className="space-y-1.5 text-xs">
+                {[
+                  { label: "Drug Name",  value: drugName },
+                  { label: "Brand",      value: brandName },
+                  { label: "Class",      value: drugClass },
+                  { label: "By",         value: manufacturer },
+                ].filter((r) => r.value).map((r) => (
+                  <div key={r.label} className="flex items-center justify-between gap-2">
+                    <span className="text-gray-400 font-medium flex-shrink-0">{r.label}</span>
+                    <span className="text-gray-700 font-semibold text-right truncate capitalize">{r.value}</span>
+                  </div>
                 ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* AI Chat — light premium */}
+        <div className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 rounded-2xl border border-indigo-100 p-5 relative overflow-hidden">
+          {/* Subtle background accents */}
+          <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-indigo-100/40 to-purple-100/40 rounded-full -mr-24 -mt-24 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-indigo-100/30 rounded-full -ml-16 -mb-16 pointer-events-none" />
+
+          {/* Header */}
+          <div className="flex items-center gap-2.5 mb-4 relative">
+            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md shadow-indigo-200">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-gray-900 font-bold text-sm leading-tight">Ask AI About This Drug</p>
+              <p className="text-indigo-400 text-xs">Powered by AI · Instant answers</p>
+            </div>
+            <div className="ml-auto flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-green-600 text-xs font-medium">Online</span>
+            </div>
+          </div>
+
+          {/* Chat area */}
+          <div className="overflow-y-auto space-y-2.5 mb-4 max-h-48 relative">
+            {chatHistory.length === 0 && (
+              <div className="space-y-2">
+                <p className="text-gray-400 text-xs">Quick questions:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {["Side effects?","Mechanism of action?","Dosage?","Indications?"].map((q) => (
+                    <button key={q} onClick={() => setQuestion(q)}
+                      className="bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 hover:border-indigo-400 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm">
+                      {q}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             {chatHistory.map((msg, i) => (
-              <div key={i} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-2xl px-5 py-3 rounded-2xl text-sm shadow ${msg.type === "user" ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white" : "bg-white border border-gray-200 text-gray-800"}`}>
-                  <p className="text-xs font-bold mb-1 opacity-70">{msg.type === "user" ? "👤 You" : "🤖 AI Assistant"}</p>
+              <div key={i} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"} items-end gap-2`}>
+                {msg.type === "ai" && (
+                  <div className="w-6 h-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
+                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </div>
+                )}
+                <div className={`max-w-sm px-3.5 py-2.5 rounded-xl text-xs leading-relaxed shadow-sm ${
+                  msg.type === "user"
+                    ? "bg-indigo-600 text-white rounded-br-sm"
+                    : "bg-white text-gray-800 border border-indigo-100 rounded-bl-sm"
+                }`}>
                   {msg.text}
                 </div>
               </div>
             ))}
             {isAsking && (
-              <div className="flex justify-start">
-                <div className="bg-white border border-gray-200 px-5 py-3 rounded-2xl text-sm text-gray-500 animate-pulse">🤖 Thinking...</div>
+              <div className="flex justify-start items-end gap-2">
+                <div className="w-6 h-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
+                </div>
+                <div className="bg-white border border-indigo-100 px-3.5 py-2.5 rounded-xl rounded-bl-sm shadow-sm">
+                  <div className="flex gap-1">
+                    {[0,1,2].map((i) => (
+                      <span key={i} className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: `${i*150}ms`}} />
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>
 
-          <div className="flex gap-3">
+          {/* Input */}
+          <div className="flex gap-2 relative">
             <input type="text" value={question} onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAsk()}
-              placeholder="Ask a question about this drug..."
-              className="flex-1 px-5 py-3 border-2 border-gray-200 rounded-2xl text-sm focus:border-indigo-400 outline-none bg-gray-50 focus:bg-white transition-all" />
-            <button onClick={handleAsk} disabled={isAsking}
-              className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white px-8 py-3 rounded-2xl font-bold text-sm hover:shadow-xl transition-all disabled:opacity-50">
-              Ask AI →
+              placeholder="Ask anything about this drug..."
+              className="flex-1 px-4 py-2.5 bg-white border border-indigo-200 rounded-xl text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all shadow-sm" />
+            <button onClick={handleAsk} disabled={isAsking || !question.trim()}
+              className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-40 shadow-md shadow-indigo-200 flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+              Ask
             </button>
           </div>
         </div>

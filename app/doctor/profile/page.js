@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import DoctorNavbar from "@/components/doctor/DoctorNavbar";
 import { get, put } from "@/lib/api";
+import ChangePasswordSection from "@/components/ChangePasswordSection";
 
 export default function DoctorProfile() {
   const queryClient = useQueryClient();
@@ -203,6 +204,8 @@ export default function DoctorProfile() {
             </div>
           </div>
         )}
+        <ChangePasswordSection accentColor="indigo" />
+
       </main>
     </div>
   );

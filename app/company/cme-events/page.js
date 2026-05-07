@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
 import { get, post, put } from "@/lib/api";
+import { formatIST } from "@/lib/time";
 
 const STATUS_STYLES = {
   upcoming:    { bg: "bg-green-100",  text: "text-green-700",  label: "Upcoming" },
@@ -18,6 +19,7 @@ export default function CompanyCMEEvents() {
   const [showModal, setShowModal]       = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [focusRecording, setFocusRecording] = useState(false);
+  const [statsEvent, setStatsEvent]     = useState(null); // event to show stats for
 
   const { data, isLoading ,refetch} = useQuery({
     queryKey: ["cme", activeTab],
@@ -166,6 +168,10 @@ export default function CompanyCMEEvents() {
                       <button onClick={() => { setEditingEvent(event); setShowModal(true); }}
                         disabled={event.status === "cancelled"}
                         className="flex-1 bg-blue-100 text-blue-600 py-2 rounded-lg font-semibold hover:bg-blue-200 transition-all text-xs disabled:opacity-40 disabled:cursor-not-allowed">Edit</button>
+                      <button onClick={() => setStatsEvent(event)}
+                        className="flex-1 bg-indigo-100 text-indigo-600 py-2 rounded-lg font-semibold hover:bg-indigo-200 transition-all text-xs">
+                        Registrations
+                      </button>
                       {event.status === "completed" && !event.event_recording && (
                         <button onClick={() => { setEditingEvent(event); setFocusRecording(true); setShowModal(true); }}
                           className="flex-1 bg-purple-100 text-purple-600 py-2 rounded-lg font-semibold hover:bg-purple-200 transition-all text-xs">Upload Recording</button>
@@ -190,6 +196,9 @@ export default function CompanyCMEEvents() {
           onClose={() => { setShowModal(false); setEditingEvent(null); setFocusRecording(false); }}
           onSaved={refetch}
         />
+      )}
+      {statsEvent && (
+        <RegistrationsModal event={statsEvent} onClose={() => setStatsEvent(null)} />
       )}
     </div>
   );
@@ -430,6 +439,128 @@ function EventModal({ editingEvent, focusRecording, onClose, onSaved }) {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function RegistrationsModal({ event, onClose }) {
+  const [tab, setTab] = useState("stats");
+
+  const { data: statsData, isLoading: statsLoading } = useQuery({
+    queryKey: ["cme-stats", event._id],
+    queryFn: () => get(`/api/v1/cme/${event._id}/statistics`),
+    staleTime: 30000,
+  });
+
+  const { data: regsData, isLoading: regsLoading } = useQuery({
+    queryKey: ["cme-registrations", event._id, tab],
+    queryFn: () => get(`/api/v1/cme/${event._id}/registrations?status=${tab === "cancelled" ? "cancelled" : "registered"}&limit=100`),
+    enabled: tab !== "stats",
+    staleTime: 30000,
+  });
+
+  const stats = statsData || {};
+  const regs  = regsData?.registrations || [];
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 rounded-t-2xl flex-shrink-0">
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="text-white font-bold text-lg leading-tight">{event.title}</h2>
+              <p className="text-indigo-200 text-xs mt-0.5">Registration Overview</p>
+            </div>
+            <button onClick={onClose} className="text-white/70 hover:text-white text-2xl leading-none">&times;</button>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2 px-6 pt-4 flex-shrink-0">
+          {[
+            { id: "stats",     label: "Statistics" },
+            { id: "registered", label: "Registered" },
+            { id: "cancelled",  label: "Cancelled" },
+          ].map((t) => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${tab === t.id ? "bg-indigo-600 text-white shadow" : "text-gray-600 hover:bg-gray-100"}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          {tab === "stats" && (
+            statsLoading ? (
+              <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {[
+                    { label: "Total Registrations",  value: stats.total_registrations,    color: "indigo" },
+                    { label: "Active",               value: stats.active_registrations,   color: "green" },
+                    { label: "Cancelled",            value: stats.cancelled_registrations, color: "red" },
+                    { label: "Capacity",             value: stats.capacity ?? "Unlimited", color: "blue" },
+                    { label: "Available Spots",      value: stats.available_spots ?? "—",  color: "teal" },
+                    { label: "Fill Rate",            value: stats.registration_rate ?? "—", color: "purple" },
+                  ].map((s) => (
+                    <div key={s.label} className={`bg-${s.color}-50 border border-${s.color}-100 rounded-2xl p-4`}>
+                      <p className={`text-2xl font-bold text-${s.color}-600`}>{s.value}</p>
+                      <p className="text-xs text-gray-500 font-medium mt-0.5">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+                {stats.capacity && (
+                  <div className="bg-gray-50 rounded-2xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-semibold text-gray-700">Capacity</p>
+                      <p className="text-sm font-bold text-indigo-600">{stats.registration_rate}</p>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div className="bg-gradient-to-r from-indigo-500 to-purple-500 h-3 rounded-full transition-all"
+                        style={{ width: stats.registration_rate || "0%" }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          )}
+
+          {(tab === "registered" || tab === "cancelled") && (
+            regsLoading ? (
+              <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+            ) : regs.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-400 font-medium">No {tab} registrations.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {regs.map((r) => (
+                  <div key={r._id} className="flex items-center gap-4 bg-gray-50 rounded-xl px-4 py-3">
+                    <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                      {r.doctor_name?.charAt(0)?.toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 text-sm truncate">{r.doctor_name}</p>
+                      <p className="text-xs text-gray-400">
+                        {tab === "registered"
+                          ? `Registered ${r.registered_at ? new Date(r.registered_at).toLocaleDateString() : ""}`
+                          : `Cancelled ${r.cancelled_at ? new Date(r.cancelled_at).toLocaleDateString() : ""}${r.cancel_reason ? `  ${r.cancel_reason}` : ""}`}
+                      </p>
+                    </div>
+                    {r.registration_passcode && (
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-lg font-mono font-bold flex-shrink-0">
+                        {r.registration_passcode}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+        </div>
       </div>
     </div>
   );

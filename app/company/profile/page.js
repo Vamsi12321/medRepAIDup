@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
 import { get, put } from "@/lib/api";
+import ChangePasswordSection from "@/components/ChangePasswordSection";
 
 const ADMIN_ONLY = ["company_name","company_address","company_pincode","company_gst_number","company_pan_number"];
 
@@ -299,6 +300,8 @@ export default function CompanyProfile() {
             </div>
           </div>
         )}
+        <ChangePasswordSection accentColor="purple" />
+
       </main>
     </div>
   );

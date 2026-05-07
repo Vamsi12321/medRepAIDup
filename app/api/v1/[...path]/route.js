@@ -1,6 +1,12 @@
 const BACKEND = process.env.BACKEND_URL;
 
 async function forward(req, { params }) {
+  // Guard — if BACKEND_URL not set, return clear error
+  if (!BACKEND) {
+    console.error("[proxy] BACKEND_URL is not set in environment");
+    return Response.json({ detail: "Proxy misconfigured: BACKEND_URL not set" }, { status: 500 });
+  }
+
   const { path: segments } = await params;
   const path = segments.join("/");
   const { searchParams } = new URL(req.url);
@@ -8,38 +14,53 @@ async function forward(req, { params }) {
   const url = `${BACKEND}/api/v1/${path}${query ? "?" + query : ""}`;
 
   const method = req.method;
-  const auth   = req.headers.get("authorization") || "";
+  const auth = req.headers.get("authorization") || "";
   const contentType = req.headers.get("content-type") || "";
 
-  let body;
-  let forwardHeaders = { Authorization: auth };
+  const forwardHeaders = {
+    Authorization: auth,
+    "ngrok-skip-browser-warning": "true",
+    "User-Agent": "MedRepAI-Proxy/1.0",
+  };
 
-  if (method !== "GET" && method !== "DELETE") {
+  let body;
+
+  if (method !== "GET" && method !== "HEAD" && method !== "DELETE") {
     if (contentType.includes("multipart/form-data")) {
-      // Forward FormData as-is — do NOT set Content-Type (browser sets boundary automatically)
+      // Forward FormData as-is — browser sets Content-Type with boundary
       body = await req.formData();
     } else {
-      // JSON body
-      try { body = JSON.stringify(await req.json()); } catch { body = undefined; }
-      forwardHeaders["Content-Type"] = "application/json";
+      // Read raw body text — avoids req.json() stream consumption issues
+      const rawText = await req.text();
+      if (rawText && rawText.trim()) {
+        body = rawText;
+        forwardHeaders["Content-Type"] = "application/json";
+      }
     }
   }
 
   const res = await fetch(url, {
     method,
     headers: forwardHeaders,
+    redirect: "follow",
     ...(body !== undefined ? { body } : {}),
   });
 
-  // Forward CSV/binary responses as-is without JSON parsing
+  // Forward binary/CSV/PDF responses as-is
   const resContentType = res.headers.get("content-type") || "";
-  if (resContentType.includes("text/csv") || resContentType.includes("application/octet-stream") || resContentType.includes("text/plain")) {
+  if (
+    resContentType.includes("text/csv") ||
+    resContentType.includes("application/octet-stream") ||
+    resContentType.includes("application/pdf") ||
+    resContentType.includes("text/plain")
+  ) {
     const blob = await res.blob();
+    const disposition = res.headers.get("content-disposition") || "attachment; filename=brochure.pdf";
     return new Response(blob, {
       status: res.status,
       headers: {
         "Content-Type": resContentType,
-        "Content-Disposition": res.headers.get("content-disposition") || "attachment",
+        "Content-Disposition": disposition,
       },
     });
   }
@@ -47,6 +68,11 @@ async function forward(req, { params }) {
   const text = await res.text();
   let data;
   try { data = JSON.parse(text); } catch { data = { detail: text }; }
+
+  if (!res.ok) {
+    console.error(`[proxy] ${method} ${url} → ${res.status}`, JSON.stringify(data));
+  }
+
   return Response.json(data, { status: res.status });
 }
 
