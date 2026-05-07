@@ -386,6 +386,7 @@ function ScheduleVisitForm({ assignedDoctors, loadingData, onClose, onSchedule }
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.doctor_id) { setError("Please select a doctor"); return; }
+    if (!form.location?.trim()) { setError("Location is required"); return; }
     if (!form.scheduled_date || !form.scheduled_time) { setError("Please set date and time"); return; }
     if (!form.purpose) { setError("Please select a purpose"); return; }
     onSchedule(form);
@@ -451,9 +452,12 @@ function ScheduleVisitForm({ assignedDoctors, loadingData, onClose, onSchedule }
 
               {/* Location */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">Location</label>
+                <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                  Location <span className="text-red-500">*</span>
+                </label>
                 <input type="text" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })}
                   placeholder="e.g. Doctor's clinic, Hospital OPD..."
+                  required
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none text-sm" />
               </div>
 
