@@ -5,6 +5,14 @@ import { useState } from "react";
 import { logout } from "@/lib/auth";
 import NotificationBell from "@/components/NotificationBell";
 
+const PAGE_TITLES = {
+  "/doctor/home":        { title: "Home",        icon: "🏠", sub: "Your dashboard" },
+  "/doctor/drug-search": { title: "Drug Search",  icon: "🔍", sub: "Search & analyze drugs" },
+  "/doctor/cme-events":  { title: "CME Events",   icon: "🎓", sub: "Continuing Medical Education" },
+  "/doctor/network":     { title: "Network",      icon: "🤝", sub: "Connect with peers" },
+  "/doctor/profile":     { title: "Profile",      icon: "👤", sub: "Your account" },
+};
+
 export default function DoctorNavbar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -39,26 +47,29 @@ export default function DoctorNavbar() {
 
       <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            <Link href="/doctor/home" className="flex items-center space-x-3 group">
-              <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center transform group-hover:scale-110 transition-transform shadow-lg">
-                <span className="text-2xl">💊</span>
+          <div className="flex justify-between items-center h-14">
+
+            {/* Logo — compact */}
+            <Link href="/doctor/home" className="flex items-center gap-2 group shrink-0">
+              <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center transform group-hover:scale-110 transition-transform shadow">
+                <span className="text-base">💊</span>
               </div>
-              <div>
-                <span className="text-2xl font-bold text-gray-900">MedRepAI</span>
-                <span className="block text-xs text-gray-500 -mt-1">Professional Platform</span>
+              <div className="leading-tight hidden sm:block">
+                <span className="text-sm font-bold text-gray-900 block">MedRepAI</span>
+                <span className="text-xs text-indigo-500 -mt-0.5 block">Doctor Portal</span>
               </div>
             </Link>
 
-            <div className="hidden md:flex items-center space-x-2">
+            {/* Desktop nav */}
+            <div className="hidden lg:flex items-center gap-0.5">
               {navItems.map((item) => (
                 <Link
                   key={item.path}
                   href={item.path}
-                  className={`flex items-center space-x-1.5 px-4 py-2.5 rounded-xl font-semibold transition-all ${
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
                     pathname === item.path
-                      ? "bg-indigo-600 text-white shadow-lg"
-                      : "text-gray-700 hover:bg-gray-50"
+                      ? "bg-indigo-600 text-white shadow"
+                      : "text-gray-600 hover:bg-gray-100"
                   }`}
                 >
                   <span>{item.icon}</span>
@@ -67,22 +78,22 @@ export default function DoctorNavbar() {
               ))}
             </div>
 
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center gap-2">
               <NotificationBell accentColor="indigo" />
-              <button 
+              <button
                 onClick={handleLogout}
-                className="hidden md:flex items-center space-x-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-xl font-semibold transition-all"
+                className="hidden lg:flex items-center gap-1.5 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-semibold transition-all"
               >
                 <span>🚪</span>
                 <span>Logout</span>
               </button>
-              
-              {/* Mobile Menu Button */}
+
+              {/* Mobile hamburger */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+                className="lg:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   {isMobileMenuOpen ? (
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   ) : (
@@ -95,16 +106,16 @@ export default function DoctorNavbar() {
 
           {/* Mobile Menu */}
           {isMobileMenuOpen && (
-            <div className="md:hidden py-4 border-t border-gray-200 animate-fadeIn">
-              <div className="space-y-2">
+            <div className="lg:hidden py-3 border-t border-gray-100">
+              <div className="grid grid-cols-2 gap-1.5">
                 {navItems.map((item) => (
                   <Link
                     key={item.path}
                     href={item.path}
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className={`flex items-center space-x-2 px-4 py-3 rounded-xl font-semibold transition-all ${
+                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                       pathname === item.path
-                        ? "bg-indigo-600 text-white shadow-lg"
+                        ? "bg-indigo-600 text-white shadow"
                         : "text-gray-700 hover:bg-gray-50"
                     }`}
                   >
@@ -114,7 +125,7 @@ export default function DoctorNavbar() {
                 ))}
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl font-semibold transition-all flex items-center space-x-2"
+                  className="col-span-2 text-left px-3 py-2.5 text-red-600 hover:bg-red-50 rounded-xl text-sm font-semibold transition-all flex items-center gap-2"
                 >
                   <span>🚪</span>
                   <span>Logout</span>
@@ -124,6 +135,17 @@ export default function DoctorNavbar() {
           )}
         </div>
       </nav>
+
+      {/* Page title bar */}
+      {PAGE_TITLES[pathname] && (
+        <div className="bg-white border-b border-gray-100">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-2">
+            <span className="text-sm">{PAGE_TITLES[pathname].icon}</span>
+            <span className="text-sm font-bold text-gray-800">{PAGE_TITLES[pathname].title}</span>
+            <span className="text-gray-400 text-xs hidden sm:inline">· {PAGE_TITLES[pathname].sub}</span>
+          </div>
+        </div>
+      )}
     </>
   );
 }

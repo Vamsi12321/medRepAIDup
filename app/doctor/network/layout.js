@@ -9,8 +9,8 @@ const tabs = [
   { href: "/doctor/network/my-posts",   label: "My Posts",   icon: Icons.myPosts },
   { href: "/doctor/network/my-network", label: "My Network", icon: Icons.network },
   { href: "/doctor/network/messages",   label: "Messages",   icon: Icons.messages },
-  { href: "/doctor/network/discover", label: "Discover", icon: Icons.discover },
-  { href: "/doctor/network/groups",   label: "Groups",   icon: Icons.groups },
+  { href: "/doctor/network/discover",   label: "Discover",   icon: Icons.discover },
+  { href: "/doctor/network/groups",     label: "Groups",     icon: Icons.groups },
 ];
 
 export default function DoctorNetworkLayout({ children }) {
@@ -18,19 +18,30 @@ export default function DoctorNetworkLayout({ children }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <DoctorNavbar />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-        <div className="mb-6 sm:mb-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl p-6 sm:p-8 text-white shadow-xl">
-          <h1 className="text-3xl sm:text-4xl font-bold mb-2">Doctor Network</h1>
-          <p className="text-indigo-100 text-base sm:text-lg">Connect, share knowledge, and collaborate with medical professionals</p>
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
+
+        {/* Compact hero */}
+        <div className="mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl px-5 py-4 text-white shadow-lg flex items-center gap-3">
+          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+            <span className="text-lg">🤝</span>
+          </div>
+          <div>
+            <h1 className="text-base font-bold leading-tight">Doctor Network</h1>
+            <p className="text-indigo-200 text-xs">Connect, share and collaborate with medical professionals</p>
+          </div>
         </div>
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 mb-6 sm:mb-8 overflow-x-auto">
-          <div className="flex items-center space-x-1 p-2 min-w-max">
+
+        {/* Tab bar */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-4 overflow-x-auto">
+          <div className="flex items-center gap-0.5 p-1 min-w-max">
             {tabs.map((tab) => {
               const active = pathname === tab.href;
               return (
                 <Link key={tab.href} href={tab.href}
-                  className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl font-semibold transition-all whitespace-nowrap text-sm sm:text-base ${
-                    active ? "bg-indigo-600 text-white shadow-lg" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg font-semibold transition-all whitespace-nowrap text-xs ${
+                    active
+                      ? "bg-indigo-600 text-white shadow"
+                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
                   }`}>
                   <tab.icon />
                   {tab.label}
@@ -39,6 +50,7 @@ export default function DoctorNetworkLayout({ children }) {
             })}
           </div>
         </div>
+
         {children}
       </main>
     </div>

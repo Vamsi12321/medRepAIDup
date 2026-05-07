@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import MRNavbar from "@/components/mr/MRNavbar";
 import { get, put } from "@/lib/api";
+import ChangePasswordSection from "@/components/ChangePasswordSection";
 
 export default function MRProfile() {
   const queryClient = useQueryClient();
@@ -215,6 +216,8 @@ export default function MRProfile() {
             </div>
           </div>
         )}
+        <ChangePasswordSection accentColor="orange" />
+
       </main>
     </div>
   );

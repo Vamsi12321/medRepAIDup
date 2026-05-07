@@ -215,16 +215,12 @@ export default function CompanyDoctors() {
             <p className="text-gray-600 text-sm">Manage healthcare professionals on your platform</p>
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={() => setShowBulkModal(true)}
-              className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
-            >
+            <button onClick={() => setShowBulkModal(true)}
+              className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-2 rounded-xl font-bold shadow hover:shadow-md transition-all flex items-center gap-1.5 text-xs">
               <span>📤</span><span>Bulk Upload</span>
             </button>
-            <button
-              onClick={() => { setSelectedDoctor(null); setShowModal(true); }}
-              className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
-            >
+            <button onClick={() => { setSelectedDoctor(null); setShowModal(true); }}
+              className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-2 rounded-xl font-bold shadow hover:shadow-md transition-all flex items-center gap-1.5 text-xs">
               <span>➕</span><span>Add Doctor</span>
             </button>
           </div>
@@ -271,64 +267,49 @@ export default function CompanyDoctors() {
           )}
         </div>
 
-        {/* Table */}
+        {/* Table / Cards */}
         {loading ? (
-          <TableSkeleton rows={5} cols={6} />
+          <div className="space-y-2">{[1,2,3,4,5].map((i) => <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />)}</div>
         ) : (
           <>
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            {/* Desktop table */}
+            <div className="hidden md:block bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[700px]">
+                <table className="w-full">
                   <thead className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
                     <tr>
-                      <th className="px-5 py-4 text-left font-bold text-sm">Doctor</th>
-                      <th className="px-5 py-4 text-left font-bold text-sm">Specialization</th>
-                      <th className="px-5 py-4 text-left font-bold text-sm">Hospital</th>
-                      <th className="px-5 py-4 text-left font-bold text-sm">Phone</th>
-                      <th className="px-5 py-4 text-left font-bold text-sm">Status</th>
-                      <th className="px-5 py-4 text-center font-bold text-sm">Actions</th>
+                      <th className="px-4 py-3 text-left font-bold text-xs">Doctor</th>
+                      <th className="px-4 py-3 text-left font-bold text-xs">Specialization</th>
+                      <th className="px-4 py-3 text-left font-bold text-xs">Hospital</th>
+                      <th className="px-4 py-3 text-left font-bold text-xs">Phone</th>
+                      <th className="px-4 py-3 text-left font-bold text-xs">Status</th>
+                      <th className="px-4 py-3 text-center font-bold text-xs">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredDoctors.map((doctor, i) => (
                       <tr key={doctor.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-all ${i % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}>
-                        <td className="px-5 py-4">
-                          <p className="font-bold text-gray-800">{doctor.name}</p>
-                          <p className="text-sm text-gray-500">{doctor.email}</p>
+                        <td className="px-4 py-3">
+                          <p className="font-bold text-gray-800 text-sm">{doctor.name}</p>
+                          <p className="text-xs text-gray-500">{doctor.email}</p>
                         </td>
-                        <td className="px-5 py-4">
-                          <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-sm font-semibold">
-                            {doctor.specialization || "—"}
-                          </span>
+                        <td className="px-4 py-3">
+                          <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg text-xs font-semibold">{doctor.specialization || "—"}</span>
                         </td>
-                        {/* API returns "hospital" not "hospital_name" */}
-                        <td className="px-5 py-4 text-gray-600 text-sm">{doctor.hospital || "—"}</td>
-                        <td className="px-5 py-4 text-gray-600 text-sm">{doctor.phone || "—"}</td>
-                        <td className="px-5 py-4">
-                          <button
-                            onClick={() => handleToggleStatus(doctor)}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 transition-all text-xs font-bold ${doctor.is_active ? "bg-green-50 border-green-300 text-green-700 hover:bg-green-100" : "bg-gray-50 border-gray-300 text-gray-500 hover:bg-gray-100"}`}
-                          >
-                            <div className={`relative w-8 h-4 rounded-full transition-colors duration-300 ${doctor.is_active ? "bg-green-500" : "bg-gray-300"}`}>
-                              <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform duration-300 ${doctor.is_active ? "translate-x-4" : "translate-x-0.5"}`} />
-                            </div>
-                            {doctor.is_active ? "Active" : "Inactive"}
+                        <td className="px-4 py-3 text-gray-600 text-xs">{doctor.hospital || "—"}</td>
+                        <td className="px-4 py-3 text-gray-600 text-xs">{doctor.phone || "—"}</td>
+                        <td className="px-4 py-3">
+                          <button onClick={() => handleToggleStatus(doctor)}
+                            className={`relative w-9 h-5 rounded-full transition-colors duration-300 ${doctor.is_active ? "bg-green-500" : "bg-gray-300"}`}>
+                            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-300 ${doctor.is_active ? "translate-x-4" : "translate-x-0.5"}`} />
                           </button>
                         </td>
-                        <td className="px-5 py-4">
-                          <div className="flex items-center justify-center space-x-2">
-                            <button
-                              onClick={() => { setSelectedDoctor(doctor); setShowModal(true); }}
-                              className="bg-blue-100 text-blue-600 px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-200 transition-all text-sm"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => setConfirmDelete(doctor)}
-                              className="bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-semibold hover:bg-red-200 transition-all text-sm"
-                            >
-                              Delete
-                            </button>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button onClick={() => { setSelectedDoctor(doctor); setShowModal(true); }}
+                              className="bg-blue-100 text-blue-600 px-2.5 py-1 rounded-lg font-semibold hover:bg-blue-200 transition-all text-xs">Edit</button>
+                            <button onClick={() => setConfirmDelete(doctor)}
+                              className="bg-red-100 text-red-600 px-2.5 py-1 rounded-lg font-semibold hover:bg-red-200 transition-all text-xs">Delete</button>
                           </div>
                         </td>
                       </tr>
@@ -336,14 +317,52 @@ export default function CompanyDoctors() {
                   </tbody>
                 </table>
               </div>
-
-              {doctors.length === 0 && (
-                <div className="text-center py-16">
-                  <span className="text-5xl">👨‍⚕️</span>
-                  <h3 className="text-xl font-bold text-gray-900 mt-4 mb-2">No doctors found</h3>
-                  <p className="text-gray-500 text-sm">Add a doctor to get started</p>
+              {filteredDoctors.length === 0 && (
+                <div className="text-center py-12">
+                  <span className="text-4xl">🩺</span>
+                  <p className="text-gray-400 mt-3 text-sm">No doctors found</p>
                 </div>
               )}
+            </div>
+
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-2">
+              {filteredDoctors.length === 0 ? (
+                <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
+                  <span className="text-4xl">🩺</span>
+                  <p className="text-gray-400 mt-3 text-sm">No doctors found</p>
+                </div>
+              ) : filteredDoctors.map((doctor) => (
+                <div key={doctor.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-3">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                      {doctor.name?.charAt(0)?.toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-gray-800 text-sm truncate">{doctor.name}</p>
+                      <p className="text-xs text-gray-400 truncate">{doctor.email}</p>
+                    </div>
+                    <button onClick={() => handleToggleStatus(doctor)}
+                      className={`relative w-9 h-5 rounded-full flex-shrink-0 transition-colors duration-300 ${doctor.is_active ? "bg-green-500" : "bg-gray-300"}`}>
+                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-300 ${doctor.is_active ? "translate-x-4" : "translate-x-0.5"}`} />
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {doctor.specialization && <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md text-xs font-semibold">{doctor.specialization}</span>}
+                    {doctor.hospital && <span className="bg-gray-50 text-gray-500 px-2 py-0.5 rounded-md text-xs">{doctor.hospital}</span>}
+                    {doctor.phone && <span className="bg-gray-50 text-gray-500 px-2 py-0.5 rounded-md text-xs">{doctor.phone}</span>}
+                    <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${doctor.is_active ? "bg-green-50 text-green-600" : "bg-gray-50 text-gray-400"}`}>
+                      {doctor.is_active ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button onClick={() => { setSelectedDoctor(doctor); setShowModal(true); }}
+                      className="flex-1 bg-blue-100 text-blue-600 py-1.5 rounded-lg font-semibold text-xs hover:bg-blue-200 transition-all">Edit</button>
+                    <button onClick={() => setConfirmDelete(doctor)}
+                      className="flex-1 bg-red-100 text-red-600 py-1.5 rounded-lg font-semibold text-xs hover:bg-red-200 transition-all">Delete</button>
+                  </div>
+                </div>
+              ))}
             </div>
           </>
         )}

@@ -6,6 +6,7 @@ import Breadcrumb from "@/components/Breadcrumb";
 import Link from "next/link";
 import { get } from "@/lib/api";
 import SmartSearch from "@/components/SmartSearch";
+import PDFSummaryModal from "@/components/PDFSummaryModal";
 
 const formatKey = (key) => key?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "";
 const getVal = (drug, key) => { const v = drug?.field_values?.find((f) => f.key === key)?.value; if (Array.isArray(v)) return v.join(", "); return v || ""; };
@@ -15,6 +16,7 @@ export default function DoctorDrugSearch() {
   const [viewMode, setViewMode]     = useState("grid");
   const [smartSearch, setSmartSearch] = useState({ mode: "keyword", chips: [], query: "" });
   const [smartResults, setSmartResults] = useState(null);
+  const [showPDF, setShowPDF] = useState(false);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["drugs-public"],
@@ -33,10 +35,14 @@ export default function DoctorDrugSearch() {
       const matches = smartSearch.chips.some((chip) => allText.includes(chip));
       if (!matches) return false;
     }
-    // Regular text search
+    // Drug name filter — check drug_name and brand_name fields specifically
     if (!search.trim()) return true;
     const q = search.toLowerCase();
-    return drug.field_values?.some((fv) => { const v = Array.isArray(fv.value) ? fv.value.join(" ") : (fv.value || ""); return v.toLowerCase().includes(q); });
+    const drugName  = (drug.drug_name  || getVal(drug, "drug_name")  || "").toLowerCase();
+    const brandName = (drug.brand_name || getVal(drug, "brand_name") || "").toLowerCase();
+    // Also fall back to searching all field_values so partial matches still work
+    const allText = drug.field_values?.map((fv) => Array.isArray(fv.value) ? fv.value.join(" ") : (fv.value || "")).join(" ").toLowerCase() || "";
+    return drugName.includes(q) || brandName.includes(q) || allText.includes(q);
   });
 
   return (
@@ -50,35 +56,49 @@ export default function DoctorDrugSearch() {
           <p className="text-indigo-100 text-xs sm:text-sm">Comprehensive medication library with detailed information</p>
         </div>
 
-        {/* Smart Search */}
+        {/* Smart Search — main highlighted feature */}
         <SmartSearch
           onSearch={(s) => { setSmartSearch(s); if (s.mode === "keyword") setSmartResults(null); }}
           onSmartResults={setSmartResults}
+          onAnalyzeReport={() => setShowPDF(true)}
           accentColor="indigo" />
 
-        {/* Search */}
-        <div className="bg-white rounded-2xl p-4 shadow-lg border border-indigo-100 mb-6 flex items-center gap-3">
-          <div className="relative flex-1">
-            <input type="text" placeholder="🔍 Search by drug name, indication, manufacturer..."
-              value={search} onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-4 pr-10 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 text-sm transition-all" />
-            {search && (
-              <button onClick={() => setSearch("")} className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600 text-sm">✕</button>
+        {/* Results bar — count left, compact name search + view toggle right */}
+        <div className="flex items-center justify-between mb-4 gap-3">
+          <p className="text-sm text-gray-500 font-semibold flex-shrink-0">
+            {smartResults ? (
+              <><span className="font-bold text-purple-600">{smartResults.total_results}</span> AI results</>
+            ) : (
+              <><span className="font-bold text-indigo-600">{filtered.length}</span> drugs found</>
             )}
-          </div>
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-            <button onClick={() => setViewMode("grid")} className={`px-3 py-2 rounded-lg text-sm transition-all ${viewMode === "grid" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500"}`}>⊞</button>
-            <button onClick={() => setViewMode("list")} className={`px-3 py-2 rounded-lg text-sm transition-all ${viewMode === "list" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500"}`}>☰</button>
+          </p>
+          <div className="flex items-center gap-2 flex-1 justify-end">
+            {/* Compact drug name search */}
+            <div className="relative max-w-xs w-full">
+              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+                placeholder="Filter by drug name..."
+                className="w-full pl-8 pr-7 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 bg-white transition-all" />
+              {search && (
+                <button onClick={() => setSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              )}
+            </div>
+            {/* View toggle */}
+            <button onClick={() => setViewMode("grid")}
+              className={`p-1.5 rounded-lg transition-all ${viewMode === "grid" ? "bg-indigo-100 text-indigo-600" : "text-gray-400 hover:bg-gray-100"}`}>
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M3 3h7v7H3V3zm0 11h7v7H3v-7zm11-11h7v7h-7V3zm0 11h7v7h-7v-7z"/></svg>
+            </button>
+            <button onClick={() => setViewMode("list")}
+              className={`p-1.5 rounded-lg transition-all ${viewMode === "list" ? "bg-indigo-100 text-indigo-600" : "text-gray-400 hover:bg-gray-100"}`}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
           </div>
         </div>
-
-        <p className="text-sm text-gray-500 font-semibold mb-4">
-          {smartResults ? (
-            <>Showing <span className="font-bold text-purple-600">{smartResults.total_results}</span> AI results</>
-          ) : (
-            <>Showing <span className="font-bold">{filtered.length}</span> drugs</>
-          )}
-        </p>
 
         {loading ? (
           <div className="text-center py-16 text-gray-400 text-sm">Loading drugs...</div>
@@ -88,7 +108,16 @@ export default function DoctorDrugSearch() {
             <p className="text-gray-500 mt-4 text-sm font-medium">Could not load drugs. Check your connection.</p>
           </div>
         ) : (() => {
-          const displayDrugs = smartResults ? smartResults.results : filtered;
+          // Always apply name filter on top of whatever source (smart results or full list)
+          const baseList = smartResults ? smartResults.results : filtered;
+          const displayDrugs = search.trim()
+            ? baseList.filter((drug) => {
+                const q = search.toLowerCase();
+                const dn = (drug.drug_name  || getVal(drug, "drug_name")  || "").toLowerCase();
+                const bn = (drug.brand_name || getVal(drug, "brand_name") || "").toLowerCase();
+                return dn.includes(q) || bn.includes(q);
+              })
+            : baseList;
           if (displayDrugs.length === 0) return (
             <div className="text-center py-16 bg-white rounded-2xl shadow border border-gray-100">
               <span className="text-5xl">💊</span>
@@ -110,14 +139,15 @@ export default function DoctorDrugSearch() {
           );
         })()}
       </main>
+      {showPDF && <PDFSummaryModal onClose={() => setShowPDF(false)} accentColor="indigo" />}
     </div>
   );
 }
 
 function DrugCard({ drug, matchScore, matchedEntities }) {
   // Smart search results have flat fields; regular drugs use field_values
-  const name         = drug.brand_name || getVal(drug, "brand_name") || drug.drug_name || getVal(drug, "drug_name") || "Drug";
-  const genericName  = drug.drug_name  || getVal(drug, "drug_name");
+  const name         = drug.drug_name   || getVal(drug, "drug_name")   || drug.brand_name || getVal(drug, "brand_name") || "Drug";
+  const brandName    = drug.brand_name  || getVal(drug, "brand_name");
   const drugClass    = drug.drug_class || getVal(drug, "drug_class");
   const manufacturer = drug.manufacturer || getVal(drug, "manufacturer");
   const indications  = Array.isArray(drug.indications) ? drug.indications.join(", ") : (drug.indications || getVal(drug, "indications"));
@@ -136,7 +166,7 @@ function DrugCard({ drug, matchScore, matchedEntities }) {
               </div>
               <div className="min-w-0">
                 <h3 className="text-base font-bold text-gray-900 group-hover:text-indigo-600 transition-colors truncate capitalize">{name}</h3>
-                {genericName && name !== genericName && <p className="text-xs text-gray-400 capitalize">{genericName}</p>}
+                {brandName && name !== brandName && <p className="text-xs text-indigo-400 font-semibold capitalize">{brandName}</p>}
               </div>
             </div>
             {specialization && (
@@ -177,7 +207,7 @@ function DrugCard({ drug, matchScore, matchedEntities }) {
 }
 
 function DrugListRow({ drug }) {
-  const name         = getVal(drug, "brand_name") || getVal(drug, "drug_name") || "Drug";
+  const name         = getVal(drug, "drug_name") || getVal(drug, "brand_name") || "Drug";
   const indications  = getVal(drug, "indications");
   const manufacturer = getVal(drug, "manufacturer");
   const dosage       = getVal(drug, "dosage_strength") || getVal(drug, "dosage");

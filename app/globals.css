@@ -1,5 +1,25 @@
 @import "tailwindcss";
 
+/* Global cursor rules — all interactive elements show pointer */
+a,
+button,
+[role="button"],
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+select,
+label[for],
+.cursor-pointer {
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+.cursor-not-allowed {
+  cursor: not-allowed;
+}
+
 .card-professional {
   background: white;
   border: 1px solid #e5e7eb;

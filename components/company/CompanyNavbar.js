@@ -4,6 +4,16 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { logout } from "@/lib/auth";
 
+const PAGE_TITLES = {
+  "/company/overview":        { title: "Overview",        icon: "🏠", sub: "Company dashboard" },
+  "/company/drug-management": { title: "Drug Management", icon: "💊", sub: "Manage your drug catalog" },
+  "/company/cme-events":      { title: "CME Events",      icon: "🎓", sub: "Manage medical education events" },
+  "/company/doctors":         { title: "Doctors",         icon: "🩺", sub: "Doctor network" },
+  "/company/medical-reps":    { title: "Medical Reps",    icon: "💼", sub: "Your field team" },
+  "/company/activity-logs":   { title: "Activity Logs",   icon: "📋", sub: "Track all activity" },
+  "/company/profile":         { title: "Profile",         icon: "👤", sub: "Company account" },
+};
+
 export default function CompanyNavbar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -19,7 +29,7 @@ export default function CompanyNavbar() {
     { name: "Overview",        path: "/company/overview",        icon: "🏠" },
     { name: "Drug Management", path: "/company/drug-management", icon: "💊" },
     { name: "CME Events",      path: "/company/cme-events",      icon: "📅" },
-    { name: "Doctors",         path: "/company/doctors",         icon: "👨‍⚕️" },
+    { name: "Doctors",         path: "/company/doctors",         icon: "🩺" },
     { name: "Medical Reps",    path: "/company/medical-reps",    icon: "💼" },
     { name: "Activity Logs",   path: "/company/activity-logs",   icon: "📋" },
     { name: "Profile",         path: "/company/profile",         icon: "👤" },
@@ -51,29 +61,29 @@ export default function CompanyNavbar() {
 
       <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex justify-between items-center h-14">
 
             {/* Logo */}
-            <Link href="/company/overview" className="flex items-center space-x-3 group shrink-0">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center transform group-hover:scale-110 transition-transform shadow-md">
-                <span className="text-xl">🏢</span>
+            <Link href="/company/overview" className="flex items-center gap-2 group shrink-0">
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg flex items-center justify-center transform group-hover:scale-110 transition-transform shadow">
+                <span className="text-base">🏢</span>
               </div>
-              <div className="leading-tight">
-                <span className="text-base font-bold text-gray-900 block">Company Portal</span>
-                <span className="text-xs text-purple-600 font-semibold">{companyName}</span>
+              <div className="leading-tight hidden sm:block">
+                <span className="text-sm font-bold text-gray-900 block">Company Portal</span>
+                <span className="text-xs text-purple-500 -mt-0.5 block truncate max-w-[120px]">{companyName}</span>
               </div>
             </Link>
 
             {/* Desktop Nav */}
-            <div className="hidden md:flex items-center space-x-1">
+            <div className="hidden lg:flex items-center gap-0.5">
               {navItems.map((item) => (
                 <Link
                   key={item.path}
                   href={item.path}
-                  className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
                     pathname === item.path
-                      ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md"
-                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                      ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow"
+                      : "text-gray-600 hover:bg-gray-100"
                   }`}
                 >
                   <span>{item.icon}</span>
@@ -83,10 +93,10 @@ export default function CompanyNavbar() {
             </div>
 
             {/* Logout + Mobile toggle */}
-            <div className="flex items-center space-x-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={handleLogout}
-                className="hidden md:flex items-center space-x-1.5 px-3 py-2 text-red-500 hover:bg-red-50 rounded-xl text-sm font-semibold transition-all"
+                className="hidden lg:flex items-center gap-1.5 px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg text-sm font-semibold transition-all"
               >
                 <span>🚪</span>
                 <span>Logout</span>
@@ -94,7 +104,7 @@ export default function CompanyNavbar() {
 
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+                className="lg:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   {isMobileMenuOpen ? (
@@ -109,14 +119,14 @@ export default function CompanyNavbar() {
 
           {/* Mobile Menu */}
           {isMobileMenuOpen && (
-            <div className="md:hidden py-3 border-t border-gray-200">
-              <div className="space-y-1">
+            <div className="lg:hidden py-3 border-t border-gray-100">
+              <div className="grid grid-cols-2 gap-1.5">
                 {navItems.map((item) => (
                   <Link
                     key={item.path}
                     href={item.path}
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className={`flex items-center space-x-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                       pathname === item.path
                         ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow"
                         : "text-gray-700 hover:bg-gray-50"
@@ -128,7 +138,7 @@ export default function CompanyNavbar() {
                 ))}
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl text-sm font-semibold transition-all flex items-center space-x-2"
+                  className="col-span-2 text-left px-3 py-2.5 text-red-600 hover:bg-red-50 rounded-xl text-sm font-semibold transition-all flex items-center gap-2"
                 >
                   <span>🚪</span>
                   <span>Logout</span>
@@ -138,6 +148,17 @@ export default function CompanyNavbar() {
           )}
         </div>
       </nav>
+
+      {/* Page title bar */}
+      {PAGE_TITLES[pathname] && (
+        <div className="bg-white border-b border-gray-100">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-2">
+            <span className="text-sm">{PAGE_TITLES[pathname].icon}</span>
+            <span className="text-sm font-bold text-gray-800">{PAGE_TITLES[pathname].title}</span>
+            <span className="text-gray-400 text-xs hidden sm:inline">· {PAGE_TITLES[pathname].sub}</span>
+          </div>
+        </div>
+      )}
     </>
   );
 }

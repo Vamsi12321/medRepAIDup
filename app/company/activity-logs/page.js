@@ -101,8 +101,8 @@ export default function ActivityLogsPage() {
             <p className="text-gray-500 text-sm mt-0.5">Track all platform activity — click any row for details</p>
           </div>
           <button onClick={handleExport}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-all shadow">
-            Export CSV
+            className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-xl font-semibold text-xs transition-all shadow">
+            📤 Export CSV
           </button>
         </div>
 
@@ -154,63 +154,95 @@ export default function ActivityLogsPage() {
           </div>
 
           {isLoading ? (
-            <div className="p-6 space-y-3">
+            <div className="p-4 space-y-2">
               {[1,2,3,4,5].map((i) => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}
             </div>
           ) : logs.length === 0 ? (
-            <div className="text-center py-16">
-              <p className="text-gray-400 font-medium">No logs found.</p>
+            <div className="text-center py-12">
+              <p className="text-gray-400 font-medium text-sm">No logs found.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-100">
-                  <tr>
-                    {["Action", "Actor", "Role", "Target", "Severity", "Time"].map((h) => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {logs.map((log) => {
-                    const sev = SEVERITY[log.severity] || SEVERITY.info;
-                    const act = ACTION_ICONS[log.action_type] || { icon: "📋", color: "bg-gray-100 text-gray-600" };
-                    const roleColor = ROLE_COLORS[log.actor_role] || "bg-gray-100 text-gray-600";
-                    return (
-                      <tr key={log.log_id}
-                        onClick={() => setSelectedLog(log)}
-                        className="hover:bg-purple-50/40 transition-colors cursor-pointer group">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${act.color}`}>{act.icon}</span>
-                            <span className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">{log.action_type}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-gray-900 text-sm">{log.actor_name || "—"}</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`text-xs px-2 py-1 rounded-lg font-semibold ${roleColor}`}>{log.actor_role || "—"}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="text-gray-700 text-sm">{log.target_name || "—"}</p>
-                          <p className="text-xs text-gray-400">{log.target_type}</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold ${sev.cls}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${sev.dot}`} />
-                            {log.severity}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
-                          <p>{formatIST(log.created_at)}</p>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <>
+              {/* Desktop table */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-100">
+                    <tr>
+                      {["Action", "Actor", "Role", "Target", "Severity", "Time"].map((h) => (
+                        <th key={h} className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {logs.map((log) => {
+                      const sev = SEVERITY[log.severity] || SEVERITY.info;
+                      const act = ACTION_ICONS[log.action_type] || { icon: "📋", color: "bg-gray-100 text-gray-600" };
+                      const roleColor = ROLE_COLORS[log.actor_role] || "bg-gray-100 text-gray-600";
+                      return (
+                        <tr key={log.log_id} onClick={() => setSelectedLog(log)}
+                          className="hover:bg-purple-50/40 transition-colors cursor-pointer">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${act.color}`}>{act.icon}</span>
+                              <span className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">{log.action_type}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-gray-900 text-sm">{log.actor_name || "—"}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`text-xs px-2 py-1 rounded-lg font-semibold ${roleColor}`}>{log.actor_role || "—"}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="text-gray-700 text-sm">{log.target_name || "—"}</p>
+                            <p className="text-xs text-gray-400">{log.target_type}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold ${sev.cls}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${sev.dot}`} />
+                              {log.severity}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
+                            {formatIST(log.created_at)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="sm:hidden divide-y divide-gray-50">
+                {logs.map((log) => {
+                  const sev = SEVERITY[log.severity] || SEVERITY.info;
+                  const act = ACTION_ICONS[log.action_type] || { icon: "📋", color: "bg-gray-100 text-gray-600" };
+                  const roleColor = ROLE_COLORS[log.actor_role] || "bg-gray-100 text-gray-600";
+                  return (
+                    <div key={log.log_id} onClick={() => setSelectedLog(log)}
+                      className="p-3 hover:bg-purple-50/40 cursor-pointer transition-colors">
+                      <div className="flex items-start gap-2.5 mb-2">
+                        <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${act.color}`}>{act.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-mono text-xs text-gray-700 font-semibold">{log.action_type}</p>
+                          <p className="text-xs text-gray-400">{formatIST(log.created_at)}</p>
+                        </div>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold flex-shrink-0 ${sev.cls}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${sev.dot}`} />
+                          {log.severity}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 text-xs">
+                        <span className="text-gray-600 font-semibold">{log.actor_name || "—"}</span>
+                        <span className={`px-1.5 py-0.5 rounded font-semibold ${roleColor}`}>{log.actor_role}</span>
+                        {log.target_name && <span className="text-gray-400">→ {log.target_name}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
 
           {totalPages > 1 && (

@@ -9,7 +9,19 @@ import { downloadCSVTemplate } from "@/lib/downloadTemplate";
 const FIELD_TYPES = ["text", "textarea", "number", "date", "select", "url"];
 
 const formatKey = (key) => key?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "";
-const getVal = (drug, key) => { const v = drug?.field_values?.find((f) => f.key === key)?.value; if (Array.isArray(v)) return v.join(", "); return v || ""; };
+
+// Read from top-level field first, then fall back to field_values array
+const getVal = (drug, key) => {
+  if (drug?.[key] !== undefined && drug?.[key] !== null) {
+    const v = drug[key];
+    if (Array.isArray(v)) return v.join(", ");
+    return String(v);
+  }
+  const fv = drug?.field_values?.find((f) => f.key === key);
+  if (!fv) return "";
+  if (Array.isArray(fv.value)) return fv.value.join(", ");
+  return fv.value || "";
+};
 
 export default function CompanyDrugManagement() {
   const queryClient = useQueryClient();
@@ -38,10 +50,22 @@ export default function CompanyDrugManagement() {
   const invalidateTemplate = () => queryClient.invalidateQueries({ queryKey: ["drug-template"] });
 
   const filteredDrugs = drugSearch.trim()
-    ? drugs.filter((d) => d.field_values?.some((fv) => {
-        const v = Array.isArray(fv.value) ? fv.value.join(" ") : (fv.value || "");
-        return v.toLowerCase().includes(drugSearch.toLowerCase());
-      }))
+    ? drugs.filter((d) => {
+        const q = drugSearch.toLowerCase();
+        // Check top-level string fields
+        const topLevel = ["drug_name","brand_name","drug_class","manufacturer","specialization","route","dosage_form","dosage_strength"]
+          .some((k) => (d[k] || "").toLowerCase().includes(q));
+        if (topLevel) return true;
+        // Check array fields (indications, symptoms, side_effects)
+        const arrayFields = ["indications","symptoms","side_effects"]
+          .some((k) => Array.isArray(d[k]) && d[k].some((v) => v.toLowerCase().includes(q)));
+        if (arrayFields) return true;
+        // Fall back to field_values
+        return d.field_values?.some((fv) => {
+          const v = Array.isArray(fv.value) ? fv.value.join(" ") : (fv.value || "");
+          return v.toLowerCase().includes(q);
+        }) || false;
+      })
     : drugs;
   const visibleFields = template?.fields?.filter((f) => f.visible) || [];
 
@@ -108,8 +132,8 @@ export default function CompanyDrugManagement() {
             <div className="grid grid-cols-3 gap-4 mb-6">
               {[
                 { label: "Total Drugs",       value: drugsTotal,                                          icon: "💊", from: "from-blue-500",  to: "to-indigo-600", text: "from-blue-600 to-indigo-600" },
-                { label: "With Brochures",    value: drugs.filter((d) => !!getVal(d,"brochure_url")).length, icon: "✅", from: "from-green-500", to: "to-emerald-600", text: "from-green-600 to-emerald-600" },
-                { label: "Missing Brochures", value: drugs.filter((d) => !getVal(d,"brochure_url")).length,  icon: "❌", from: "from-red-500",   to: "to-pink-600",   text: "from-red-600 to-pink-600" },
+                { label: "With Brochures",    value: drugs.filter((d) => d.has_brochure === true).length,  icon: "✅", from: "from-green-500", to: "to-emerald-600", text: "from-green-600 to-emerald-600" },
+                { label: "Missing Brochures", value: drugs.filter((d) => d.has_brochure !== true).length,   icon: "❌", from: "from-red-500",   to: "to-pink-600",   text: "from-red-600 to-pink-600" },
               ].map((s) => (
                 <div key={s.label} className="bg-white rounded-2xl p-5 shadow border border-gray-100">
                   <div className={`w-10 h-10 bg-gradient-to-br ${s.from} ${s.to} rounded-xl flex items-center justify-center mb-3`}>
@@ -132,29 +156,42 @@ export default function CompanyDrugManagement() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredDrugs.map((drug) => {
-                  const specialization = getVal(drug, "specialization");
-                  const drugName       = getVal(drug, "drug_name") || drug.field_values?.find((f) => f.key?.includes("name"))?.value || "Drug";
-                  const brandName      = getVal(drug, "brand_name");
-                  const drugClass      = getVal(drug, "drug_class");
+                  const drugName       = drug.drug_name    || getVal(drug, "drug_name")    || "Drug";
+                  const brandName      = drug.brand_name   || getVal(drug, "brand_name");
+                  const drugClass      = drug.drug_class   || getVal(drug, "drug_class");
+                  const specialization = drug.specialization || getVal(drug, "specialization");
 
-                  const HEADER_KEYS = ["brand_name","drug_name","drug_class","specialization","brochure_url"];
+                  // Build display fields — deduplicated by key
+                  const SKIP = new Set(["_id","__v","template_id","field_values","created_at","updated_at","is_active","company_id","drug_name","brand_name","drug_class","specialization","brochure_url","search_text"]);
+                  const ORDERED = ["manufacturer","indications","symptoms","side_effects","mechanism_of_action","dosage_strength","dosage_form","route"];
+                  const seenKeys = new Set();
+                  const displayFields = [];
 
-                  // Always use drug's own field_values as source — shows all fields that have values
-                  const allTemplateFields = template?.fields || [];
-                  const displayFields = (drug.field_values || [])
-                    .filter((fv) => {
-                      if (HEADER_KEYS.includes(fv.key)) return false;
-                      const v = fv.value;
-                      if (!v || (Array.isArray(v) && v.length === 0)) return false;
-                      const tmplField = allTemplateFields.find((f) => f.key === fv.key);
-                      if (tmplField) return tmplField.visible === true;
-                      return true;
-                    })
-                    .map((fv) => {
-                      const tmplField = allTemplateFields.find((f) => f.key === fv.key);
-                      const displayVal = Array.isArray(fv.value) ? fv.value.join(", ") : fv.value;
-                      return { key: fv.key, label: tmplField?.label || null, field_id: fv.field_id || fv.key, value: displayVal };
-                    });
+                  // Add ordered fields first
+                  ORDERED.forEach((k) => {
+                    if (seenKeys.has(k)) return;
+                    const v = drug[k];
+                    if (!v || (Array.isArray(v) && v.length === 0)) return;
+                    seenKeys.add(k);
+                    displayFields.push({ key: k, value: Array.isArray(v) ? v.join(", ") : String(v) });
+                  });
+
+                  // Add remaining from field_values (catches custom fields like reference_url)
+                  (drug.field_values || []).forEach((fv) => {
+                    if (seenKeys.has(fv.key) || SKIP.has(fv.key)) return;
+                    if (!fv.value || (Array.isArray(fv.value) && fv.value.length === 0)) return;
+                    seenKeys.add(fv.key);
+                    displayFields.push({ key: fv.key, value: Array.isArray(fv.value) ? fv.value.join(", ") : String(fv.value) });
+                  });
+
+                  // Add any remaining top-level fields not yet shown
+                  Object.entries(drug).forEach(([k, v]) => {
+                    if (seenKeys.has(k) || SKIP.has(k) || ORDERED.includes(k)) return;
+                    if (!v || (Array.isArray(v) && v.length === 0)) return;
+                    if (typeof v === "object" && !Array.isArray(v)) return;
+                    seenKeys.add(k);
+                    displayFields.push({ key: k, value: Array.isArray(v) ? v.join(", ") : String(v) });
+                  });
 
                   // Rotating color palette for field rows
                   const fieldColors = [
@@ -171,10 +208,10 @@ export default function CompanyDrugManagement() {
                   ];
 
                   return (
-                    <div key={drug._id} className="bg-white rounded-2xl shadow-md border border-gray-100 hover:shadow-xl transition-all duration-300 overflow-hidden group">
+                    <div key={drug._id} className={`bg-white rounded-2xl shadow-md border hover:shadow-xl transition-all duration-300 overflow-hidden group ${drug.is_active === false ? "border-gray-200 opacity-60" : "border-gray-100"}`}>
 
                       {/* Gradient accent bar */}
-                      <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+                      <div className={`h-1 w-full ${drug.is_active === false ? "bg-gray-300" : "bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"}`} />
 
                       {/* Card header */}
                       <div className="px-5 pt-4 pb-3 relative overflow-hidden">
@@ -205,26 +242,37 @@ export default function CompanyDrugManagement() {
                       {/* Divider */}
                       <div className="mx-4 border-t border-gray-100" />
 
-                      {/* Field rows — compact two-column layout */}
+                      {/* Field rows — compact two-column layout, max 4 fields shown */}
                       <div className="px-4 py-3 grid grid-cols-2 gap-2">
-                        {displayFields.map((f, idx) => {
+                        {displayFields.slice(0, 6).map((f, idx) => {
                           const c = fieldColors[idx % fieldColors.length];
+                          const isLong = String(f.value).length > 40;
                           return (
-                            <div key={f.field_id || f.key}
-                              className={`${c.bg} rounded-xl px-3 py-2 border-l-3 ${c.border} border-l-4 ${String(f.value).length > 30 ? "col-span-2" : ""}`}>
-                              <p className={`text-xs ${c.label} font-bold mb-0.5`}>{f.label || formatKey(f.key)}</p>
-                              <p className="text-gray-700 font-medium text-xs line-clamp-2">{String(f.value)}</p>
+                            <div key={f.key + "_" + idx}
+                              className={`${c.bg} rounded-xl px-3 py-2 border-l-4 ${c.border} ${isLong ? "col-span-2" : ""}`}>
+                              <p className={`text-xs ${c.label} font-bold mb-0.5`}>{formatKey(f.key)}</p>
+                              <p className="text-gray-700 font-medium text-xs line-clamp-1">{f.value}</p>
                             </div>
                           );
                         })}
+                        {displayFields.length === 0 && (
+                          <p className="col-span-2 text-xs text-gray-400 text-center py-2">No additional fields</p>
+                        )}
+                        {displayFields.length > 6 && (
+                          <p className="col-span-2 text-xs text-gray-400 text-center">+{displayFields.length - 6} more fields</p>
+                        )}
                       </div>
 
                       {/* Actions */}
-                      <div className="px-4 pb-4 pt-1">
+                      <div className="px-4 pb-4 pt-1 space-y-2">
+                        {/* Active toggle */}
+                        <DrugActiveToggle drug={drug} onToggled={invalidateDrugs} />
                         <button onClick={() => { setEditDrug(drug); setShowDrugModal(true); }}
-                          className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-2 rounded-xl font-bold text-xs hover:shadow-lg transition-all group-hover:from-indigo-700 group-hover:to-purple-700">
+                          disabled={!drug.is_active}
+                          className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-2 rounded-xl font-bold text-xs hover:shadow-lg transition-all group-hover:from-indigo-700 group-hover:to-purple-700 disabled:opacity-40 disabled:cursor-not-allowed">
                           ✏️ Edit Drug
                         </button>
+                        <BrochureUploadButton drug={drug} onUploaded={invalidateDrugs} />
                       </div>
                     </div>
                   );
@@ -349,7 +397,7 @@ function TemplateManager({ template, loading, onRefresh }) {
       <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-3">
         <span className="text-blue-500">ℹ️</span>
         <div className="text-sm text-blue-800">
-          <span className="font-bold">{template.template_name}</span> — Fixed fields can have their label, visibility and options updated. Dynamic fields can be fully edited or deleted.
+          <span className="font-bold">{template.template_name}</span> — Fixed fields can have their label, visibility and options updated. Dynamic fields can be fully edited.
         </div>
       </div>
 
@@ -400,7 +448,6 @@ function TemplateManager({ template, loading, onRefresh }) {
             {dynamicFields.map((f) => (
               <FieldRow key={f.field_id} field={f} templateId={template._id}
                 onUpdate={(body) => updateField(f.field_id, body)}
-                onDelete={() => deleteField(f.field_id)}
                 isEditing={editingField === f.field_id}
                 onEdit={() => setEditingField(f.field_id)}
                 onCancel={() => setEditingField(null)}
@@ -461,7 +508,6 @@ function FieldRow({ field, onUpdate, onDelete, isEditing, onEdit, onCancel, savi
       </div>
       <div className="flex items-center gap-2">
         <button onClick={onEdit} className="text-xs text-blue-600 hover:text-blue-800 font-semibold">Edit</button>
-        {onDelete && <button onClick={onDelete} className="text-xs text-red-400 hover:text-red-600 font-semibold">Delete</button>}
       </div>
     </div>
   );
@@ -563,14 +609,23 @@ function AddFieldRow({ onSave, onCancel, saving, nextOrder }) {
 // ── Drug Modal (Add / Edit) ───────────────────────────────────────────────────
 function DrugModal({ template, drug, onClose, onSaved }) {
   const isEdit = !!drug;
-  // Build initial form from existing drug field_values
+  // Build initial form from existing drug field_values (GET response format)
   const initForm = () => {
     if (!drug) return {};
-    return Object.fromEntries((drug.field_values || []).map((fv) => {
+    const form = {};
+    // Primary: read from field_values array — has correct field_ids and all values
+    (drug.field_values || []).forEach((fv) => {
       const v = fv.value;
-      // Convert arrays to comma-separated string for editing
-      return [fv.key, Array.isArray(v) ? v.join(", ") : v];
-    }));
+      form[fv.key] = Array.isArray(v) ? v.join(", ") : (v ?? "");
+    });
+    // Fallback: top-level fields not covered by field_values
+    Object.entries(drug).forEach(([k, v]) => {
+      if (form[k] !== undefined) return; // already set from field_values
+      if (["_id","__v","template_id","field_values","created_at","updated_at","is_active","company_id","search_text"].includes(k)) return;
+      if (v === null || v === undefined) return;
+      form[k] = Array.isArray(v) ? v.join(", ") : String(v);
+    });
+    return form;
   };
   const [formData, setFormData] = useState(initForm);
   const [saving, setSaving]     = useState(false);
@@ -582,14 +637,35 @@ function DrugModal({ template, drug, onClose, onSaved }) {
     e.preventDefault();
     setSaving(true);
     setError("");
-    const field_values = visibleFields.map((f) => {
-      let value = formData[f.key] || "";
-      // Convert comma-separated string back to array for array-type fields
-      if (f.type === "array" && typeof value === "string" && value.trim()) {
+
+    const ARRAY_KEYS = new Set(["symptoms","indications","side_effects"]);
+
+    const buildValue = (f) => {
+      let value = formData[f.key] ?? "";
+      if ((f.type === "array" || ARRAY_KEYS.has(f.key)) && typeof value === "string" && value.trim()) {
         value = value.split(",").map((v) => v.trim()).filter(Boolean);
       }
-      return { field_id: f.field_id, key: f.key, value };
-    });
+      return value;
+    };
+
+    let field_values;
+
+    if (isEdit) {
+      // PUT — use existing drug's field_ids to update in-place (no duplicates)
+      const existingFvMap = Object.fromEntries(
+        (drug.field_values || []).map((fv) => [fv.key, fv.field_id])
+      );
+      field_values = visibleFields
+        .filter((f) => existingFvMap[f.key] !== undefined)
+        .map((f) => ({ field_id: existingFvMap[f.key], key: f.key, value: buildValue(f) }));
+    } else {
+      // POST — use template's field_ids for all visible fields
+      field_values = visibleFields.map((f) => ({
+        field_id: f.field_id,
+        key: f.key,
+        value: buildValue(f),
+      }));
+    }
 
     try {
       if (isEdit) {
@@ -600,41 +676,62 @@ function DrugModal({ template, drug, onClose, onSaved }) {
       onSaved();
       onClose();
     } catch (err) {
-      setError(err.message || "Failed to save drug");
+      const raw = err?.data?.detail || err?.message || "Failed to save drug";
+      const detail = Array.isArray(raw)
+        ? raw.map((d) => (typeof d === "string" ? d : d.msg || JSON.stringify(d))).join(", ")
+        : String(raw);
+      const status = err?.status ? ` (${err.status})` : "";
+      setError(detail + status);
     }
     setSaving(false);
   };
 
   const renderField = (f) => {
-    const base = "w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-400 text-sm outline-none";
+    const base = "w-full px-3 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-300 text-xs outline-none transition-all";
     const val  = formData[f.key] || "";
     const onChange = (v) => setFormData((p) => ({ ...p, [f.key]: v }));
 
     switch (f.type) {
-      case "array":    return (
+      case "array": return (
         <div>
-          <textarea className={base} rows={2} value={val} onChange={(e) => onChange(e.target.value)}
-            placeholder={`Enter comma-separated values (e.g. fever, headache, cough)`} />
-          <p className="text-xs text-gray-400 mt-1">Separate multiple values with commas</p>
+          <input type="text" className={base} value={val} onChange={(e) => onChange(e.target.value)}
+            placeholder="e.g. fever, headache, cough" />
+          <p className="text-xs text-gray-400 mt-0.5">Separate with commas</p>
         </div>
       );
-      case "textarea": return <textarea className={base} rows={3} value={val} onChange={(e) => onChange(e.target.value)} placeholder={`Enter ${f.label?.toLowerCase() || "value"}...`} />;
-      case "select":   return (
-        <select className={`${base} bg-white`} value={val} onChange={(e) => onChange(e.target.value)}>
+      case "textarea": return (
+        <textarea className={base} rows={2} value={val}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={"Enter " + (f.label?.toLowerCase() || "value") + "..."} />
+      );
+      case "select": return (
+        <select className={base + " bg-white"} value={val} onChange={(e) => onChange(e.target.value)}>
           <option value="">Select {f.label?.toLowerCase() || "option"}</option>
           {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
       );
       case "date":   return <input type="date"   className={base} value={val} onChange={(e) => onChange(e.target.value)} />;
-      case "number": return <input type="number" className={base} value={val} onChange={(e) => onChange(e.target.value)} placeholder={`Enter ${f.label?.toLowerCase() || "value"}...`} />;
+      case "number": return <input type="number" className={base} value={val} onChange={(e) => onChange(e.target.value)} placeholder={"Enter " + (f.label?.toLowerCase() || "value")} />;
       case "url":    return <input type="url"    className={base} value={val} onChange={(e) => onChange(e.target.value)} placeholder="https://..." />;
       case "file":   return (
-        <div className="border-2 border-dashed border-gray-300 rounded-xl p-5 text-center hover:border-indigo-400 cursor-pointer">
-          <p className="text-sm text-gray-500"><span className="text-indigo-600 font-semibold">Click to upload</span> or drag and drop</p>
-          <p className="text-xs text-gray-400 mt-1">PDF only (max 10MB)</p>
+        <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+          {val ? (
+            <div className="flex items-center justify-between">
+              <a href={val} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 font-semibold hover:underline truncate">
+                📄 View current brochure
+              </a>
+              <button type="button" onClick={() => onChange("")} className="text-xs text-red-400 hover:text-red-600 ml-2 flex-shrink-0">Remove</button>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 text-center">Brochure upload available on the drug card after saving</p>
+          )}
         </div>
       );
-      default: return <input type="text" className={base} value={val} onChange={(e) => onChange(e.target.value)} placeholder={`Enter ${f.label?.toLowerCase() || "value"}...`} />;
+      default: return (
+        <input type="text" className={base} value={val}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={"Enter " + (f.label?.toLowerCase() || "value")} />
+      );
     }
   };
 
@@ -643,31 +740,37 @@ function DrugModal({ template, drug, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-5 rounded-t-3xl flex items-center justify-between sticky top-0 z-10">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">💊</span>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[88vh] flex flex-col">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-500 px-5 py-3 rounded-t-2xl flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl">💊</span>
             <div>
-              <h2 className="text-xl font-bold text-white">{isEdit ? "Edit Drug" : "Add New Drug"}</h2>
-              <p className="text-blue-100 text-xs">{template.template_name}</p>
+              <h2 className="text-sm font-bold text-white leading-tight">{isEdit ? "Edit Drug" : "Add New Drug"}</h2>
+              <p className="text-blue-200 text-xs">{template.template_name}</p>
             </div>
           </div>
           <button onClick={onClose} className="text-white hover:bg-white/20 rounded-lg p-1.5">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>}
+        {/* Scrollable form body */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-xs">{error}</div>
+          )}
 
           {/* Fixed fields */}
           <div>
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Standard Fields</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Standard Fields</p>
+            <div className="grid grid-cols-2 gap-3">
               {fixedVisible.map((f) => (
-                <div key={f.field_id} className={f.type === "textarea" || f.type === "file" ? "md:col-span-2" : ""}>
-                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
-                    {f.label || formatKey(f.key)} {f.required && <span className="text-red-500">*</span>}
+                <div key={f.field_id} className={f.type === "textarea" || f.type === "array" || f.type === "file" ? "col-span-2" : ""}>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    {f.label || formatKey(f.key)}{f.required && <span className="text-red-500 ml-0.5">*</span>}
                   </label>
                   {renderField(f)}
                 </div>
@@ -678,14 +781,15 @@ function DrugModal({ template, drug, onClose, onSaved }) {
           {/* Dynamic fields */}
           {dynamicVisible.length > 0 && (
             <div>
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
-                Custom Fields <span className="bg-indigo-100 text-indigo-600 text-xs px-2 py-0.5 rounded-full normal-case">{dynamicVisible.length}</span>
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-indigo-50 rounded-xl p-4 border border-indigo-100">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                Custom Fields
+                <span className="bg-indigo-100 text-indigo-600 text-xs px-1.5 py-0.5 rounded-full normal-case font-semibold">{dynamicVisible.length}</span>
+              </p>
+              <div className="grid grid-cols-2 gap-3 bg-indigo-50 rounded-xl p-3 border border-indigo-100">
                 {dynamicVisible.map((f) => (
-                  <div key={f.field_id} className={f.type === "textarea" ? "md:col-span-2" : ""}>
-                    <label className="block text-xs font-bold text-gray-700 mb-1.5">
-                      {f.label || formatKey(f.key)} {f.required && <span className="text-red-500">*</span>}
+                  <div key={f.field_id} className={f.type === "textarea" || f.type === "array" ? "col-span-2" : ""}>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      {f.label || formatKey(f.key)}{f.required && <span className="text-red-500 ml-0.5">*</span>}
                       <span className="ml-1 text-indigo-400 font-normal">(custom)</span>
                     </label>
                     {renderField(f)}
@@ -694,19 +798,223 @@ function DrugModal({ template, drug, onClose, onSaved }) {
               </div>
             </div>
           )}
-
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-bold hover:bg-gray-200 text-sm">Cancel</button>
-            <button type="submit" disabled={saving} className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-2.5 rounded-xl font-bold hover:shadow-lg text-sm disabled:opacity-50">
-              {saving ? "Saving..." : isEdit ? "Update Drug" : "Add Drug"}
-            </button>
-          </div>
         </form>
+
+        {/* Footer buttons */}
+        <div className="flex gap-2 px-5 py-3 border-t border-gray-100 flex-shrink-0">
+          <button type="button" onClick={onClose}
+            className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-xl font-semibold hover:bg-gray-200 text-sm transition-all">
+            Cancel
+          </button>
+          <button type="submit" form="drug-form" disabled={saving}
+            onClick={handleSubmit}
+            className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-2 rounded-xl font-bold hover:shadow-md text-sm disabled:opacity-50 transition-all">
+            {saving ? "Saving..." : isEdit ? "Update Drug" : "Add Drug"}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
+// ── Drug Active Toggle ────────────────────────────────────────────────────────
+function DrugActiveToggle({ drug, onToggled }) {
+  const [loading, setLoading] = React.useState(false);
+  const isActive = drug.is_active !== false; // default true if undefined
+
+  const toggle = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("access_token");
+      if (isActive) {
+        // Deactivate — soft delete via DELETE endpoint
+        const res = await fetch(`/api/v1/drugs/${drug._id}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "ngrok-skip-browser-warning": "true",
+          },
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          throw new Error(d.detail || "Failed to deactivate");
+        }
+      } else {
+        // Reactivate — PUT with is_active field
+        // Build field_values from existing drug to keep all data intact
+        const field_values = (drug.field_values || []).map((fv) => ({
+          field_id: fv.field_id,
+          key: fv.key,
+          value: fv.value,
+        }));
+        const res = await fetch(`/api/v1/drugs/${drug._id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+            "ngrok-skip-browser-warning": "true",
+          },
+          body: JSON.stringify({ field_values, is_active: true }),
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          throw new Error(d.detail || "Failed to reactivate");
+        }
+      }
+      onToggled();
+    } catch (err) {
+      alert(err.message || "Toggle failed");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="flex items-center justify-between px-1 py-1">
+      <div className="flex items-center gap-2">
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? "bg-green-500" : "bg-gray-300"}`} />
+        <span className="text-xs font-semibold text-gray-600">
+          {isActive ? "Visible to Doctors & MRs" : "Hidden from Doctors & MRs"}
+        </span>
+      </div>
+      <button
+        onClick={toggle}
+        disabled={loading}
+        className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+          isActive ? "bg-green-500" : "bg-gray-300"
+        }`}
+        title={isActive ? "Click to hide from doctors/MRs" : "Click to show to doctors/MRs"}
+      >
+        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+          isActive ? "translate-x-4" : "translate-x-0"
+        }`} />
+      </button>
+    </div>
+  );
+}
+
+// ── Brochure Upload Button ────────────────────────────────────────────────────
+function BrochureUploadButton({ drug, onUploaded }) {
+  const fileRef = React.useRef(null);
+  const [uploading, setUploading] = React.useState(false);
+  const [deleting, setDeleting]   = React.useState(false);
+  const [downloading, setDownloading] = React.useState(false);
+  const [msg, setMsg] = React.useState("");
+  const hasBrochure = drug.has_brochure === true;
+
+  const showMsg = (m) => { setMsg(m); setTimeout(() => setMsg(""), 3000); };
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".pdf")) { showMsg("❌ PDF only"); return; }
+    if (file.size > 10 * 1024 * 1024) { showMsg("❌ Max 10MB"); return; }
+    setUploading(true);
+    try {
+      const token = localStorage.getItem("access_token");
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/v1/drugs/${drug._id}/brochure`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Upload failed");
+      showMsg("✅ Brochure uploaded!");
+      onUploaded();
+    } catch (err) {
+      showMsg("❌ " + (err.message || "Failed"));
+    }
+    setUploading(false);
+    e.target.value = "";
+  };
+
+  const handleDelete = async () => {
+    if (!confirm("Delete this brochure from Cloudinary?")) return;
+    setDeleting(true);
+    try {
+      const token = localStorage.getItem("access_token");
+      const res = await fetch(`/api/v1/drugs/${drug._id}/brochure`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Delete failed");
+      showMsg("✅ Brochure deleted");
+      onUploaded();
+    } catch (err) {
+      showMsg("❌ " + (err.message || "Failed"));
+    }
+    setDeleting(false);
+  };
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const token = localStorage.getItem("access_token");
+      const res = await fetch(`/api/v1/drugs/${drug._id}/brochure/download`, {
+        headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || "Download failed");
+      }
+      // Use filename from Content-Disposition header
+      const disposition = res.headers.get("content-disposition") || "";
+      const match = disposition.match(/filename[^;=\n]*=["']?([^"'\n;]+)["']?/i);
+      const filename = match?.[1]?.trim() || `${drug.drug_name || "drug"}-brochure.pdf`;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      showMsg("❌ " + (err.message || "Download failed"));
+    }
+    setDownloading(false);
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={handleFile} />
+
+      {hasBrochure ? (
+        /* Has brochure — show download + delete + replace */
+        <div className="space-y-1.5">
+          <div className="flex gap-1.5">
+            <button onClick={handleDownload} disabled={downloading}
+              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-semibold border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition-all disabled:opacity-50">
+              {downloading ? "..." : "↓ Download"}
+            </button>
+            <button onClick={handleDelete} disabled={deleting}
+              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-semibold border border-red-200 text-red-500 hover:bg-red-50 transition-all disabled:opacity-50">
+              {deleting ? "..." : "🗑 Delete"}
+            </button>
+          </div>
+          <button onClick={() => fileRef.current?.click()} disabled={uploading}
+            className="w-full py-1.5 rounded-lg text-xs font-semibold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all disabled:opacity-50">
+            {uploading ? "Uploading..." : "📄 Replace Brochure"}
+          </button>
+        </div>
+      ) : (
+        /* No brochure — just upload */
+        <button onClick={() => fileRef.current?.click()} disabled={uploading}
+          className="w-full py-2 rounded-xl font-bold text-xs transition-all border border-dashed border-gray-300 text-gray-400 hover:border-indigo-300 hover:text-indigo-500 hover:bg-indigo-50 disabled:opacity-50">
+          {uploading ? "Uploading..." : "📄 Upload Brochure"}
+        </button>
+      )}
+
+      {msg && <p className="text-xs text-center font-medium text-gray-600">{msg}</p>}
+    </div>
+  );
+}
+
+// ── Bulk Upload Modal ─────────────────────────────────────────────────────────
 function BulkUploadModal({ onClose, onSuccess }) {
   const fileRef = React.useRef(null);
   const [file, setFile]           = React.useState(null);
@@ -724,12 +1032,25 @@ function BulkUploadModal({ onClose, onSuccess }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleDownload = () => {
-    if (!template?.fields) return;
-    const visibleFields = template.fields.filter((f) => f.visible);
-    const headers = visibleFields.map((f) => f.key);
-    // Only header row — fill from row 2 onwards
-    downloadCSVTemplate(headers, [[]], `drugs_template.csv`);
+  const handleDownload = async () => {
+    try {
+      const token = localStorage.getItem("access_token");
+      const res = await fetch("/api/v1/drugs/download-template", {
+        headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
+      });
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "drug_template.csv"; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      // Fallback to local generation if backend endpoint fails
+      if (!template?.fields) return;
+      const visibleFields = template.fields.filter((f) => f.visible);
+      const headers = visibleFields.map((f) => f.key);
+      downloadCSVTemplate(headers, [[]], "drugs_template.csv");
+    }
   };
 
   const fixedFields   = template?.fields?.filter((f) => f.is_fixed  && f.visible) || [];

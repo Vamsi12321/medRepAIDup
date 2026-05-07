@@ -18,7 +18,7 @@ const segmentLabel = {
   "home":            "Home",
   "drug-management": "💊 Drug Management",
   "cme-events":      "🎓 CME Events",
-  "doctors":         "👨‍⚕️ Doctors",
+  "doctors":         "🩺 Doctors",
   "medical-reps":    "💼 Medical Reps",
   "profile":         "👤 Profile",
   "drug-search":     "🔍 Drug Search",

@@ -206,16 +206,12 @@ export default function CompanyMedicalReps() {
             <p className="text-gray-600 text-sm">Manage your field force and sales team</p>
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={() => setShowBulkModal(true)}
-              className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
-            >
+            <button onClick={() => setShowBulkModal(true)}
+              className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-2 rounded-xl font-bold shadow hover:shadow-md transition-all flex items-center gap-1.5 text-xs">
               <span>📤</span><span>Bulk Upload</span>
             </button>
-            <button
-              onClick={() => { setSelectedMR(null); setShowModal(true); }}
-              className="w-full sm:w-auto bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
-            >
+            <button onClick={() => { setSelectedMR(null); setShowModal(true); }}
+              className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-2 rounded-xl font-bold shadow hover:shadow-md transition-all flex items-center gap-1.5 text-xs">
               <span>➕</span><span>Add MR</span>
             </button>
           </div>
@@ -288,25 +284,22 @@ export default function CompanyMedicalReps() {
                         {mr.phone && <p className="text-xs text-gray-400">{mr.phone}</p>}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <button
-                        onClick={() => setVisitsMR(mr)}
-                        className="bg-purple-100 text-purple-600 px-3 py-1.5 rounded-lg font-semibold hover:bg-purple-200 transition-all text-xs">
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button onClick={() => setVisitsMR(mr)}
+                        className="bg-purple-100 text-purple-600 px-2.5 py-1 rounded-lg font-semibold hover:bg-purple-200 transition-all text-xs">
                         Visits
                       </button>
-                      <button
-                        onClick={() => handleToggleStatus(mr)}
+                      <button onClick={() => handleToggleStatus(mr)}
                         className={`relative w-9 h-5 rounded-full transition-colors duration-300 ${mr.is_active ? "bg-green-500" : "bg-gray-300"}`}
-                        title={mr.is_active ? "Active — click to deactivate" : "Inactive — click to activate"}
-                      >
+                        title={mr.is_active ? "Active — click to deactivate" : "Inactive — click to activate"}>
                         <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-300 ${mr.is_active ? "translate-x-4" : "translate-x-0.5"}`} />
                       </button>
                       <button onClick={() => { setSelectedMR(mr); setShowModal(true); }}
-                        className="bg-blue-100 text-blue-600 px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-200 transition-all text-xs">
+                        className="bg-blue-100 text-blue-600 px-2.5 py-1 rounded-lg font-semibold hover:bg-blue-200 transition-all text-xs">
                         Edit
                       </button>
                       <button onClick={() => setConfirmDelete(mr)}
-                        className="bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-semibold hover:bg-red-200 transition-all text-xs">
+                        className="bg-red-100 text-red-600 px-2.5 py-1 rounded-lg font-semibold hover:bg-red-200 transition-all text-xs">
                         Delete
                       </button>
                     </div>
