@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { get, post as apiPost, del } from "@/lib/api";
@@ -32,6 +32,14 @@ const ACCENT = {
 };
 
 export default function FeedPage() {
+  return (
+    <Suspense fallback={<div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />)}</div>}>
+      <FeedPageInner />
+    </Suspense>
+  );
+}
+
+function FeedPageInner() {
   const queryClient  = useQueryClient();
   const searchParams = useSearchParams();
   const highlightPostId = searchParams?.get("post") || null;
