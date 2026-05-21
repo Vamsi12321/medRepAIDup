@@ -49,14 +49,6 @@ export default function DiscoverPage() {
             placeholder="Search by name..."
             className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-200" />
         </div>
-        <div className="flex gap-1.5">
-          {[{ v: "", l: "All" }, { v: "DOCTOR", l: "Doctors" }, { v: "MR", l: "MRs" }].map((f) => (
-            <button key={f.v} onClick={() => { setRole(f.v); setPage(1); }}
-              className={"px-3 py-2 rounded-lg text-xs font-semibold transition-all " + (roleFilter === f.v ? "bg-indigo-600 text-white shadow" : "bg-gray-50 text-gray-600 border border-gray-200 hover:border-indigo-300")}>
-              {f.l}
-            </button>
-          ))}
-        </div>
       </div>
 
       {isLoading ? (
@@ -73,15 +65,15 @@ export default function DiscoverPage() {
           <div className="space-y-2">
             {users.map((u) => (
               <div key={u.user_id} className="bg-white rounded-xl p-3 shadow-sm border border-gray-200 flex items-center gap-3">
-                <div className={"w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 " + (u.role === "MR" ? "bg-gradient-to-br from-orange-500 to-red-500" : "bg-gradient-to-br from-indigo-500 to-purple-500")}>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 bg-gradient-to-br from-indigo-500 to-purple-500">
                   {u.name?.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-gray-900 text-sm truncate">{u.name}</p>
                   <p className="text-xs text-gray-400">{u.specialization || u.territory || u.role}{u.hospital ? " · " + u.hospital : ""}</p>
                 </div>
-                <span className={"text-xs px-2 py-0.5 rounded-md font-bold flex-shrink-0 " + (u.role === "MR" ? "bg-orange-100 text-orange-700" : "bg-indigo-100 text-indigo-700")}>
-                  {u.role}
+                <span className="text-xs px-2 py-0.5 rounded-md font-bold flex-shrink-0 bg-indigo-100 text-indigo-700">
+                  Doctor
                 </span>
                 <div className="flex gap-1.5 flex-shrink-0">
                   {u.connection_status === "connected" ? (

@@ -305,6 +305,16 @@ export default function CompanyMedicalReps() {
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+                    {mr.zone && (
+                      <span className="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-lg text-xs font-semibold">
+                        🌐 {mr.zone}
+                      </span>
+                    )}
+                    {mr.state && (
+                      <span className="flex items-center gap-1 bg-green-50 text-green-600 px-2.5 py-1 rounded-lg text-xs font-semibold">
+                        📍 {mr.state}
+                      </span>
+                    )}
                     {mr.territory && (
                       <span className="flex items-center gap-1 bg-orange-50 text-orange-600 px-2.5 py-1 rounded-lg text-xs font-semibold">
                         📍 {mr.territory}
@@ -318,6 +328,18 @@ export default function CompanyMedicalReps() {
                         <div className="absolute left-0 top-full mt-1 z-20 hidden group-hover:block bg-white border border-gray-200 rounded-xl shadow-lg p-2 min-w-max">
                           {mr.assigned_doctors.map((d) => (
                             <p key={d.id} className="text-xs text-gray-700 font-medium px-2 py-1 hover:bg-gray-50 rounded">👨‍⚕️ {d.name}</p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="relative group">
+                      <span className="flex items-center gap-1 bg-green-50 text-green-600 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-default">
+                        💊 {mr.assigned_drugs?.length || 0} drug{mr.assigned_drugs?.length !== 1 ? "s" : ""}
+                      </span>
+                      {mr.assigned_drugs?.length > 0 && (
+                        <div className="absolute left-0 top-full mt-1 z-20 hidden group-hover:block bg-white border border-gray-200 rounded-xl shadow-lg p-2 min-w-max">
+                          {mr.assigned_drugs.map((d) => (
+                            <p key={d.id} className="text-xs text-gray-700 font-medium px-2 py-1 hover:bg-gray-50 rounded">💊 {d.name}</p>
                           ))}
                         </div>
                       )}
@@ -380,6 +402,8 @@ function MRModal({ mr, onClose, onSaved }) {
     email:       mr?.email       || "",
     password:    "",
     phone:       mr?.phone       || "",
+    zone:        mr?.zone        || "",
+    state:       mr?.state       || "",
     territory:   mr?.territory   || "",
   });
   // assigned_doctors from API are objects {id, name} — extract IDs for submission
@@ -387,12 +411,24 @@ function MRModal({ mr, onClose, onSaved }) {
   const [assignedDoctors, setAssignedDoctors] = useState(initialDoctorObjs.map((d) => d.id || d));
   const [doctorObjects, setDoctorObjects] = useState(initialDoctorObjs.filter((d) => d.id)); // already have name+id
 
+  // assigned_drugs from API are objects {id, name} — extract IDs for submission
+  const initialDrugObjs = mr?.assigned_drugs || [];
+  const [assignedDrugs, setAssignedDrugs] = useState(initialDrugObjs.map((d) => d.id || d));
+  const [drugObjects, setDrugObjects] = useState(initialDrugObjs.filter((d) => d.id));
+
   // Doctor search state
   const [doctorSearch, setDoctorSearch] = useState("");
   const [allDoctors, setAllDoctors] = useState([]);
   const [loadingDoctors, setLoadingDoctors] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+
+  // Drug search state
+  const [drugSearch, setDrugSearch] = useState("");
+  const [allDrugs, setAllDrugs] = useState([]);
+  const [loadingDrugs, setLoadingDrugs] = useState(true);
+  const [drugDropdownOpen, setDrugDropdownOpen] = useState(false);
+  const drugDropdownRef = useRef(null);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -403,10 +439,24 @@ function MRModal({ mr, onClose, onSaved }) {
     get(isEdit ? `/api/v1/doctors?page_size=500` : `/api/v1/doctors/available`)
       .then((data) => {
         setAllDoctors(data.doctors || []);
-        // doctorObjects already pre-populated from API response above
       })
       .catch(() => {})
       .finally(() => setLoadingDoctors(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch all drugs once on modal open
+  useEffect(() => {
+    setLoadingDrugs(true);
+    get("/api/v1/drugs?limit=500")
+      .then((data) => {
+        const drugs = (data.drugs || []).map((d) => ({
+          id: d._id || d.id,
+          name: d.name || d.field_values?.find((f) => f.key === "brand_name")?.value || d.field_values?.find((f) => f.key === "name")?.value || "Unknown Drug",
+        }));
+        setAllDrugs(drugs);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingDrugs(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Filter locally by search keyword
@@ -418,9 +468,17 @@ function MRModal({ mr, onClose, onSaved }) {
       )
     : allDoctors;
 
+  // Filter drugs locally by search keyword
+  const drugResults = drugSearch.trim()
+    ? allDrugs.filter((d) => d.name?.toLowerCase().includes(drugSearch.toLowerCase()))
+    : allDrugs;
+
   // Close dropdown on outside click
   useEffect(() => {
-    const handler = (e) => { if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDropdownOpen(false); };
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDropdownOpen(false);
+      if (drugDropdownRef.current && !drugDropdownRef.current.contains(e.target)) setDrugDropdownOpen(false);
+    };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
@@ -438,6 +496,19 @@ function MRModal({ mr, onClose, onSaved }) {
     setDoctorObjects((prev) => prev.filter((d) => d.id !== id));
   };
 
+  const addDrug = (drug) => {
+    if (assignedDrugs.includes(drug.id)) return;
+    setAssignedDrugs((prev) => [...prev, drug.id]);
+    setDrugObjects((prev) => [...prev, drug]);
+    setDrugSearch("");
+    setDrugDropdownOpen(false);
+  };
+
+  const removeDrug = (id) => {
+    setAssignedDrugs((prev) => prev.filter((d) => d !== id));
+    setDrugObjects((prev) => prev.filter((d) => d.id !== id));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -447,8 +518,11 @@ function MRModal({ mr, onClose, onSaved }) {
         await put(`/api/v1/mrs/${mr.id}`, {
           name:             form.name,
           phone:            form.phone,
+          zone:             form.zone,
+          state:            form.state,
           territory:        form.territory,
           assigned_doctors: assignedDoctors,
+          assigned_drugs:   assignedDrugs,
         });
       } else {
         await post(`/api/v1/mrs`, {
@@ -456,8 +530,11 @@ function MRModal({ mr, onClose, onSaved }) {
           email:            form.email,
           password:         form.password || "Welcome@123",
           phone:            form.phone,
+          zone:             form.zone,
+          state:            form.state,
           territory:        form.territory,
           assigned_doctors: assignedDoctors,
+          assigned_drugs:   assignedDrugs,
         });
       }
       onSaved(isEdit ? "MR updated successfully." : "MR added successfully.");
@@ -509,8 +586,33 @@ function MRModal({ mr, onClose, onSaved }) {
             {field("Full Name", "name", "text", "Rajesh Kumar", true)}
             {field("Email", "email", "email", "mr@company.com", !isEdit)}
             {!isEdit && field("Password (default: Welcome@123)", "password", "password", "Leave blank for default")}
-            {field("Phone", "phone", "tel", "+91 98765 43210")}
-            {field("Territory", "territory", "text", "Mumbai North")}
+            {field("Phone", "phone", "tel", "+91 98765 43210", true)}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">Zone <span className="text-red-500">*</span></label>
+              <select value={form.zone} onChange={(e) => setForm({ ...form, zone: e.target.value })} required
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-400 focus:border-transparent text-sm outline-none bg-white">
+                <option value="">Select Zone</option>
+                <option value="South">South</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">State <span className="text-red-500">*</span></label>
+              <select value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} required
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-400 focus:border-transparent text-sm outline-none bg-white">
+                <option value="">Select State</option>
+                <option value="Telangana">Telangana</option>
+                <option value="Andhra Pradesh">Andhra Pradesh</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">Territory <span className="text-red-500">*</span></label>
+              <select value={form.territory} onChange={(e) => setForm({ ...form, territory: e.target.value })} required
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-400 focus:border-transparent text-sm outline-none bg-white">
+                <option value="">Select Territory</option>
+                <option value="Hyderabad">Hyderabad</option>
+                <option value="Visakhapatnam">Visakhapatnam</option>
+              </select>
+            </div>
           </div>
 
           {/* Assign Doctors */}
@@ -568,6 +670,63 @@ function MRModal({ mr, onClose, onSaved }) {
               )}
             </div>
             <p className="text-xs text-gray-400 mt-1">{assignedDoctors.length} doctor{assignedDoctors.length !== 1 ? "s" : ""} assigned</p>
+          </div>
+
+          {/* Assign Drugs */}
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1.5">Assign Drugs / Products</label>
+
+            {/* Selected drugs chips */}
+            {drugObjects.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {drugObjects.map((d) => (
+                  <span key={d.id} className="flex items-center space-x-1.5 bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
+                    <span>💊 {d.name}</span>
+                    <button type="button" onClick={() => removeDrug(d.id)} className="text-green-400 hover:text-green-700 ml-1 font-bold">×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Drug search input + dropdown */}
+            <div className="relative" ref={drugDropdownRef}>
+              <input
+                type="text"
+                value={drugSearch}
+                onChange={(e) => { setDrugSearch(e.target.value); setDrugDropdownOpen(true); }}
+                onFocus={() => setDrugDropdownOpen(true)}
+                placeholder="Search and add drugs..."
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-400 focus:border-transparent text-sm outline-none"
+              />
+              {drugDropdownOpen && (
+                <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                  {loadingDrugs ? (
+                    <div className="px-4 py-3 text-sm text-gray-400">Loading drugs...</div>
+                  ) : drugResults.length === 0 ? (
+                    <div className="px-4 py-3 text-sm text-gray-400">No drugs found</div>
+                  ) : (
+                    drugResults.slice(0, 20).map((d) => {
+                      const already = assignedDrugs.includes(d.id);
+                      return (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() => !already && addDrug(d)}
+                          className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${already ? "bg-gray-50 text-gray-400 cursor-default" : "hover:bg-orange-50 text-gray-700"}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs">💊</span>
+                            <p className="font-semibold">{d.name}</p>
+                          </div>
+                          {already && <span className="text-xs text-green-500 font-semibold">Added</span>}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 mt-1">{assignedDrugs.length} drug{assignedDrugs.length !== 1 ? "s" : ""} assigned</p>
           </div>
 
           <div className="flex space-x-3 pt-2">

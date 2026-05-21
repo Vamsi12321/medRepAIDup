@@ -88,7 +88,7 @@ function FeedPageInner() {
 
         {/* Filter pills */}
         <div className="flex gap-1.5">
-          {[{ v: "", l: "All Posts" }, { v: "DOCTOR", l: "Doctors" }, { v: "MR", l: "MRs" }].map((f) => (
+          {[{ v: "", l: "All Posts" }].map((f) => (
             <button key={f.v} onClick={() => { setFilterRole(f.v); setPage(1); }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 filterRole === f.v
@@ -211,19 +211,19 @@ export function PostCard({ post: postData, currentUserId, accentColor = "indigo"
         {/* Author row */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
-            <div className={"w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 " + (isMR ? "bg-gradient-to-br from-orange-500 to-red-500" : "bg-gradient-to-br from-indigo-500 to-purple-500")}>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 bg-gradient-to-br from-indigo-500 to-purple-500">
               {postData.author_name?.split(" ").map((n) => n[0]).join("").slice(0, 2)}
             </div>
             <div>
               <p className="font-bold text-gray-900 text-sm leading-tight">{postData.author_name}</p>
               <p className="text-xs text-gray-400">
-                {postData.author_specialization || postData.author_territory || postData.author_role}
+                {postData.author_specialization || postData.author_territory || "Doctor"}
                 {" · "}{timeAgo(postData.created_at)}
               </p>
             </div>
           </div>
-          <span className={"px-2 py-0.5 rounded-md text-xs font-bold " + (isMR ? "bg-orange-100 text-orange-700" : "bg-indigo-100 text-indigo-700")}>
-            {postData.author_role}
+          <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-indigo-100 text-indigo-700">
+            Doctor
           </span>
         </div>
 

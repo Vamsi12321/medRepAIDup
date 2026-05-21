@@ -33,6 +33,11 @@ export function middleware(request) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
+  // Block MR from network routes
+  if (userRole === "mr" && pathname.startsWith("/mr/network")) {
+    return NextResponse.redirect(new URL("/mr/dashboard", request.url));
+  }
+
   // Wrong role — send to their own dashboard
   const allowedPrefixes = roleRoutes[userRole] || [];
   const hasAccess = allowedPrefixes.some((prefix) => pathname.startsWith(prefix));

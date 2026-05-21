@@ -27,10 +27,8 @@ async function forward(req, { params }) {
 
   if (method !== "GET" && method !== "HEAD" && method !== "DELETE") {
     if (contentType.includes("multipart/form-data")) {
-      // Forward FormData as-is — browser sets Content-Type with boundary
       body = await req.formData();
     } else {
-      // Read raw body text — avoids req.json() stream consumption issues
       const rawText = await req.text();
       if (rawText && rawText.trim()) {
         body = rawText;
@@ -39,12 +37,32 @@ async function forward(req, { params }) {
     }
   }
 
-  const res = await fetch(url, {
-    method,
-    headers: forwardHeaders,
-    redirect: "follow",
-    ...(body !== undefined ? { body } : {}),
-  });
+  // ── LOG: before forwarding ──────────────────────────────────────────────────
+  console.log(`[proxy] ▶ ${method} ${url}`);
+  console.log(`[proxy]   BACKEND_URL = ${BACKEND}`);
+  console.log(`[proxy]   Auth header = ${auth ? auth.slice(0, 30) + "..." : "none"}`);
+  if (body && typeof body === "string") {
+    console.log(`[proxy]   Body (first 200) = ${body.slice(0, 200)}`);
+  }
+  // ───────────────────────────────────────────────────────────────────────────
+
+  let res;
+  try {
+    res = await fetch(url, {
+      method,
+      headers: forwardHeaders,
+      redirect: "follow",
+      ...(body !== undefined ? { body } : {}),
+    });
+  } catch (fetchErr) {
+    // ── LOG: network error (backend unreachable) ──────────────────────────────
+    console.error(`[proxy] ✗ Network error calling ${url}:`, fetchErr.message);
+    return Response.json({ detail: `Proxy network error: ${fetchErr.message}` }, { status: 502 });
+  }
+
+  // ── LOG: after response ─────────────────────────────────────────────────────
+  console.log(`[proxy] ◀ ${method} ${url} → ${res.status} ${res.statusText}`);
+  // ───────────────────────────────────────────────────────────────────────────
 
   // Forward binary/CSV/PDF responses as-is
   const resContentType = res.headers.get("content-type") || "";
@@ -70,7 +88,9 @@ async function forward(req, { params }) {
   try { data = JSON.parse(text); } catch { data = { detail: text }; }
 
   if (!res.ok) {
-    console.error(`[proxy] ${method} ${url} → ${res.status}`, JSON.stringify(data));
+    // ── LOG: non-2xx response body ──────────────────────────────────────────
+    console.error(`[proxy] ✗ ${method} ${url} → ${res.status}`, JSON.stringify(data));
+    // ─────────────────────────────────────────────────────────────────────────
   }
 
   return Response.json(data, { status: res.status });

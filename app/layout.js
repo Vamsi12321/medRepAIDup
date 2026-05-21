@@ -3,8 +3,8 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import QueryProvider from "@/components/QueryProvider";
 
 export const metadata = {
-  title: "MedAware - Drug Awareness Platform",
-  description: "Professional drug awareness platform for healthcare professionals",
+  title: "MedRepAI - AI-Powered Pharma Intelligence Platform",
+  description: "Connect medical reps, doctors, and pharma companies. Track visits, measure SFE, forecast demand, and grow prescriptions — all powered by AI.",
 };
 
 export default function RootLayout({ children }) {
