@@ -2,16 +2,19 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { logout } from "@/lib/auth";
+import { get } from "@/lib/api";
 import NotificationBell from "@/components/NotificationBell";
 
 const PAGE_TITLES = {
-  "/mr/dashboard":   { title: "Dashboard",   icon: "🏠", sub: "Your overview" },
-  "/mr/doctors":     { title: "My Doctors",  icon: "🩺", sub: "Manage your doctor list" },
-  "/mr/visits":      { title: "Visits",      icon: "📅", sub: "Track your visits" },
-  "/mr/drug-search": { title: "Drug Search", icon: "🔍", sub: "Search & analyze drugs" },
-  "/mr/network":     { title: "Network",     icon: "🤝", sub: "Connect with peers" },
-  "/mr/profile":     { title: "Profile",     icon: "👤", sub: "Your account" },
+  "/mr/dashboard":      { title: "Dashboard",      icon: "🏠", sub: "Your overview" },
+  "/mr/doctors":        { title: "My Doctors",     icon: "🩺", sub: "Manage your doctor list" },
+  "/mr/visits":         { title: "Visits",         icon: "📅", sub: "Track your visits" },
+  "/mr/drug-search":    { title: "Drug Search",    icon: "🔍", sub: "Search & analyze drugs" },
+  "/mr/announcements":  { title: "Comms Center",   icon: "📢", sub: "Company communications" },
+  "/mr/grievance":      { title: "Grievance",      icon: "📝", sub: "Raise & track tickets" },
+  "/mr/profile":        { title: "Profile",        icon: "👤", sub: "Your account" },
 };
 
 export default function MRNavbar() {
@@ -21,18 +24,28 @@ export default function MRNavbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navItems = [
-    { name: "Dashboard",   path: "/mr/dashboard",   icon: "🏠" },
-    { name: "My Doctors",  path: "/mr/doctors",     icon: "🩺" },
-    { name: "Visits",      path: "/mr/visits",      icon: "📅" },
-    { name: "Drug Search", path: "/mr/drug-search", icon: "🔍" },
-    { name: "Network",     path: "/mr/network",     icon: "🤝" },
-    { name: "Profile",     path: "/mr/profile",     icon: "👤" },
+    { name: "Dashboard",     path: "/mr/dashboard",     icon: "🏠" },
+    { name: "My Doctors",    path: "/mr/doctors",       icon: "🩺" },
+    { name: "Visits",        path: "/mr/visits",        icon: "📅" },
+    { name: "Drug Search",   path: "/mr/drug-search",   icon: "🔍" },
+    { name: "Comms",         path: "/mr/announcements", icon: "📢" },
+    { name: "Grievance",     path: "/mr/grievance",     icon: "📝" },
+    { name: "Profile",       path: "/mr/profile",       icon: "👤" },
   ];
 
   const handleLogout = () => {
     setIsLoggingOut(true);
     setTimeout(() => logout(router), 1000);
   };
+
+  // Unread communications count
+  const { data: unreadData } = useQuery({
+    queryKey: ["comms-unread-count"],
+    queryFn: () => get("/api/v1/communications/unread/count"),
+    refetchInterval: 60000,
+    staleTime: 30000,
+  });
+  const unreadCount = unreadData?.unread_count || 0;
 
   return (
     <>
@@ -68,7 +81,7 @@ export default function MRNavbar() {
                 <Link
                   key={item.path}
                   href={item.path}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
+                  className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
                     pathname === item.path
                       ? "bg-gradient-to-r from-orange-600 to-red-600 text-white shadow"
                       : "text-gray-600 hover:bg-gray-100"
@@ -76,6 +89,11 @@ export default function MRNavbar() {
                 >
                   <span>{item.icon}</span>
                   <span>{item.name}</span>
+                  {item.path === "/mr/announcements" && unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
                 </Link>
               ))}
             </div>

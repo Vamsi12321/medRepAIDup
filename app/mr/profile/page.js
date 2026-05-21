@@ -25,7 +25,7 @@ export default function MRProfile() {
   });
 
   const updateMutation = useMutation({
-        mutationFn: (data) => {
+    mutationFn: (data) => {
       const clean = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== "" && v !== undefined));
       if (clean.experience_years !== undefined) clean.experience_years = parseInt(clean.experience_years, 10);
       return put("/api/v1/profile/me", clean);
@@ -47,6 +47,8 @@ export default function MRProfile() {
       location:         profile?.location || "",
       experience_years: profile?.experience_years || "",
       territory:        profile?.territory || "",
+      zone:             profile?.zone || "",
+      state:            profile?.state || "",
       avatar_url:       profile?.avatar_url || "",
     });
     setError("");
@@ -86,8 +88,13 @@ export default function MRProfile() {
               </div>
               <h2 className="text-xl font-bold text-gray-900">{profile?.full_name}</h2>
               <p className="text-orange-600 font-semibold text-sm mt-1">Medical Representative</p>
-              {profile?.territory && <p className="text-gray-500 text-xs mt-1">{profile.territory}</p>}
-              {profile?.location && <p className="text-gray-400 text-xs mt-1">{profile.location}</p>}
+              {profile?.territory && <p className="text-gray-500 text-xs mt-1">📍 {profile.territory}</p>}
+              {(profile?.zone || profile?.state) && (
+                <p className="text-gray-400 text-xs mt-0.5">
+                  {[profile.zone, profile.state].filter(Boolean).join(", ")}
+                </p>
+              )}
+              {profile?.location && <p className="text-gray-400 text-xs mt-0.5">{profile.location}</p>}
               {profile?.bio && <p className="text-gray-600 text-sm mt-3 leading-relaxed">{profile.bio}</p>}
               <button onClick={startEdit}
                 className="mt-4 w-full bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-xl font-semibold text-sm transition-all">
@@ -101,37 +108,40 @@ export default function MRProfile() {
             <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-200">
               <h3 className="font-bold text-gray-900 mb-4">Profile Details</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  { label: "Email",        value: profile?.email,                        color: "orange" },
-                  { label: "Phone",        value: profile?.phone || "—",                 color: "blue" },
-                  { label: "Territory",    value: profile?.territory || "—",             color: "purple" },
-                  { label: "Experience",   value: profile?.experience_years ? `${profile.experience_years} years` : "—", color: "green" },
-                  { label: "Location",     value: profile?.location || "—",              color: "teal" },
-                  { label: "Member Since", value: profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : "—", color: "gray" },
-                ].map((f) => (
-                  <div key={f.label} className={`bg-${f.color}-50 border border-${f.color}-100 rounded-xl p-3`}>
-                    <p className={`text-xs text-${f.color}-600 font-semibold mb-1`}>{f.label}</p>
-                    <p className="text-sm font-bold text-gray-800 truncate">{f.value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Company info — shown if available */}
-            {(profile?.company_name || profile?.company_id) && (
-              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-200">
-                <h3 className="font-bold text-gray-900 mb-4">Company</h3>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
-                    {profile.company_name?.charAt(0)?.toUpperCase() || "C"}
-                  </div>
-                  <div>
-                    <p className="font-bold text-gray-900">{profile.company_name || "—"}</p>
-                    {profile.company_id && <p className="text-xs text-gray-400 mt-0.5">ID: {profile.company_id}</p>}
-                  </div>
+                <div className="bg-orange-50 border border-orange-100 rounded-xl p-3">
+                  <p className="text-xs text-orange-600 font-semibold mb-1">Email</p>
+                  <p className="text-sm font-bold text-gray-800 truncate">{profile?.email || "—"}</p>
+                </div>
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                  <p className="text-xs text-blue-600 font-semibold mb-1">Phone</p>
+                  <p className="text-sm font-bold text-gray-800 truncate">{profile?.phone || "—"}</p>
+                </div>
+                <div className="bg-purple-50 border border-purple-100 rounded-xl p-3">
+                  <p className="text-xs text-purple-600 font-semibold mb-1">Territory</p>
+                  <p className="text-sm font-bold text-gray-800 truncate">{profile?.territory || "—"}</p>
+                </div>
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3">
+                  <p className="text-xs text-indigo-600 font-semibold mb-1">Zone</p>
+                  <p className="text-sm font-bold text-gray-800 truncate">{profile?.zone || "—"}</p>
+                </div>
+                <div className="bg-teal-50 border border-teal-100 rounded-xl p-3">
+                  <p className="text-xs text-teal-600 font-semibold mb-1">State</p>
+                  <p className="text-sm font-bold text-gray-800 truncate">{profile?.state || "—"}</p>
+                </div>
+                <div className="bg-green-50 border border-green-100 rounded-xl p-3">
+                  <p className="text-xs text-green-600 font-semibold mb-1">Experience</p>
+                  <p className="text-sm font-bold text-gray-800 truncate">{profile?.experience_years ? `${profile.experience_years} years` : "—"}</p>
+                </div>
+                <div className="bg-cyan-50 border border-cyan-100 rounded-xl p-3">
+                  <p className="text-xs text-cyan-600 font-semibold mb-1">Location</p>
+                  <p className="text-sm font-bold text-gray-800 truncate">{profile?.location || "—"}</p>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                  <p className="text-xs text-gray-600 font-semibold mb-1">Member Since</p>
+                  <p className="text-sm font-bold text-gray-800 truncate">{profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : "—"}</p>
                 </div>
               </div>
-            )}
+            </div>
 
             {/* Company info */}
             {company && (
@@ -156,16 +166,16 @@ export default function MRProfile() {
                   <div className="flex flex-wrap gap-2 pt-1">
                     {(company.company_city || company.company_state) && (
                       <span className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">
-                         {[company.company_city, company.company_state, company.company_country].filter(Boolean).join(", ")}
+                        📍 {[company.company_city, company.company_state, company.company_country].filter(Boolean).join(", ")}
                       </span>
                     )}
-                    {company.company_founded_year && <span className="text-xs bg-orange-50 text-orange-600 px-2.5 py-1 rounded-full"> Est. {company.company_founded_year}</span>}
+                    {company.company_founded_year && <span className="text-xs bg-orange-50 text-orange-600 px-2.5 py-1 rounded-full">🏢 Est. {company.company_founded_year}</span>}
                     {company.company_size && <span className="text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-full">👥 {company.company_size}</span>}
                     {company.company_website && (
                       <a href={company.company_website?.startsWith("http") ? company.company_website : `https://${company.company_website}`}
                         target="_blank" rel="noopener noreferrer"
                         className="text-xs bg-green-50 text-green-600 px-2.5 py-1 rounded-full hover:bg-green-100 transition-colors">
-                         {company.company_website}
+                        🌐 {company.company_website}
                       </a>
                     )}
                   </div>
@@ -189,6 +199,8 @@ export default function MRProfile() {
                   { key: "full_name",        label: "Full Name",          type: "text" },
                   { key: "phone",            label: "Phone",              type: "text" },
                   { key: "territory",        label: "Territory",          type: "text" },
+                  { key: "zone",             label: "Zone",               type: "text" },
+                  { key: "state",            label: "State",              type: "text" },
                   { key: "location",         label: "Location",           type: "text" },
                   { key: "experience_years", label: "Experience (years)", type: "number" },
                   { key: "avatar_url",       label: "Avatar URL",         type: "text" },

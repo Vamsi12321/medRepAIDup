@@ -68,6 +68,8 @@ export default function Login() {
 
       const appRole = roleKeyMap[data.user.role] || data.user.role.toLowerCase();
       localStorage.setItem("userRole", appRole);
+      localStorage.setItem("userDepartment", data.user.department || "");
+      localStorage.setItem("companyName", data.user.company_name || data.company_name || "");
 
       document.cookie = `access_token=${data.access_token}; path=/; max-age=3600; SameSite=Lax`;
       document.cookie = `userRole=${appRole}; path=/; max-age=3600; SameSite=Lax`;

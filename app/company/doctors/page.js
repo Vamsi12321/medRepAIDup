@@ -8,8 +8,8 @@ import { get, put, post, del } from "@/lib/api";
 import { TableSkeleton } from "@/components/Skeleton";
 import { downloadCSVTemplate } from "@/lib/downloadTemplate";
 
-const DOCTOR_HEADERS = ["name","email","phone","specialization","hospital","license_number","address"];
-const DOCTOR_SAMPLE  = [["Dr. Sarah Sharma","sharma@gmail.com","+919876543210","Cardiologist","City Hospital","MH12345","123 Medical Street, Mumbai"]];
+const DOCTOR_HEADERS = ["name","email","phone","specialization","classification","hospital","license_number","address"];
+const DOCTOR_SAMPLE  = [["Dr. Sarah Sharma","sharma@gmail.com","+919876543210","Cardiologist","A","City Hospital","MH12345","123 Medical Street, Mumbai"]];
 
 function BulkUploadModal({ onClose, onSuccess }) {
   const fileRef = React.useRef(null);
@@ -144,13 +144,14 @@ export default function CompanyDoctors() {
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [confirmDelete, setConfirmDelete]   = useState(null);
   const [showBulkModal, setShowBulkModal]   = useState(false);
+  const [showRequests, setShowRequests]     = useState(false);
   const [filterHospital, setFilterHospital]             = useState("");
   const [filterStatus, setFilterStatus]                 = useState("all");
   const [filterSpecialization, setFilterSpecialization] = useState("");
 
   const { data, isLoading ,refetch} = useQuery({
     queryKey: ["doctors"],
-    queryFn:  () => get("/api/v1/doctors/?page_size=1000").then((d) => d.doctors || []),
+    queryFn:  () => get("/api/v1/doctors?page_size=1000").then((d) => d.doctors || []),
   });
 
   const doctors = data || [];
@@ -215,6 +216,10 @@ export default function CompanyDoctors() {
             <p className="text-gray-600 text-sm">Manage healthcare professionals on your platform</p>
           </div>
           <div className="flex gap-2">
+            <button onClick={() => setShowRequests(true)}
+              className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-3 py-2 rounded-xl font-bold shadow hover:shadow-md transition-all flex items-center gap-1.5 text-xs">
+              <span>📋</span><span>Requests</span>
+            </button>
             <button onClick={() => setShowBulkModal(true)}
               className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-2 rounded-xl font-bold shadow hover:shadow-md transition-all flex items-center gap-1.5 text-xs">
               <span>📤</span><span>Bulk Upload</span>
@@ -280,8 +285,9 @@ export default function CompanyDoctors() {
                     <tr>
                       <th className="px-4 py-3 text-left font-bold text-xs">Doctor</th>
                       <th className="px-4 py-3 text-left font-bold text-xs">Specialization</th>
+                      <th className="px-4 py-3 text-left font-bold text-xs">Class</th>
                       <th className="px-4 py-3 text-left font-bold text-xs">Hospital</th>
-                      <th className="px-4 py-3 text-left font-bold text-xs">Phone</th>
+                      <th className="px-4 py-3 text-left font-bold text-xs">Added By</th>
                       <th className="px-4 py-3 text-left font-bold text-xs">Status</th>
                       <th className="px-4 py-3 text-center font-bold text-xs">Actions</th>
                     </tr>
@@ -296,8 +302,24 @@ export default function CompanyDoctors() {
                         <td className="px-4 py-3">
                           <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg text-xs font-semibold">{doctor.specialization || "—"}</span>
                         </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
+                            doctor.classification === "A" ? "bg-red-100 text-red-700" :
+                            doctor.classification === "B" ? "bg-yellow-100 text-yellow-700" :
+                            "bg-gray-100 text-gray-600"
+                          }`}>{doctor.classification || "C"}</span>
+                        </td>
                         <td className="px-4 py-3 text-gray-600 text-xs">{doctor.hospital || "—"}</td>
-                        <td className="px-4 py-3 text-gray-600 text-xs">{doctor.phone || "—"}</td>
+                        <td className="px-4 py-3">
+                          {doctor.added_by ? (
+                            <div>
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                doctor.added_by.role === "ADMIN" ? "bg-purple-100 text-purple-700" : "bg-orange-100 text-orange-700"
+                              }`}>{doctor.added_by.role}</span>
+                              <p className="text-xs text-gray-600 mt-0.5 truncate max-w-[100px]">{doctor.added_by.name}</p>
+                            </div>
+                          ) : <span className="text-xs text-gray-400">—</span>}
+                        </td>
                         <td className="px-4 py-3">
                           <button onClick={() => handleToggleStatus(doctor)}
                             className={`relative w-9 h-5 rounded-full transition-colors duration-300 ${doctor.is_active ? "bg-green-500" : "bg-gray-300"}`}>
@@ -349,8 +371,16 @@ export default function CompanyDoctors() {
                   </div>
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {doctor.specialization && <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md text-xs font-semibold">{doctor.specialization}</span>}
+                    {doctor.classification && <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
+                      doctor.classification === "A" ? "bg-red-50 text-red-600" :
+                      doctor.classification === "B" ? "bg-yellow-50 text-yellow-600" :
+                      "bg-gray-50 text-gray-500"
+                    }`}>Class {doctor.classification}</span>}
                     {doctor.hospital && <span className="bg-gray-50 text-gray-500 px-2 py-0.5 rounded-md text-xs">{doctor.hospital}</span>}
-                    {doctor.phone && <span className="bg-gray-50 text-gray-500 px-2 py-0.5 rounded-md text-xs">{doctor.phone}</span>}
+                    {doctor.added_by && <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${
+                      doctor.added_by.role === "ADMIN" ? "bg-purple-50 text-purple-600" : "bg-orange-50 text-orange-600"
+                    }`}>{doctor.added_by.role}: {doctor.added_by.name}</span>}
+                    {doctor.approved_by && <span className="bg-green-50 text-green-600 px-2 py-0.5 rounded-md text-xs font-semibold">✓ {doctor.approved_by.name}</span>}
                     <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${doctor.is_active ? "bg-green-50 text-green-600" : "bg-gray-50 text-gray-400"}`}>
                       {doctor.is_active ? "Active" : "Inactive"}
                     </span>
@@ -391,6 +421,8 @@ export default function CompanyDoctors() {
           </div>
         </div>
       )}
+
+      {showRequests && <DoctorRequestsPanel onClose={() => setShowRequests(false)} onApproved={invalidate} />}
     </div>
   );
 }
@@ -407,6 +439,7 @@ function DoctorModal({ doctor, onClose, onSaved }) {
     password:       "",
     phone:          doctor?.phone          || "",
     specialization: doctor?.specialization || "",
+    classification: doctor?.classification || "C",
     hospital:       doctor?.hospital       || "",
     license_number: doctor?.license_number || "",
     address:        doctor?.address        || "",
@@ -424,6 +457,7 @@ function DoctorModal({ doctor, onClose, onSaved }) {
           name:           form.name,
           phone:          form.phone,
           specialization: form.specialization,
+          classification: form.classification,
           hospital:       form.hospital,
           license_number: form.license_number,
           address:        form.address,
@@ -436,6 +470,7 @@ function DoctorModal({ doctor, onClose, onSaved }) {
           password:       form.password || "Doctor@123",
           phone:          form.phone,
           specialization: form.specialization,
+          classification: form.classification,
           hospital:       form.hospital,
           license_number: form.license_number,
           address:        form.address,
@@ -495,6 +530,15 @@ function DoctorModal({ doctor, onClose, onSaved }) {
             {!isEdit && field("Password (default: Doctor@123)", "password", "password", "Leave blank for default")}
             {field("Phone", "phone", "tel", "+91 98765 43210")}
             {field("Specialization", "specialization", "text", "e.g. Cardiologist")}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">Classification <span className="text-red-500">*</span></label>
+              <select value={form.classification} onChange={(e) => setForm({ ...form, classification: e.target.value })} required
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-transparent text-sm outline-none bg-white">
+                <option value="A">A — High Value (2 visits/month)</option>
+                <option value="B">B — Medium Value (1 visit/month)</option>
+                <option value="C">C — Low Value (1 visit/2 months)</option>
+              </select>
+            </div>
             {field("Hospital", "hospital", "text", "City Hospital")}
             {field("License Number", "license_number", "text", "MH12345")}
             {field("Address", "address", "text", "123 Medical Street, Mumbai")}
@@ -510,6 +554,214 @@ function DoctorModal({ doctor, onClose, onSaved }) {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function DoctorRequestsPanel({ onClose, onApproved }) {
+  const [filter, setFilter] = useState("pending");
+  const [searchReq, setSearchReq] = useState("");
+  const [rejectId, setRejectId] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [processing, setProcessing] = useState(null);
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["doctor-requests", filter],
+    queryFn: () => get(`/api/v1/doctors/requests?status_filter=${filter}`).then((d) => d.requests || []),
+    enabled: filter !== "approved",
+  });
+
+  // Approved tab: doctors where added_by.role === "MR" and approved_by !== null
+  const { data: doctorsData, isLoading: loadingDoctors } = useQuery({
+    queryKey: ["doctors"],
+    queryFn: () => get("/api/v1/doctors?page_size=1000").then((d) => d.doctors || []),
+    enabled: filter === "approved",
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const approvedDoctors = (doctorsData || []).filter(
+    (d) => d.added_by?.role === "MR" && d.approved_by !== null
+  );
+
+  const requests = filter === "approved" ? [] : (data || []);
+  const loading = filter === "approved" ? loadingDoctors : isLoading;
+
+  // Apply search filter
+  const sq = searchReq.toLowerCase().trim();
+  const filteredRequests = sq ? requests.filter((r) =>
+    r.name?.toLowerCase().includes(sq) ||
+    r.specialization?.toLowerCase().includes(sq) ||
+    r.hospital?.toLowerCase().includes(sq) ||
+    r.requested_by_name?.toLowerCase().includes(sq) ||
+    r.email?.toLowerCase().includes(sq)
+  ) : requests;
+  const filteredApproved = sq ? approvedDoctors.filter((d) =>
+    d.name?.toLowerCase().includes(sq) ||
+    d.specialization?.toLowerCase().includes(sq) ||
+    d.hospital?.toLowerCase().includes(sq) ||
+    d.added_by?.name?.toLowerCase().includes(sq) ||
+    d.email?.toLowerCase().includes(sq)
+  ) : approvedDoctors;
+
+  const handleApprove = async (id) => {
+    setProcessing(id);
+    try {
+      await post(`/api/v1/doctors/requests/${id}/approve`);
+      refetch();
+      onApproved();
+    } catch {}
+    setProcessing(null);
+  };
+
+  const handleReject = async () => {
+    if (!rejectReason.trim() || rejectReason.length < 10) return;
+    setProcessing(rejectId);
+    try {
+      await post(`/api/v1/doctors/requests/${rejectId}/reject`, { rejection_reason: rejectReason });
+      refetch();
+      setRejectId(null);
+      setRejectReason("");
+    } catch {}
+    setProcessing(null);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      <div className="flex-1 bg-black/50" onClick={onClose} />
+      <div className="w-full max-w-lg bg-white shadow-2xl flex flex-col h-full border-l border-gray-200">
+        <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-5 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">📋</span>
+              <div>
+                <h2 className="text-lg font-bold text-white">Doctor Requests</h2>
+                <p className="text-amber-100 text-xs">MR-submitted doctor requests</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="text-white/80 hover:text-white hover:bg-white/20 rounded-xl p-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Filter tabs */}
+        <div className="px-4 py-3 border-b border-gray-100 flex gap-1.5 flex-shrink-0">
+          {["pending", "approved", "rejected"].map((s) => (
+            <button key={s} onClick={() => setFilter(s)}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all capitalize ${filter === s ? "bg-amber-100 text-amber-700 shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+              {s}
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div className="px-4 py-2 border-b border-gray-100 flex-shrink-0">
+          <input type="text" placeholder="🔍 Search by name, specialization, MR..."
+            value={searchReq} onChange={(e) => setSearchReq(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400" />
+        </div>
+
+        {/* Request list */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {loading ? (
+            <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+          ) : filter === "approved" ? (
+            /* Approved tab — from doctors collection where added_by.role === "MR" */
+            filteredApproved.length === 0 ? (
+              <div className="text-center py-16">
+                <span className="text-4xl">✅</span>
+                <p className="text-gray-400 mt-3 text-sm">No approved MR requests yet</p>
+              </div>
+            ) : filteredApproved.map((doc) => (
+              <div key={doc.id} className="bg-white rounded-xl border border-green-200 shadow-sm p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{doc.name}</p>
+                    <p className="text-xs text-gray-500">{doc.specialization} · {doc.hospital || "No hospital"}</p>
+                    <p className="text-xs text-gray-400">{doc.email} · {doc.phone}</p>
+                  </div>
+                  {doc.classification && (
+                    <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
+                      doc.classification === "A" ? "bg-red-100 text-red-700" :
+                      doc.classification === "B" ? "bg-yellow-100 text-yellow-700" :
+                      "bg-gray-100 text-gray-600"
+                    }`}>Class {doc.classification}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-[10px] text-gray-400 mb-2">
+                  <span>Requested by: <span className="font-semibold text-orange-600">{doc.added_by?.name}</span></span>
+                  <span>· Approved by: <span className="font-semibold text-green-600">{doc.approved_by?.name}</span></span>
+                  {doc.created_at && <span>· {new Date(doc.created_at).toLocaleDateString()}</span>}
+                </div>
+                <div className="bg-green-50 rounded-lg px-3 py-1.5 border border-green-100">
+                  <p className="text-xs text-green-700 font-semibold">✓ Approved & Active</p>
+                </div>
+              </div>
+            ))
+          ) : filteredRequests.length === 0 ? (
+            <div className="text-center py-16">
+              <span className="text-4xl">📋</span>
+              <p className="text-gray-400 mt-3 text-sm">No {filter} requests</p>
+            </div>
+          ) : filteredRequests.map((req) => (
+            <div key={req.request_id} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <p className="text-sm font-bold text-gray-900">{req.name}</p>
+                  <p className="text-xs text-gray-500">{req.specialization} · {req.hospital || "No hospital"}</p>
+                  <p className="text-xs text-gray-400">{req.email} · {req.phone}</p>
+                </div>
+                {req.classification && (
+                  <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
+                    req.classification === "A" ? "bg-red-100 text-red-700" :
+                    req.classification === "B" ? "bg-yellow-100 text-yellow-700" :
+                    "bg-gray-100 text-gray-600"
+                  }`}>Class {req.classification}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-[10px] text-gray-400 mb-3">
+                <span>Requested by: <span className="font-semibold text-gray-600">{req.requested_by_name}</span></span>
+                {req.created_at && <span>· {new Date(req.created_at).toLocaleDateString()}</span>}
+              </div>
+              {req.status === "pending" && (
+                <div className="flex gap-2">
+                  <button onClick={() => handleApprove(req.request_id)} disabled={processing === req.request_id}
+                    className="flex-1 bg-green-500 text-white py-2 rounded-lg font-bold text-xs hover:bg-green-600 transition-all disabled:opacity-50">
+                    {processing === req.request_id ? "..." : "✓ Approve"}
+                  </button>
+                  <button onClick={() => { setRejectId(req.request_id); setRejectReason(""); }}
+                    className="flex-1 bg-red-100 text-red-600 py-2 rounded-lg font-bold text-xs hover:bg-red-200 transition-all">
+                    ✗ Reject
+                  </button>
+                </div>
+              )}
+              {req.status === "rejected" && (
+                <div className="bg-red-50 rounded-lg px-3 py-2 border border-red-100">
+                  <p className="text-xs text-red-600 font-semibold">✗ Rejected</p>
+                  {req.rejection_reason && <p className="text-[10px] text-red-500 mt-0.5">{req.rejection_reason}</p>}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Reject modal */}
+        {rejectId && (
+          <div className="absolute inset-0 bg-black/30 flex items-center justify-center p-4 z-10">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5">
+              <h3 className="text-sm font-bold text-gray-900 mb-3">Rejection Reason</h3>
+              <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Provide reason (min 10 characters)..." rows={3}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-red-200 resize-none mb-3" />
+              <div className="flex gap-2">
+                <button onClick={() => setRejectId(null)} className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-xl font-bold text-xs">Cancel</button>
+                <button onClick={handleReject} disabled={rejectReason.length < 10}
+                  className="flex-1 bg-red-500 text-white py-2 rounded-xl font-bold text-xs disabled:opacity-50">Reject</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

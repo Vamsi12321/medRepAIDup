@@ -10,7 +10,11 @@ const PAGE_TITLES = {
   "/company/cme-events":      { title: "CME Events",      icon: "🎓", sub: "Manage medical education events" },
   "/company/doctors":         { title: "Doctors",         icon: "🩺", sub: "Doctor network" },
   "/company/medical-reps":    { title: "Medical Reps",    icon: "💼", sub: "Your field team" },
+  "/company/sfe":             { title: "SFE Analytics",   icon: "📊", sub: "Sales force effectiveness" },
+  "/company/communications":  { title: "Communications",  icon: "📢", sub: "Send announcements & alerts" },
+  "/company/grievances":      { title: "Grievances",      icon: "📝", sub: "Manage MR tickets" },
   "/company/activity-logs":   { title: "Activity Logs",   icon: "📋", sub: "Track all activity" },
+  "/company/admin-management": { title: "Admin Mgmt", icon: "⚙️", sub: "Departments & admins" },
   "/company/profile":         { title: "Profile",         icon: "👤", sub: "Company account" },
 };
 
@@ -20,19 +24,27 @@ export default function CompanyNavbar() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [companyName, setCompanyName] = useState("My Company");
+  const [isGeneralAdmin, setIsGeneralAdmin] = useState(false);
 
   useEffect(() => {
     setCompanyName(localStorage.getItem("companyName") || "My Company");
+    const dept = localStorage.getItem("userDepartment");
+    // general admin has no department — treat empty, null, "null", "undefined", "general" as no dept
+    const hasNoDept = !dept || dept === "null" || dept === "undefined" || dept === "general" || dept.trim() === "";
+    setIsGeneralAdmin(hasNoDept);
   }, []);
 
   const navItems = [
-    { name: "Overview",        path: "/company/overview",        icon: "🏠" },
-    { name: "Drug Management", path: "/company/drug-management", icon: "💊" },
-    { name: "CME Events",      path: "/company/cme-events",      icon: "📅" },
-    { name: "Doctors",         path: "/company/doctors",         icon: "🩺" },
-    { name: "Medical Reps",    path: "/company/medical-reps",    icon: "💼" },
-    { name: "Activity Logs",   path: "/company/activity-logs",   icon: "📋" },
-    { name: "Profile",         path: "/company/profile",         icon: "👤" },
+    { name: "Overview",   path: "/company/overview",        icon: "🏠" },
+    { name: "Drugs",      path: "/company/drug-management", icon: "💊" },
+    { name: "CME",        path: "/company/cme-events",      icon: "📅" },
+    { name: "Doctors",    path: "/company/doctors",         icon: "🩺" },
+    { name: "MRs",        path: "/company/medical-reps",    icon: "💼" },
+    { name: "SFE",        path: "/company/sfe",             icon: "📊" },
+    { name: "Comms",      path: "/company/communications",  icon: "📢" },
+    { name: "Grievances", path: "/company/grievances",      icon: "📝" },
+    { name: "Logs",       path: "/company/activity-logs",   icon: "📋" },
+    ...(isGeneralAdmin ? [{ name: "Admin", path: "/company/admin-management", icon: "⚙️" }] : []),
   ];
 
   const handleLogout = () => {
@@ -75,31 +87,35 @@ export default function CompanyNavbar() {
             </Link>
 
             {/* Desktop Nav */}
-            <div className="hidden lg:flex items-center gap-0.5">
+            <div className="hidden lg:flex items-center gap-0">
               {navItems.map((item) => (
                 <Link
                   key={item.path}
                   href={item.path}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
+                  className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                     pathname === item.path
                       ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow"
                       : "text-gray-600 hover:bg-gray-100"
                   }`}
                 >
-                  <span>{item.icon}</span>
+                  <span className="text-sm">{item.icon}</span>
                   <span>{item.name}</span>
                 </Link>
               ))}
             </div>
 
-            {/* Logout + Mobile toggle */}
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Logout + Profile + Mobile toggle */}
+            <div className="flex items-center gap-1 shrink-0">
+              <Link href="/company/profile"
+                className={"hidden lg:flex items-center px-2 py-1.5 rounded-lg text-xs font-semibold transition-all " + (pathname === "/company/profile" ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow" : "text-gray-600 hover:bg-gray-100")}>
+                <span className="text-sm">👤</span>
+              </Link>
               <button
                 onClick={handleLogout}
-                className="hidden lg:flex items-center gap-1.5 px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg text-sm font-semibold transition-all"
+                className="hidden lg:flex items-center px-2 py-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                title="Logout"
               >
-                <span>🚪</span>
-                <span>Logout</span>
+                <span className="text-sm">🚪</span>
               </button>
 
               <button

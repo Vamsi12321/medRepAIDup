@@ -8,7 +8,7 @@ import UserProfileModal from "@/components/network/UserProfileModal";
 
 function Avatar({ name, role }) {
   return (
-    <div className={"w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 " + (role === "MR" ? "bg-gradient-to-br from-orange-500 to-red-500" : "bg-gradient-to-br from-indigo-500 to-purple-500")}>
+    <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 bg-gradient-to-br from-indigo-500 to-purple-500">
       {name?.split(" ").map((n) => n[0]).join("").slice(0, 2)}
     </div>
   );
@@ -106,8 +106,8 @@ export default function MyNetworkPage() {
                   <p className="text-xs text-gray-400">{c.specialization || c.territory || c.role}</p>
                 </div>
               </button>
-              <span className={"text-xs px-2 py-0.5 rounded-md font-bold flex-shrink-0 " + (c.role === "MR" ? "bg-orange-100 text-orange-700" : "bg-indigo-100 text-indigo-700")}>
-                {c.role}
+              <span className="text-xs px-2 py-0.5 rounded-md font-bold flex-shrink-0 bg-indigo-100 text-indigo-700">
+                Doctor
               </span>
               <div className="flex gap-1.5 flex-shrink-0">
                 <button onClick={() => messageMutation.mutate(c.user_id)} disabled={messageMutation.isPending}

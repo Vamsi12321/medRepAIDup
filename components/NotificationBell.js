@@ -64,13 +64,15 @@ function getNavPath(notif, role) {
     case "cme_created":
     case "cme_reminder_1day":
     case "cme_reminder_1hour":
-    case "cme_recording":       return base + "/cme-events";
+    case "cme_recording":       return role === "mr" ? "/mr/dashboard" : "/doctor/cme-events";
     case "drug_added":          return base + "/drug-search";
     case "visit_scheduled":
     case "visit_rescheduled":
     case "visit_completed":
-    case "visit_cancelled":     return role === "mr" ? "/mr/visits" : base + "/home";
-    default:                    return base + "/home";
+    case "visit_cancelled":     return role === "mr" ? "/mr/visits" : "/doctor/home";
+    case "doctor_request_approved":
+    case "doctor_request_rejected": return role === "mr" ? "/mr/doctors" : "/doctor/home";
+    default:                    return role === "mr" ? "/mr/dashboard" : "/doctor/home";
   }
 }
 
