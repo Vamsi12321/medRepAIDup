@@ -38,15 +38,14 @@ export default function MRDrugSearch() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50 overflow-x-hidden">
+    <div className="min-h-screen bg-[#fafbfd]">
       <MRNavbar />
       {showPDF && <PDFSummaryModal onClose={() => setShowPDF(false)} accentColor="orange" />}
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-5 sm:py-7">
         <Breadcrumb />
-
-        <div className="mb-4 sm:mb-6 bg-gradient-to-r from-orange-600 via-red-600 to-pink-600 rounded-2xl p-4 sm:p-6 shadow-lg text-white">
-          <h1 className="text-xl sm:text-2xl font-bold mb-1">💊 Drug Database</h1>
-          <p className="text-orange-100 text-xs sm:text-sm">Comprehensive medication library for medical representatives</p>
+        <div className="mb-6">
+          <h1 className="text-2xl font-extrabold text-gray-900">Drug Search</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Comprehensive medication library</p>
         </div>
 
         <SmartSearch

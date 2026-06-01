@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import DoctorNavbar from "@/components/doctor/DoctorNavbar";
+import { formatISTDate } from "@/lib/time";
 import { get, put } from "@/lib/api";
 import ChangePasswordSection from "@/components/ChangePasswordSection";
 

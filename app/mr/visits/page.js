@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import MRNavbar from "@/components/mr/MRNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
 import { get, post, put } from "@/lib/api";
+import { formatISTDate } from "@/lib/time";
 
 const STATUS_STYLES = {
   scheduled:   { bg: "bg-blue-100",   text: "text-blue-700",   label: "Scheduled" },
@@ -39,6 +40,7 @@ const getGPS = () => new Promise((resolve, reject) => {
 export default function MRVisits() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("upcoming");
+  const [historyFilter, setHistoryFilter] = useState("all");
   const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [showReportForm, setShowReportForm] = useState(null);
   const [showUpdateForm, setShowUpdateForm] = useState(null);
@@ -166,40 +168,42 @@ export default function MRVisits() {
 
   const upcoming = visits.filter((v) => v.status === "scheduled" || v.status === "checked_in" || v.status === "checked_out");
   const history = visits.filter((v) => v.status === "completed" || v.status === "cancelled");
-  const displayed = activeTab === "upcoming" ? upcoming : history;
+  const filteredHistory = historyFilter === "all" ? history : history.filter((v) => v.status === historyFilter);
+  const displayed = activeTab === "upcoming" ? upcoming : filteredHistory;
 
   const canCheckIn = !activeVisit && pendingReports < 2;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50">
+    <div className="min-h-screen bg-[#fafbfd]">
       <MRNavbar />
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8">
+      <main className="max-w-6xl mx-auto px-3 sm:px-5 lg:px-8 py-5 sm:py-7">
         <Breadcrumb />
-
-        {/* Header */}
+{/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Visit Planner 📅</h1>
-            <p className="text-gray-500 text-sm">Schedule, track, and report your doctor visits</p>
+            <h1 className="text-2xl font-extrabold text-gray-900 mb-0.5">Visits</h1>
+            <p className="text-gray-400 text-sm">Schedule, track, and report your doctor visits</p>
           </div>
           <button onClick={() => setShowScheduleForm(true)}
-            className="w-full sm:w-auto bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2">
+            className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white px-5 py-3 rounded-xl font-bold shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 text-sm">
             <span>➕</span><span>Schedule Visit</span>
           </button>
         </div>
 
         {/* Active Visit Banner */}
         {activeVisit && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4 flex items-center justify-between">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-white text-lg animate-pulse">📍</div>
+              <div className="w-11 h-11 bg-amber-500 rounded-xl flex items-center justify-center text-white text-lg shadow-sm">
+                <span className="animate-pulse">📍</span>
+              </div>
               <div>
-                <p className="text-sm font-bold text-amber-800">Active Visit — {activeVisit.doctor_name}</p>
-                <p className="text-xs text-amber-600">{activeVisit.location} · {activeVisit.duration_so_far_minutes} min</p>
+                <p className="text-sm font-bold text-amber-900">Active Visit — {activeVisit.doctor_name}</p>
+                <p className="text-xs text-amber-600">{activeVisit.location} · {activeVisit.duration_so_far_minutes} min elapsed</p>
               </div>
             </div>
             <button onClick={() => handleCheckOut(activeVisit.id)} disabled={actionLoading === activeVisit.id}
-              className="bg-amber-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-amber-700 transition-all disabled:opacity-50">
+              className="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all disabled:opacity-50">
               {actionLoading === activeVisit.id ? "..." : "Check Out →"}
             </button>
           </div>
@@ -207,62 +211,32 @@ export default function MRVisits() {
 
         {/* Pending Reports Banner */}
         {pendingReports > 0 && !activeVisit && (
-          <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 mb-4">
+          <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 mb-5 shadow-sm">
             <p className="text-sm font-bold text-purple-800">⚠️ {pendingReports} pending report{pendingReports > 1 ? "s" : ""} — submit to complete your visits</p>
           </div>
         )}
 
-        {/* Monthly Targets */}
-        {targets.length > 0 && (
-          <div className="bg-white rounded-2xl p-4 shadow border border-gray-100 mb-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-gray-800">🎯 Monthly Targets</h3>
-              <span className="text-xs text-gray-400">{targets.filter((t) => t.completed >= t.required).length}/{targets.length} met</span>
-            </div>
-            <div className="space-y-2">
-              {targets.map((t) => {
-                const pct = t.required > 0 ? Math.min(100, Math.round((t.completed / t.required) * 100)) : 0;
-                const met = t.completed >= t.required;
-                return (
-                  <div key={t.doctor_id} className="flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-xs font-semibold text-gray-700 truncate">{t.doctor_name}</span>
-                        <span className={`text-xs font-bold ${met ? "text-green-600" : "text-gray-500"}`}>{t.completed}/{t.required} {met && "✓"}</span>
-                      </div>
-                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full transition-all ${met ? "bg-green-500" : "bg-orange-400"}`} style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                      t.classification === "A" ? "bg-red-100 text-red-600" :
-                      t.classification === "B" ? "bg-yellow-100 text-yellow-600" : "bg-gray-100 text-gray-500"
-                    }`}>{t.classification}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-3 mb-4">
+        {/* Monthly Targets + Stats in a row */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-5">
+          {/* Stats */}
           {[
-            { label: "Scheduled", value: visits.filter((v) => v.status === "scheduled").length, icon: "📅", color: "from-blue-500 to-indigo-500" },
-            { label: "In Progress", value: visits.filter((v) => v.status === "checked_in" || v.status === "checked_out").length, icon: "⏱️", color: "from-amber-500 to-orange-500" },
-            { label: "Completed", value: visits.filter((v) => v.status === "completed").length, icon: "✅", color: "from-green-500 to-emerald-500" },
-            { label: "Cancelled", value: visits.filter((v) => v.status === "cancelled").length, icon: "❌", color: "from-red-400 to-pink-500" },
+            { label: "Scheduled", value: visits.filter((v) => v.status === "scheduled").length, accent: "border-l-blue-400", icon: "📅" },
+            { label: "In Progress", value: visits.filter((v) => v.status === "checked_in" || v.status === "checked_out").length, accent: "border-l-amber-400", icon: "⏱️" },
+            { label: "Completed", value: visits.filter((v) => v.status === "completed").length, accent: "border-l-emerald-400", icon: "✅" },
+            { label: "Cancelled", value: visits.filter((v) => v.status === "cancelled").length, accent: "border-l-red-400", icon: "❌" },
           ].map((s) => (
-            <div key={s.label} className="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
-              <div className={`w-7 h-7 bg-gradient-to-br ${s.color} rounded-lg flex items-center justify-center text-sm mb-1.5`}>{s.icon}</div>
-              <p className="text-xl font-bold text-gray-900">{s.value}</p>
-              <p className="text-[10px] text-gray-500 font-medium">{s.label}</p>
+            <div key={s.label} className={`bg-white rounded-xl p-4 border border-gray-100 border-l-4 ${s.accent} shadow-sm`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-base">{s.icon}</span>
+              </div>
+              <p className="text-2xl font-extrabold text-gray-900">{s.value}</p>
+              <p className="text-[11px] text-gray-400 font-medium">{s.label}</p>
             </div>
           ))}
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 mb-4 flex flex-wrap gap-3 items-end">
+        <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm mb-5 flex flex-wrap gap-3 items-end">
           <div className="flex-1 min-w-[140px]">
             <label className="block text-[10px] font-semibold text-gray-400 mb-1">Doctor</label>
             <select value={filterDoctor} onChange={(e) => setFilterDoctor(e.target.value)}
@@ -288,25 +262,46 @@ export default function MRVisits() {
         </div>
 
         {/* Tabs */}
-        <div className="flex space-x-2 mb-5 bg-white rounded-xl p-1.5 shadow-sm border border-gray-100 w-fit">
-          {[{ id: "upcoming", label: "📅 Active & Upcoming" }, { id: "history", label: "🕐 History" }].map((t) => (
-            <button key={t.id} onClick={() => setActiveTab(t.id)}
-              className={`px-4 py-2 rounded-lg font-semibold text-xs transition-all ${activeTab === t.id ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow" : "text-gray-600 hover:bg-gray-50"}`}>
-              {t.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-3 mb-5">
+          <div className="flex space-x-2 bg-white rounded-xl p-1.5 shadow-sm border border-gray-100 w-fit">
+            {[{ id: "upcoming", label: "📅 Active & Upcoming" }, { id: "history", label: "🕐 History" }].map((t) => (
+              <button key={t.id} onClick={() => setActiveTab(t.id)}
+                className={`px-4 py-2 rounded-lg font-semibold text-xs transition-all ${activeTab === t.id ? "bg-orange-500 text-white shadow" : "text-gray-600 hover:bg-gray-50"}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sub-filter for history */}
+          {activeTab === "history" && (
+            <div className="flex gap-1.5">
+              {[
+                { id: "all", label: "All", count: history.length },
+                { id: "completed", label: "Completed", count: history.filter((v) => v.status === "completed").length },
+                { id: "cancelled", label: "Cancelled", count: history.filter((v) => v.status === "cancelled").length },
+              ].map((f) => (
+                <button key={f.id} onClick={() => setHistoryFilter(f.id)}
+                  className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all ${historyFilter === f.id ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+                  {f.label} ({f.count})
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Visit list */}
-        {loadingVisits ? (
-          <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-28 bg-white rounded-2xl animate-pulse border border-gray-100" />)}</div>
-        ) : displayed.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-100">
-            <span className="text-5xl">📅</span>
-            <p className="text-gray-500 mt-4 font-medium text-sm">{activeTab === "upcoming" ? "No upcoming visits" : "No history yet"}</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
+        {/* Main content: Visits + Targets sidebar */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {/* Visit list — left 2 cols */}
+          <div className="lg:col-span-2">
+            {loadingVisits ? (
+              <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-28 bg-white rounded-2xl animate-pulse border border-gray-100" />)}</div>
+            ) : displayed.length === 0 ? (
+              <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-100">
+                <span className="text-5xl">📅</span>
+                <p className="text-gray-500 mt-4 font-medium text-sm">{activeTab === "upcoming" ? "No upcoming visits" : "No history yet"}</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
             {displayed.map((visit) => (
               <VisitCard
                 key={visit.id}
@@ -323,6 +318,58 @@ export default function MRVisits() {
             ))}
           </div>
         )}
+          </div>
+
+          {/* ── Right Sidebar: Monthly Targets ── */}
+          <div className="lg:col-span-1">
+            {targets.length > 0 && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sticky top-20">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-7 h-7 bg-orange-50 rounded-lg flex items-center justify-center"><span className="text-xs">🎯</span></div>
+                  <div>
+                    <p className="text-xs font-bold text-gray-900">Monthly Targets</p>
+                    <p className="text-[10px] text-gray-400">{targets.filter((t) => t.completed >= t.required).length}/{targets.length} achieved</p>
+                  </div>
+                </div>
+
+                {/* Overall progress ring */}
+                <div className="flex items-center justify-center mb-4">
+                  <div className="relative w-20 h-20">
+                    <svg className="w-20 h-20 -rotate-90" viewBox="0 0 36 36">
+                      <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#f3f4f6" strokeWidth="3" />
+                      <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#f97316" strokeWidth="3" strokeDasharray={`${targets.length > 0 ? Math.round((targets.filter((t) => t.completed >= t.required).length / targets.length) * 100) : 0}, 100`} strokeLinecap="round" />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-sm font-extrabold text-gray-900">{targets.length > 0 ? Math.round((targets.filter((t) => t.completed >= t.required).length / targets.length) * 100) : 0}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Doctor list */}
+                <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                  {targets.map((t) => {
+                    const pct = t.required > 0 ? Math.min(100, Math.round((t.completed / t.required) * 100)) : 0;
+                    const met = t.completed >= t.required;
+                    return (
+                      <div key={t.doctor_id}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${met ? "bg-emerald-400" : "bg-orange-400"}`} />
+                            <span className="text-[11px] font-semibold text-gray-700 truncate max-w-[100px]">{t.doctor_name}</span>
+                          </div>
+                          <span className={`text-[10px] font-bold ${met ? "text-emerald-600" : "text-gray-400"}`}>{t.completed}/{t.required}</span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all duration-500 ${met ? "bg-emerald-400" : "bg-orange-400"}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </main>
 
       {showScheduleForm && (
@@ -364,15 +411,41 @@ function VisitCard({ visit, canCheckIn, actionLoading, onCheckIn, onCheckOut, on
       <div className="flex flex-wrap gap-2 mb-3 text-xs">
         <span className="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg font-medium">📅 {visit.scheduled_date}</span>
         <span className="bg-orange-50 text-orange-700 px-2.5 py-1 rounded-lg font-medium">⏰ {to12h(visit.scheduled_time)}</span>
-        {visit.duration_minutes && <span className="bg-green-50 text-green-700 px-2.5 py-1 rounded-lg font-medium">⏱️ {visit.duration_minutes} min</span>}
+        {visit.duration_minutes > 0 && <span className="bg-green-50 text-green-700 px-2.5 py-1 rounded-lg font-medium">⏱️ {visit.duration_minutes} min</span>}
       </div>
 
       {/* Completed visit report summary */}
-      {visit.status === "completed" && visit.outcome && (
+      {visit.status === "completed" && visit.report && (
         <div className="bg-green-50 rounded-lg p-2.5 mb-3 text-xs border border-green-100 space-y-1">
-          {visit.outcome && <p><span className="font-semibold text-green-700">Outcome:</span> {visit.outcome}</p>}
-          {visit.doctor_mood && <p><span className="font-semibold text-green-700">Mood:</span> {visit.doctor_mood}</p>}
-          {visit.feedback && <p><span className="font-semibold text-green-700">Notes:</span> {visit.feedback}</p>}
+          {visit.report.outcome && <p><span className="font-semibold text-green-700">Outcome:</span> {visit.report.outcome}</p>}
+          {visit.report.doctor_mood && <p><span className="font-semibold text-green-700">Mood:</span> {visit.report.doctor_mood === "positive" ? "😊 Positive" : visit.report.doctor_mood === "negative" ? "😞 Negative" : "😐 Neutral"}</p>}
+          {(visit.report.products_discussed || []).length > 0 && (
+            <p><span className="font-semibold text-green-700">Products:</span> {visit.report.products_discussed.map((p) => typeof p === "string" ? p : p.name).join(", ")}</p>
+          )}
+          {visit.report.samples_given > 0 && <p><span className="font-semibold text-green-700">Samples:</span> {visit.report.samples_given}</p>}
+          {visit.report.rx_commitment && <p><span className="font-semibold text-green-700">Rx Commitment:</span> Yes{visit.report.expected_rx_per_month ? ` (${visit.report.expected_rx_per_month}/mo)` : ""}</p>}
+          {visit.report.competitor_info && <p><span className="font-semibold text-green-700">Competitor:</span> {visit.report.competitor_info}</p>}
+          {visit.report.follow_up_date && <p><span className="font-semibold text-green-700">Follow-up:</span> {formatISTDate(visit.report.follow_up_date)}</p>}
+          {visit.report.notes && <p><span className="font-semibold text-green-700">Notes:</span> {visit.report.notes}</p>}
+        </div>
+      )}
+
+      {/* Check-in/Check-out GPS info */}
+      {visit.status === "completed" && (visit.check_in || visit.check_out) && (
+        <div className="bg-blue-50 rounded-lg p-2.5 mb-3 text-xs border border-blue-100 flex flex-wrap gap-3">
+          {visit.check_in && (() => {
+            const s = String(visit.check_in.timestamp);
+            const d = s.endsWith("Z") || s.includes("+") ? new Date(s) : new Date(s + "Z");
+            const t = !isNaN(d) ? d.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: true }) : "—";
+            return <span className="text-blue-700">📍 In: {t}</span>;
+          })()}
+          {visit.check_out && (() => {
+            const s = String(visit.check_out.timestamp);
+            const d = s.endsWith("Z") || s.includes("+") ? new Date(s) : new Date(s + "Z");
+            const t = !isNaN(d) ? d.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: true }) : "—";
+            return <span className="text-blue-700">🏁 Out: {t}</span>;
+          })()}
+          {visit.duration_minutes > 0 && <span className="text-blue-700">⏱️ {visit.duration_minutes} min</span>}
         </div>
       )}
 
@@ -388,16 +461,16 @@ function VisitCard({ visit, canCheckIn, actionLoading, onCheckIn, onCheckOut, on
         {visit.status === "scheduled" && (
           <>
             <button onClick={onCheckIn} disabled={!canCheckIn || actionLoading === visit.id}
-              className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-2 rounded-xl font-bold text-xs hover:shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm hover:shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed">
               {actionLoading === visit.id ? "Getting GPS..." : "📍 Check In"}
             </button>
             <button onClick={onReschedule}
-              className="bg-blue-100 text-blue-600 px-3 py-2 rounded-xl font-bold text-xs hover:bg-blue-200 transition-all">
-              🔄
+              className="bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-blue-100 border border-blue-100 transition-all">
+              Reschedule
             </button>
             <button onClick={() => setShowCancelReason(true)}
-              className="bg-red-100 text-red-600 px-3 py-2 rounded-xl font-bold text-xs hover:bg-red-200 transition-all">
-              ✕
+              className="bg-red-50 text-red-600 px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-red-100 border border-red-100 transition-all">
+              Cancel
             </button>
           </>
         )}
@@ -405,19 +478,19 @@ function VisitCard({ visit, canCheckIn, actionLoading, onCheckIn, onCheckOut, on
         {visit.status === "checked_in" && (
           <>
             <button onClick={onCheckOut} disabled={actionLoading === visit.id}
-              className="flex-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white py-2 rounded-xl font-bold text-xs hover:shadow-md transition-all disabled:opacity-50">
+              className="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm hover:shadow-md transition-all disabled:opacity-50">
               {actionLoading === visit.id ? "Getting GPS..." : "🚪 Check Out"}
             </button>
             <button onClick={() => setShowCancelCheckin(true)}
-              className="bg-gray-100 text-gray-600 px-3 py-2 rounded-xl font-bold text-xs hover:bg-gray-200 transition-all">
-              Cancel
+              className="bg-gray-50 text-gray-600 px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-gray-100 border border-gray-200 transition-all">
+              Cancel Check-in
             </button>
           </>
         )}
 
         {visit.status === "checked_out" && (
           <button onClick={onReport}
-            className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-500 text-white py-2 rounded-xl font-bold text-xs hover:shadow-md transition-all">
+            className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm hover:shadow-md transition-all">
             📋 Submit Report
           </button>
         )}
@@ -563,7 +636,7 @@ function ReportForm({ visit, assignedDrugs, onClose, onSubmit }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div className="bg-gradient-to-r from-purple-500 to-indigo-500 p-5 rounded-t-2xl flex items-center justify-between">
+        <div className="bg-gradient-to-r from-orange-500 to-red-500 p-5 rounded-t-2xl flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-white">📋 Visit Report</h2>
             <p className="text-purple-200 text-xs">{visit.doctor_name} · {visit.scheduled_date}</p>
@@ -663,7 +736,7 @@ function ReportForm({ visit, assignedDrugs, onClose, onSubmit }) {
 
           <div className="flex gap-3">
             <button type="button" onClick={onClose} className="flex-1 bg-gray-100 text-gray-600 py-2.5 rounded-xl font-bold text-sm">Cancel</button>
-            <button type="submit" className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-500 text-white py-2.5 rounded-xl font-bold text-sm">Submit Report</button>
+            <button type="submit" className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white py-2.5 rounded-xl font-bold text-sm">Submit Report</button>
           </div>
         </form>
       </div>

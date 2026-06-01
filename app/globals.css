@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Animation for visit tab switching */
+@keyframes fadeSlide {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 /* Global cursor rules — all interactive elements show pointer */
 a,
 button,

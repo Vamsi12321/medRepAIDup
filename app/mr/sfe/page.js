@@ -1,139 +1,139 @@
 "use client";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import MRNavbar from "@/components/mr/MRNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
+import { get, post, put } from "@/lib/api";
+import { formatISTDate, formatISTTime } from "@/lib/time";
+
+const now = new Date();
+const CURRENT_MONTH = now.getMonth() + 1;
+const CURRENT_YEAR = now.getFullYear();
 
 const TABS = [
-  { id: "primary",   label: "Primary Sales",                 icon: "📦" },
-  { id: "secondary", label: "Secondary Sales",                icon: "🏪" },
-  { id: "mvc",       label: "MVC (Monthly Visit Coverage)",   icon: "🔄" },
-  { id: "mcr",       label: "MCR (Monthly Call Report)",      icon: "📞" },
+  { id: "mcr",  label: "MCR (Monthly Call Report)", icon: "📞" },
+  { id: "mvc",  label: "MVC (Visit Coverage)",      icon: "🔄" },
+  { id: "rcpa", label: "RCPA (Commitments)",        icon: "💊" },
 ];
 
-// ── MOCK DATA ─────────────────────────────────────────────────────────────────
-const MOCK = {
-  primary: {
-    total_sales: "₹4,85,000", target: "₹5,00,000", achievement_pct: 97,
-    top_product: "Amlodipine 5mg", monthly_trend: "+12%",
-    products: [
-      { name: "Amlodipine 5mg", value: "₹1,45,000", pct: 95 },
-      { name: "Metformin 500mg", value: "₹1,20,000", pct: 80 },
-      { name: "Atorvastatin 10mg", value: "₹98,000", pct: 72 },
-      { name: "Pantoprazole 40mg", value: "₹72,000", pct: 60 },
-      { name: "Azithromycin 250mg", value: "₹50,000", pct: 45 },
-    ],
-    territories: [
-      { name: "Hyderabad Urban", value: "₹2,10,000", pct: 105 },
-      { name: "Secunderabad", value: "₹1,45,000", pct: 90 },
-      { name: "Kukatpally", value: "₹80,000", pct: 75 },
-      { name: "Gachibowli", value: "₹50,000", pct: 62 },
-    ],
-  },
-  secondary: {
-    retail_sales: "₹3,20,000", prescriptions: "847", stock_movement: "92%", growth: "+8.5%",
-    doctor_prescriptions: [
-      { name: "Dr. Arjun Mehta", specialization: "Cardiologist", count: 145 },
-      { name: "Dr. Sneha Reddy", specialization: "Diabetologist", count: 120 },
-      { name: "Dr. Vikram Patel", specialization: "General Physician", count: 98 },
-      { name: "Dr. Priya Sharma", specialization: "Neurologist", count: 76 },
-      { name: "Dr. Rahul Gupta", specialization: "Orthopedic", count: 54 },
-    ],
-  },
-  mvc: {
-    doctors_covered: "42", missed_doctors: "8", repeat_visits: "156", coverage_pct: 84,
-    doctors: [
-      { name: "Dr. Arjun Mehta", planned: 4, actual: 4 },
-      { name: "Dr. Sneha Reddy", planned: 4, actual: 3 },
-      { name: "Dr. Vikram Patel", planned: 3, actual: 3 },
-      { name: "Dr. Priya Sharma", planned: 3, actual: 2 },
-      { name: "Dr. Rahul Gupta", planned: 2, actual: 2 },
-      { name: "Dr. Kavitha Nair", planned: 2, actual: 1 },
-      { name: "Dr. Suresh Kumar", planned: 3, actual: 0 },
-      { name: "Dr. Anita Desai", planned: 2, actual: 2 },
-    ],
-  },
-  mcr: {
-    total_calls: 98, pending_mcr: 5, submitted_today: 4, completion_pct: 95,
-    recent_reports: [
-      { id: "mcr1", doctor: "Dr. Arjun Mehta", specialization: "Cardiologist", date: "2026-05-07", products: ["Amlodipine 5mg", "Atorvastatin 10mg"], samples: 3, mood: "Positive", feedback: "Interested in new clinical data. Wants samples for 10 patients.", followup: "2026-05-14", competitor: "Cipla — Amlokind" },
-      { id: "mcr2", doctor: "Dr. Sneha Reddy", specialization: "Diabetologist", date: "2026-05-07", products: ["Metformin 500mg"], samples: 5, mood: "Neutral", feedback: "Already prescribing competitor. Needs price comparison.", followup: "2026-05-10", competitor: "USV — Glycomet" },
-      { id: "mcr3", doctor: "Dr. Vikram Patel", specialization: "GP", date: "2026-05-06", products: ["Pantoprazole 40mg", "Azithromycin 250mg"], samples: 2, mood: "Positive", feedback: "Happy with product quality. Will increase prescriptions.", followup: "2026-05-13", competitor: null },
-      { id: "mcr4", doctor: "Dr. Priya Sharma", specialization: "Neurologist", date: "2026-05-06", products: ["Pregabalin 75mg"], samples: 0, mood: "Negative", feedback: "Not interested currently. Has loyalty with Sun Pharma.", followup: "2026-05-20", competitor: "Sun Pharma — Pregastar" },
-      { id: "mcr5", doctor: "Dr. Rahul Gupta", specialization: "Orthopedic", date: "2026-05-05", products: ["Diclofenac 50mg"], samples: 4, mood: "Positive", feedback: "Prescribing regularly. Wants patient education material.", followup: "2026-05-12", competitor: null },
-    ],
-    pending_submissions: [
-      { doctor: "Dr. Kavitha Nair", specialization: "Pediatrician", visit_date: "2026-05-07" },
-      { doctor: "Dr. Suresh Kumar", specialization: "Dermatologist", visit_date: "2026-05-07" },
-      { doctor: "Dr. Meera Joshi", specialization: "ENT", visit_date: "2026-05-06" },
-    ],
-  },
-};
-
 export default function SFEPage() {
-  const [activeTab, setActiveTab] = useState("primary");
+  const [activeTab, setActiveTab] = useState("mcr");
+  const [month, setMonth] = useState(CURRENT_MONTH);
+  const [year, setYear] = useState(CURRENT_YEAR);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["sfe", activeTab],
-    queryFn: () => MOCK[activeTab] || {},
-    staleTime: 2 * 60 * 1000,
+  // Fetch MR's own profile info
+  const userId = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+  const { data: mrList } = useQuery({
+    queryKey: ["my-mr-info"],
+    queryFn: () => get("/api/v1/mrs").then((r) => r.mrs || []),
+    staleTime: 10 * 60 * 1000,
   });
+  const mrInfo = (mrList || []).find((m) => m.id === userId) || null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#fafbfd]">
       <MRNavbar />
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-5">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <Breadcrumb />
-        <div className="mb-5 bg-gradient-to-r from-indigo-700 via-purple-700 to-pink-700 rounded-2xl px-5 py-5 text-white shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center">
-              <span className="text-2xl">📊</span>
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-extrabold text-gray-900 mb-0.5">SFE Analytics</h1>
+          <p className="text-sm text-gray-400">Track your performance, coverage & commitments</p>
+        </div>
+
+        {/* MR Profile Card */}
+        {mrInfo && (
+          <div className="mb-6 bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 text-sm font-bold">
+                  {mrInfo.name?.charAt(0) || "M"}
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-900">{mrInfo.name}</p>
+                  <p className="text-xs text-gray-400 flex items-center gap-1">
+                    <svg className="w-3 h-3 text-orange-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/></svg>
+                    {mrInfo.territory} · {mrInfo.zone} · {mrInfo.state}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className="text-[11px] bg-gray-50 text-gray-600 px-2.5 py-1 rounded-full border border-gray-100 font-medium">{mrInfo.email}</span>
+                {mrInfo.phone && <span className="text-[11px] bg-gray-50 text-gray-600 px-2.5 py-1 rounded-full border border-gray-100 font-medium">{mrInfo.phone}</span>}
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold leading-tight">Sales Force Effectiveness</h1>
-              <p className="text-purple-200 text-xs">Track performance, coverage & daily execution</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <div className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium">
+                <span>🩺</span>
+                {(mrInfo.assigned_doctors || []).map((d) => (
+                  <span key={d.id} className="bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full border border-orange-100">{d.name}</span>
+                ))}
+                {(mrInfo.assigned_doctors || []).length === 0 && <span className="text-gray-400">No doctors</span>}
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium">
+                <span>💊</span>
+                {(mrInfo.assigned_drugs || []).map((d) => (
+                  <span key={d.id} className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-100">{d.name}</span>
+                ))}
+                {(mrInfo.assigned_drugs || []).length === 0 && <span className="text-gray-400">No drugs</span>}
+              </div>
             </div>
+          </div>
+        )}
+
+        {/* Controls Row: Month/Year + Tabs */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+          <div className="flex gap-1 bg-white rounded-xl p-1 border border-gray-100 shadow-sm overflow-x-auto">
+            {TABS.map((t) => (
+              <button key={t.id} onClick={() => setActiveTab(t.id)}
+                className={"flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap " + (
+                  activeTab === t.id ? "bg-orange-500 text-white shadow" : "text-gray-500 hover:bg-gray-50"
+                )}>
+                <span>{t.icon}</span> {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <select value={month} onChange={(e) => setMonth(+e.target.value)}
+              className="text-xs border border-gray-200 rounded-lg px-3 py-2 bg-white font-medium text-gray-700 focus:ring-2 focus:ring-orange-200 outline-none">
+              {Array.from({ length: 12 }, (_, i) => (
+                <option key={i + 1} value={i + 1}>{new Date(2026, i).toLocaleString("default", { month: "long" })}</option>
+              ))}
+            </select>
+            <select value={year} onChange={(e) => setYear(+e.target.value)}
+              className="text-xs border border-gray-200 rounded-lg px-3 py-2 bg-white font-medium text-gray-700 focus:ring-2 focus:ring-orange-200 outline-none">
+              {[2024, 2025, 2026, 2027].map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
           </div>
         </div>
 
-        <div className="flex gap-1 mb-5 bg-white rounded-xl p-1 shadow-sm border border-gray-100 overflow-x-auto">
-          {TABS.map((t) => (
-            <button key={t.id} onClick={() => setActiveTab(t.id)}
-              className={"flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap " + (
-                activeTab === t.id ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow" : "text-gray-500 hover:bg-gray-50"
-              )}>
-              <span>{t.icon}</span> {t.label}
-            </button>
-          ))}
-        </div>
-
-        {activeTab === "primary"   && <PrimarySales data={data} loading={isLoading} />}
-        {activeTab === "secondary" && <SecondarySales data={data} loading={isLoading} />}
-        {activeTab === "mvc"       && <MVCSection data={data} loading={isLoading} />}
-        {activeTab === "mcr"       && <MCRSection data={data} loading={isLoading} />}
+        {activeTab === "mcr"  && <MCRSection month={month} year={year} />}
+        {activeTab === "mvc"  && <MVCSection month={month} year={year} />}
+        {activeTab === "rcpa" && <RCPASection month={month} year={year} />}
       </main>
     </div>
   );
 }
 
-function StatCard({ icon, label, value, sub, color = "from-indigo-500 to-purple-500" }) {
+// ── Shared UI Components ──────────────────────────────────────────────────────
+function StatCard({ icon, label, value, sub, color = "from-orange-500 to-red-500" }) {
   return (
-    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-      <div className={"w-9 h-9 bg-gradient-to-br " + color + " rounded-lg flex items-center justify-center mb-3 shadow-sm"}>
-        <span className="text-base">{icon}</span>
+    <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:shadow-md transition-all">
+      <div className={"w-10 h-10 bg-gradient-to-br " + color + " rounded-xl flex items-center justify-center mb-3 shadow-sm"}>
+        <span className="text-base text-white">{icon}</span>
       </div>
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-      <p className="text-xs text-gray-500 font-medium">{label}</p>
-      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+      <p className="text-2xl font-extrabold text-gray-900">{value}</p>
+      <p className="text-[11px] text-gray-400 font-medium mt-0.5">{label}</p>
+      {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
     </div>
   );
 }
 
-function ProgressBar({ value, max = 100, color = "bg-indigo-500" }) {
+function ProgressBar({ value, max = 100, color = "bg-orange-500" }) {
   const pct = Math.min(100, Math.max(0, (value / max) * 100));
   return (
-    <div className="w-full bg-gray-200 rounded-full h-2.5">
-      <div className={color + " h-2.5 rounded-full transition-all"} style={{ width: pct + "%" }} />
+    <div className="w-full bg-gray-100 rounded-full h-2.5">
+      <div className={color + " h-2.5 rounded-full transition-all duration-700"} style={{ width: pct + "%" }} />
     </div>
   );
 }
@@ -144,272 +144,607 @@ function LoadingSkeleton() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[1,2,3,4].map((i) => <div key={i} className="h-28 bg-white rounded-xl animate-pulse border border-gray-100" />)}
       </div>
-      <div className="h-32 bg-white rounded-xl animate-pulse border border-gray-100" />
+      <div className="h-48 bg-white rounded-xl animate-pulse border border-gray-100" />
     </div>
   );
 }
 
-// ── Primary Sales ─────────────────────────────────────────────────────────────
-function PrimarySales({ data, loading }) {
-  if (loading) return <LoadingSkeleton />;
-  const s = data || {};
+function ErrorBox({ message }) {
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard icon="📦" label="Total Primary Sales" value={s.total_sales || "—"} color="from-blue-500 to-indigo-500" />
-        <StatCard icon="🎯" label="Target Achievement" value={(s.achievement_pct || 0) + "%"} sub={s.target ? "Target: " + s.target : ""} color="from-green-500 to-emerald-500" />
-        <StatCard icon="🏆" label="Top Product" value={s.top_product || "—"} color="from-orange-500 to-red-500" />
-        <StatCard icon="📈" label="Monthly Trend" value={s.monthly_trend || "—"} color="from-purple-500 to-pink-500" />
-      </div>
-      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-bold text-gray-800">Target Achievement</p>
-          <span className="text-sm font-bold text-indigo-600">{s.achievement_pct || 0}%</span>
-        </div>
-        <ProgressBar value={s.achievement_pct || 0} color="bg-gradient-to-r from-indigo-500 to-purple-500" />
-      </div>
-      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-        <p className="text-sm font-bold text-gray-800 mb-4">Product-wise Sales</p>
-        <div className="space-y-3">
-          {(s.products || []).map((p, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center text-xs font-bold text-indigo-600 flex-shrink-0">{i + 1}</div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-xs font-semibold text-gray-800 truncate">{p.name}</p>
-                  <span className="text-xs font-bold text-indigo-600 flex-shrink-0 ml-2">{p.value}</span>
-                </div>
-                <ProgressBar value={p.pct || 0} color="bg-indigo-400" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-        <p className="text-sm font-bold text-gray-800 mb-4">Territory Performance</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {(s.territories || []).map((t, i) => (
-            <div key={i} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-xs font-semibold text-gray-700">{t.name}</p>
-                <span className="text-xs font-bold text-green-600">{t.value}</span>
-              </div>
-              <ProgressBar value={t.pct || 0} color="bg-green-400" />
-            </div>
-          ))}
-        </div>
-      </div>
+    <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
+      <p className="text-sm text-red-600 font-medium">⚠️ {message}</p>
     </div>
   );
 }
 
-// ── Secondary Sales ───────────────────────────────────────────────────────────
-function SecondarySales({ data, loading }) {
-  if (loading) return <LoadingSkeleton />;
-  const s = data || {};
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard icon="🏪" label="Retail Sales" value={s.retail_sales || "—"} color="from-teal-500 to-cyan-500" />
-        <StatCard icon="🩺" label="Doctor Prescriptions" value={s.prescriptions || "—"} color="from-blue-500 to-indigo-500" />
-        <StatCard icon="📦" label="Stock Movement" value={s.stock_movement || "—"} color="from-orange-500 to-amber-500" />
-        <StatCard icon="📊" label="Growth" value={s.growth || "—"} color="from-green-500 to-emerald-500" />
-      </div>
-      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-        <p className="text-sm font-bold text-gray-800 mb-4">Doctor Prescriptions</p>
-        <div className="space-y-2">
-          {(s.doctor_prescriptions || []).map((d, i) => (
-            <div key={i} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{d.name?.charAt(0)}</div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-800">{d.name}</p>
-                  <p className="text-xs text-gray-400">{d.specialization}</p>
-                </div>
-              </div>
-              <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">{d.count} Rx</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+// ── MCR Section ───────────────────────────────────────────────────────────────
+function MCRSection({ month, year }) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["sfe-mcr", month, year],
+    queryFn: () => get("/api/v1/sfe/mcr", { month, year }),
+  });
 
-// ── MVC (Monthly Visit Coverage) ──────────────────────────────────────────────
-function MVCSection({ data, loading }) {
-  if (loading) return <LoadingSkeleton />;
+  if (isLoading) return <LoadingSkeleton />;
+  if (error) return <ErrorBox message={error.message} />;
+
   const s = data || {};
-  const doctors = s.doctors || [];
+  const pct = s.mcr_percentage || 0;
+  const pctColor = pct >= 90 ? "text-emerald-600" : pct >= 75 ? "text-orange-600" : "text-red-600";
+  const pctBg = pct >= 90 ? "bg-emerald-500" : pct >= 75 ? "bg-orange-400" : "bg-red-500";
+  const pctLabel = pct >= 90 ? "Excellent" : pct >= 75 ? "Good" : pct >= 60 ? "Needs Improvement" : "Critical";
+
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard icon="🩺" label="Doctors Covered" value={s.doctors_covered || "—"} color="from-green-500 to-emerald-500" />
-        <StatCard icon="❌" label="Missed Doctors" value={s.missed_doctors || "—"} color="from-red-500 to-pink-500" />
-        <StatCard icon="🔄" label="Repeat Visits" value={s.repeat_visits || "—"} color="from-blue-500 to-indigo-500" />
-        <StatCard icon="📊" label="Coverage %" value={(s.coverage_pct || 0) + "%"} color="from-purple-500 to-pink-500" />
-      </div>
-      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-bold text-gray-800">Overall Coverage</p>
-          <span className={"text-sm font-bold " + ((s.coverage_pct || 0) >= 100 ? "text-green-600" : (s.coverage_pct || 0) >= 70 ? "text-orange-600" : "text-red-600")}>{s.coverage_pct || 0}%</span>
-        </div>
-        <ProgressBar value={s.coverage_pct || 0} color={(s.coverage_pct || 0) >= 100 ? "bg-green-500" : (s.coverage_pct || 0) >= 70 ? "bg-orange-400" : "bg-red-500"} />
-      </div>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100">
-          <p className="text-sm font-bold text-gray-800">Doctor Visit Coverage</p>
-        </div>
-        {doctors.length === 0 ? (
-          <p className="text-xs text-gray-400 text-center py-8">No MVC data yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-gray-50 border-b border-gray-100">
-                <tr>
-                  <th className="text-left px-4 py-2.5 font-bold text-gray-500">Doctor</th>
-                  <th className="text-center px-4 py-2.5 font-bold text-gray-500">Planned</th>
-                  <th className="text-center px-4 py-2.5 font-bold text-gray-500">Actual</th>
-                  <th className="text-center px-4 py-2.5 font-bold text-gray-500">Coverage</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {doctors.map((d, i) => {
-                  const pct = d.planned > 0 ? Math.round((d.actual / d.planned) * 100) : 0;
-                  const color = pct >= 100 ? "text-green-600 bg-green-50" : pct >= 70 ? "text-orange-600 bg-orange-50" : "text-red-600 bg-red-50";
-                  return (
-                    <tr key={i} className="hover:bg-gray-50">
-                      <td className="px-4 py-2.5 font-semibold text-gray-800">{d.name}</td>
-                      <td className="px-4 py-2.5 text-center text-gray-600">{d.planned}</td>
-                      <td className="px-4 py-2.5 text-center text-gray-600">{d.actual}</td>
-                      <td className="px-4 py-2.5 text-center"><span className={"px-2 py-0.5 rounded-md font-bold " + color}>{pct}%</span></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+      {/* Left: Doctor Details */}
+      <div className="lg:col-span-2 space-y-4">
+        {/* Visited Doctors */}
+        {(s.visited || []).length > 0 && (
+          <div>
+            <p className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+              <span className="w-5 h-5 bg-emerald-100 rounded flex items-center justify-center text-[10px]">✅</span>
+              Visited ({s.visited.length})
+            </p>
+            <div className="space-y-2.5">
+              {s.visited.map((d, i) => (
+                <DoctorVisitCard key={i} doctor={d} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Not Visited Doctors */}
+        {(s.not_visited || []).length > 0 && (
+          <div>
+            <p className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+              <span className="w-5 h-5 bg-red-100 rounded flex items-center justify-center text-[10px]">❌</span>
+              Not Visited ({s.not_visited.length})
+            </p>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="divide-y divide-gray-50">
+                {s.not_visited.map((d, i) => (
+                  <div key={i} className="px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-red-50 rounded-full flex items-center justify-center text-red-500 text-xs font-bold border border-red-100">{d.doctor_name?.charAt(0)}</div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-800">{d.doctor_name}</p>
+                        <p className="text-[10px] text-gray-400">Last visited: {d.last_visited ? formatISTDate(d.last_visited) : "Never"}</p>
+                      </div>
+                    </div>
+                    <span className={"px-2 py-0.5 rounded-full font-bold text-[10px] border " + (d.classification === "A" ? "bg-red-50 text-red-600 border-red-100" : d.classification === "B" ? "bg-amber-50 text-amber-600 border-amber-100" : "bg-gray-50 text-gray-500 border-gray-200")}>{d.classification}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>
+
+      {/* Right: Stats Sidebar */}
+      <div className="lg:col-span-1">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sticky top-20 space-y-5">
+          {/* Circular Progress */}
+          <div className="flex flex-col items-center">
+            <div className="relative w-28 h-28 mb-3">
+              <svg className="w-28 h-28 -rotate-90" viewBox="0 0 36 36">
+                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#f3f4f6" strokeWidth="3.5" />
+                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke={pct >= 90 ? "#10b981" : pct >= 75 ? "#f97316" : "#ef4444"} strokeWidth="3.5" strokeDasharray={`${pct}, 100`} strokeLinecap="round" />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className={`text-2xl font-black ${pctColor}`}>{pct.toFixed(1)}%</span>
+                <span className="text-[9px] text-gray-400 font-medium">MCR</span>
+              </div>
+            </div>
+            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${pct >= 90 ? "bg-emerald-50 text-emerald-700" : pct >= 75 ? "bg-orange-50 text-orange-700" : "bg-red-50 text-red-700"}`}>{pctLabel}</span>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
+              <p className="text-lg font-extrabold text-gray-900">{s.total_assigned || 0}</p>
+              <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider">Assigned</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
+              <p className="text-lg font-extrabold text-emerald-600">{s.doctors_visited || 0}</p>
+              <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider">Visited</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
+              <p className="text-lg font-extrabold text-red-500">{s.doctors_not_visited || 0}</p>
+              <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider">Missed</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
+              <p className="text-lg font-extrabold text-gray-900">{pct.toFixed(0)}%</p>
+              <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider">Coverage</p>
+            </div>
+          </div>
+
+          {/* Linear progress */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] text-gray-500 font-medium">Coverage Progress</span>
+              <span className={`text-[10px] font-bold ${pctColor}`}>{s.doctors_visited || 0}/{s.total_assigned || 0}</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all duration-700 ${pctBg}`} style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-// ── MCR (Monthly Call Report) — MR's Daily Work Journal ───────────────────────
-function MCRSection({ data, loading }) {
-  if (loading) return <LoadingSkeleton />;
-  const s = data || {};
-  const [showSubmit, setShowSubmit] = useState(false);
+// ── Doctor Visit Card (expandable with full visit details) ────────────────────
+function DoctorVisitCard({ doctor }) {
+  const [expanded, setExpanded] = useState(false);
+  const [activeVisit, setActiveVisit] = useState(0);
+  const d = doctor;
+  const visits = d.visits || [];
 
   const MOOD_STYLES = {
-    Positive: { bg: "bg-green-100", text: "text-green-700", icon: "😊" },
-    Neutral:  { bg: "bg-yellow-100", text: "text-yellow-700", icon: "😐" },
-    Negative: { bg: "bg-red-100", text: "text-red-700", icon: "😞" },
+    positive: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", icon: "😊" },
+    neutral:  { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", icon: "😐" },
+    negative: { bg: "bg-red-50", text: "text-red-700", border: "border-red-200", icon: "😞" },
   };
 
   return (
-    <div className="space-y-5">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard icon="📞" label="Total Calls" value={s.total_calls || "—"} color="from-blue-500 to-indigo-500" />
-        <StatCard icon="✅" label="MCR Submitted" value={(s.total_calls - (s.pending_mcr || 0)) || "—"} color="from-green-500 to-emerald-500" />
-        <StatCard icon="⏳" label="Pending MCR" value={s.pending_mcr || "—"} color="from-yellow-500 to-orange-500" />
-        <StatCard icon="📊" label="Completion" value={(s.completion_pct || 0) + "%"} color="from-purple-500 to-pink-500" />
-      </div>
-
-      {/* Pending submissions alert */}
-      {(s.pending_submissions || []).length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-bold text-amber-800 flex items-center gap-2">
-              <span>⚠️</span> Pending MCR Submissions
-            </p>
-            <span className="bg-amber-200 text-amber-800 px-2 py-0.5 rounded-md text-xs font-bold">
-              {s.pending_submissions.length} pending
-            </span>
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all">
+      {/* Doctor Header */}
+      <button onClick={() => setExpanded(!expanded)} className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center text-orange-600 text-sm font-bold border border-orange-100">
+            {d.doctor_name?.charAt(0)}
           </div>
-          <div className="space-y-2">
-            {s.pending_submissions.map((p, i) => (
-              <div key={i} className="flex items-center justify-between bg-white rounded-lg px-3 py-2.5 border border-amber-100">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center text-amber-700 text-xs font-bold flex-shrink-0">
-                    {p.doctor?.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-gray-800">{p.doctor}</p>
-                    <p className="text-xs text-gray-400">{p.specialization} · {p.visit_date}</p>
-                  </div>
-                </div>
-                <button className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all">
-                  Submit MCR
-                </button>
-              </div>
+          <div className="text-left">
+            <p className="text-sm font-bold text-gray-900">{d.doctor_name}</p>
+            <p className="text-[11px] text-gray-400">{d.visits_count} visit{d.visits_count > 1 ? "s" : ""} · Last: {d.last_visit_date ? formatISTDate(d.last_visit_date) : "—"}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={"px-2 py-0.5 rounded-full font-bold text-[10px] border " + (d.classification === "A" ? "bg-red-50 text-red-600 border-red-100" : d.classification === "B" ? "bg-amber-50 text-amber-600 border-amber-100" : "bg-gray-50 text-gray-500 border-gray-200")}>{d.classification}</span>
+          <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-transform duration-200 ${expanded ? "bg-orange-100 rotate-180" : "bg-gray-100"}`}>
+            <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+          </div>
+        </div>
+      </button>
+
+      {/* Expanded: Visit Tabs + Content */}
+      {expanded && visits.length > 0 && (
+        <div className="border-t border-gray-100">
+          {/* Visit Tabs */}
+          <div className="px-5 pt-3 flex gap-1.5 overflow-x-auto">
+            {visits.map((v, vi) => (
+              <button key={vi} onClick={() => setActiveVisit(vi)}
+                className={`px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all ${activeVisit === vi ? "bg-orange-500 text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+                Visit {vi + 1}
+              </button>
             ))}
+          </div>
+
+          {/* Active Visit Content */}
+          <div key={activeVisit} className="animate-[fadeSlide_0.3s_ease-out]">
+            {(() => {
+            const v = visits[activeVisit];
+            if (!v) return null;
+            const mood = MOOD_STYLES[v.doctor_mood] || MOOD_STYLES.neutral;
+            return (
+              <div className="p-5">
+                {/* Visit meta */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span className="font-medium">{v.scheduled_date ? formatISTDate(v.scheduled_date) : (v.completed_at ? formatISTDate(v.completed_at) : "")}</span>
+                    {v.completed_at && <><span className="text-gray-300">·</span><span>{formatISTTime(v.completed_at)}</span></>}
+                    {v.duration_minutes > 0 && <><span className="text-gray-300">·</span><span>{v.duration_minutes} min</span></>}
+                  </div>
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${mood.bg} ${mood.text} ${mood.border}`}>
+                    {mood.icon} {v.doctor_mood}
+                  </span>
+                </div>
+
+                {/* Details grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+                  {v.purpose && (
+                    <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
+                      <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider">Purpose</p>
+                      <p className="text-xs font-bold text-gray-800 mt-0.5">{v.purpose}</p>
+                    </div>
+                  )}
+                  {v.location && (
+                    <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
+                      <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider">Location</p>
+                      <p className="text-xs font-bold text-gray-800 mt-0.5">{v.location}</p>
+                    </div>
+                  )}
+                  {v.samples_given != null && (
+                    <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
+                      <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider">Samples</p>
+                      <p className="text-xs font-bold text-gray-800 mt-0.5">{v.samples_given}</p>
+                    </div>
+                  )}
+                  {v.rx_commitment != null && (
+                    <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
+                      <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider">Rx Commitment</p>
+                      <p className={"text-xs font-bold mt-0.5 " + (v.rx_commitment ? "text-emerald-700" : "text-gray-500")}>{v.rx_commitment ? `Yes (${v.expected_rx_per_month || "—"}/mo)` : "No"}</p>
+                    </div>
+                  )}
+                  {v.follow_up_date && (
+                    <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
+                      <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider">Follow-up</p>
+                      <p className="text-xs font-bold text-purple-700 mt-0.5">{formatISTDate(v.follow_up_date)}</p>
+                    </div>
+                  )}
+                  {v.competitor_info && (
+                    <div className="bg-red-50 rounded-xl px-3 py-2.5 border border-red-100">
+                      <p className="text-[9px] text-red-400 font-medium uppercase tracking-wider">Competitor</p>
+                      <p className="text-xs font-bold text-red-700 mt-0.5">{v.competitor_info}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Products */}
+                {(v.products_discussed || []).length > 0 && (
+                  <div className="mb-3">
+                    <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider mb-1.5">Products Discussed</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {v.products_discussed.map((p, pi) => (
+                        <span key={pi} className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-medium border border-blue-100">{typeof p === "string" ? p : p.name}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Outcome + Feedback + Notes */}
+                <div className="space-y-2.5">
+                  {v.outcome && (
+                    <div className="bg-emerald-50 rounded-xl px-4 py-3 border border-emerald-100">
+                      <p className="text-[9px] text-emerald-600 font-medium uppercase tracking-wider mb-0.5">Outcome</p>
+                      <p className="text-xs text-emerald-800 font-medium">{v.outcome}</p>
+                    </div>
+                  )}
+                  {v.feedback && (
+                    <div className="bg-blue-50 rounded-xl px-4 py-3 border border-blue-100">
+                      <p className="text-[9px] text-blue-600 font-medium uppercase tracking-wider mb-0.5">Doctor Feedback</p>
+                      <p className="text-xs text-blue-800 font-medium">{v.feedback}</p>
+                    </div>
+                  )}
+                  {v.notes && (
+                    <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-200">
+                      <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider mb-0.5">Notes</p>
+                      <p className="text-xs text-gray-600">{v.notes}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
           </div>
         </div>
       )}
 
-      {/* Recent MCR Reports — MR's work journal */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-          <p className="text-sm font-bold text-gray-800">Recent Call Reports</p>
-          <span className="text-xs text-gray-400">{(s.recent_reports || []).length} reports</span>
+      {expanded && visits.length === 0 && (
+        <div className="border-t border-gray-100 p-5">
+          <p className="text-xs text-gray-400 text-center">No visit data available.</p>
         </div>
-        {(s.recent_reports || []).length === 0 ? (
-          <p className="text-xs text-gray-400 text-center py-8">No MCR reports yet. Submit after each doctor visit.</p>
+      )}
+    </div>
+  );
+}
+
+// ── MVC Section ───────────────────────────────────────────────────────────────
+function MVCSection({ month, year }) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["sfe-mvc", month, year],
+    queryFn: () => get("/api/v1/sfe/mvc", { month, year }),
+  });
+
+  if (isLoading) return <LoadingSkeleton />;
+  if (error) return <ErrorBox message={error.message} />;
+
+  const s = data || {};
+  const pct = s.mvc_percentage || 0;
+  const pctColor = pct >= 85 ? "text-emerald-600" : pct >= 70 ? "text-orange-600" : "text-red-600";
+  const pctBg = pct >= 85 ? "bg-emerald-500" : pct >= 70 ? "bg-orange-400" : "bg-red-500";
+  const pctLabel = pct >= 85 ? "Excellent" : pct >= 70 ? "Good" : pct >= 55 ? "Needs Improvement" : "Critical";
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+      {/* Left: Doctor Table */}
+      <div className="lg:col-span-2">
+        {(s.doctors || []).length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <p className="text-sm font-bold text-gray-900">Doctor Visit Coverage</p>
+              <span className="text-[10px] text-gray-400">{(s.doctors || []).length} doctors</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50/80 border-b border-gray-100">
+                  <tr>
+                    <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase text-[10px] tracking-wider">Doctor</th>
+                    <th className="text-center px-3 py-3 font-bold text-gray-500 uppercase text-[10px] tracking-wider">Class</th>
+                    <th className="text-center px-3 py-3 font-bold text-gray-500 uppercase text-[10px] tracking-wider">Req</th>
+                    <th className="text-center px-3 py-3 font-bold text-gray-500 uppercase text-[10px] tracking-wider">Done</th>
+                    <th className="text-center px-3 py-3 font-bold text-gray-500 uppercase text-[10px] tracking-wider">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {s.doctors.map((d, i) => {
+                    const statusStyles = {
+                      covered: "bg-emerald-50 text-emerald-700 border-emerald-100",
+                      under:   "bg-orange-50 text-orange-700 border-orange-100",
+                      missed:  "bg-red-50 text-red-600 border-red-100",
+                    };
+                    return (
+                      <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${d.status === "covered" ? "bg-emerald-100 text-emerald-600" : d.status === "missed" ? "bg-red-100 text-red-500" : "bg-orange-100 text-orange-600"}`}>{d.doctor_name?.charAt(0)}</div>
+                            <span className="font-semibold text-gray-800">{d.doctor_name}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <span className={"px-1.5 py-0.5 rounded-full font-bold text-[9px] border " + (d.classification === "A" ? "bg-red-50 text-red-600 border-red-100" : d.classification === "B" ? "bg-amber-50 text-amber-600 border-amber-100" : "bg-gray-50 text-gray-500 border-gray-200")}>{d.classification}</span>
+                        </td>
+                        <td className="px-3 py-3 text-center text-gray-500 font-medium">{d.required_visits}</td>
+                        <td className="px-3 py-3 text-center font-bold text-gray-900">{d.actual_visits}</td>
+                        <td className="px-3 py-3 text-center">
+                          <span className={"px-2 py-0.5 rounded-full font-bold text-[10px] border " + (statusStyles[d.status] || "bg-gray-50 text-gray-600 border-gray-200")}>{d.status}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Right: Stats Sidebar */}
+      <div className="lg:col-span-1">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sticky top-20 space-y-5">
+          {/* Circular Progress */}
+          <div className="flex flex-col items-center">
+            <div className="relative w-28 h-28 mb-3">
+              <svg className="w-28 h-28 -rotate-90" viewBox="0 0 36 36">
+                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#f3f4f6" strokeWidth="3.5" />
+                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke={pct >= 85 ? "#10b981" : pct >= 70 ? "#f97316" : "#ef4444"} strokeWidth="3.5" strokeDasharray={`${pct}, 100`} strokeLinecap="round" />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className={`text-2xl font-black ${pctColor}`}>{pct.toFixed(1)}%</span>
+                <span className="text-[9px] text-gray-400 font-medium">MVC</span>
+              </div>
+            </div>
+            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${pct >= 85 ? "bg-emerald-50 text-emerald-700" : pct >= 70 ? "bg-orange-50 text-orange-700" : "bg-red-50 text-red-700"}`}>{pctLabel}</span>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-emerald-50 rounded-xl p-2.5 text-center border border-emerald-100">
+              <p className="text-base font-extrabold text-emerald-700">{s.fully_covered || 0}</p>
+              <p className="text-[8px] text-emerald-600 font-medium uppercase">Covered</p>
+            </div>
+            <div className="bg-orange-50 rounded-xl p-2.5 text-center border border-orange-100">
+              <p className="text-base font-extrabold text-orange-700">{s.under_covered || 0}</p>
+              <p className="text-[8px] text-orange-600 font-medium uppercase">Under</p>
+            </div>
+            <div className="bg-red-50 rounded-xl p-2.5 text-center border border-red-100">
+              <p className="text-base font-extrabold text-red-600">{s.not_visited || 0}</p>
+              <p className="text-[8px] text-red-500 font-medium uppercase">Missed</p>
+            </div>
+          </div>
+
+          {/* Avg compliance */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] text-gray-500 font-medium">Avg Compliance</span>
+              <span className="text-[10px] font-bold text-gray-700">{(s.avg_compliance || 0).toFixed(1)}%</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all duration-700 ${pctBg}`} style={{ width: `${s.avg_compliance || 0}%` }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── RCPA Section ──────────────────────────────────────────────────────────────
+function RCPASection({ month, year }) {
+  const queryClient = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ doctor_id: "", product_id: "", rx_per_week: "", confidence: "medium", visit_id: "" });
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["sfe-rcpa", month, year],
+    queryFn: () => get("/api/v1/sfe/rcpa", { month, year }),
+  });
+
+  const { data: doctors } = useQuery({
+    queryKey: ["mr-doctors-list"],
+    queryFn: () => get("/api/v1/doctors", { page_size: 500 }).then((r) => r.doctors || []),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: products } = useQuery({
+    queryKey: ["products-list"],
+    queryFn: () => get("/api/v1/drugs", { page_size: 500 }).then((r) => r.drugs || r.products || r),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (body) => post("/api/v1/sfe/rcpa", body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sfe-rcpa"] });
+      setShowForm(false);
+      setForm({ doctor_id: "", product_id: "", rx_per_week: "", confidence: "medium", visit_id: "" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, body }) => put(`/api/v1/sfe/rcpa/${id}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sfe-rcpa"] });
+      setEditingId(null);
+    },
+  });
+
+  const handleCreate = (e) => {
+    e.preventDefault();
+    const body = { ...form, rx_per_week: parseInt(form.rx_per_week) };
+    if (!body.visit_id) delete body.visit_id;
+    createMutation.mutate(body);
+  };
+
+  const handleUpdate = (id) => {
+    const body = {};
+    if (editForm.rx_per_week) body.rx_per_week = parseInt(editForm.rx_per_week);
+    if (editForm.confidence) body.confidence = editForm.confidence;
+    if (editForm.status) body.status = editForm.status;
+    updateMutation.mutate({ id, body });
+  };
+
+  if (isLoading) return <LoadingSkeleton />;
+  if (error) return <ErrorBox message={error.message} />;
+
+  const commitments = data?.commitments || [];
+  const total = data?.total || 0;
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        <StatCard icon="💊" label="Total Commitments" value={total} color="from-orange-500 to-red-500" />
+        <StatCard icon="📈" label="Active" value={commitments.filter((c) => c.status === "active").length} color="from-green-500 to-emerald-500" />
+        <StatCard icon="✅" label="Fulfilled" value={commitments.filter((c) => c.status === "fulfilled").length} color="from-blue-500 to-cyan-500" />
+      </div>
+
+      {/* Create Button */}
+      <div className="flex justify-end">
+        <button onClick={() => setShowForm(!showForm)}
+          className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all">
+          {showForm ? "Cancel" : "+ New Commitment"}
+        </button>
+      </div>
+
+      {/* Create Form */}
+      {showForm && (
+        <form onSubmit={handleCreate} className="bg-white rounded-xl p-5 shadow-sm border border-orange-100 space-y-4">
+          <p className="text-sm font-bold text-gray-800">Log RCPA Commitment</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 font-medium mb-1 block">Doctor *</label>
+              <select value={form.doctor_id} onChange={(e) => setForm({ ...form, doctor_id: e.target.value })} required
+                className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2">
+                <option value="">Select doctor</option>
+                {(doctors || []).map((d) => <option key={d.id || d._id} value={d.id || d._id}>{d.name || d.full_name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 font-medium mb-1 block">Product *</label>
+              <select value={form.product_id} onChange={(e) => setForm({ ...form, product_id: e.target.value })} required
+                className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2">
+                <option value="">Select product</option>
+                {(Array.isArray(products) ? products : []).map((p) => <option key={p.id || p._id} value={p.id || p._id}>{p.name || p.brand_name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 font-medium mb-1 block">Rx/Week *</label>
+              <input type="number" min="1" value={form.rx_per_week} onChange={(e) => setForm({ ...form, rx_per_week: e.target.value })} required
+                className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2" placeholder="e.g. 15" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 font-medium mb-1 block">Confidence *</label>
+              <select value={form.confidence} onChange={(e) => setForm({ ...form, confidence: e.target.value })}
+                className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2">
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setShowForm(false)} className="text-xs text-gray-500 px-4 py-2 rounded-lg hover:bg-gray-100">Cancel</button>
+            <button type="submit" disabled={createMutation.isPending}
+              className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-50">
+              {createMutation.isPending ? "Saving..." : "Save Commitment"}
+            </button>
+          </div>
+          {createMutation.error && <p className="text-xs text-red-500">{createMutation.error.message}</p>}
+        </form>
+      )}
+
+      {/* Commitments List */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100">
+          <p className="text-sm font-bold text-gray-800">Your Commitments</p>
+        </div>
+        {commitments.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-8">No RCPA commitments for this period.</p>
         ) : (
           <div className="divide-y divide-gray-50">
-            {(s.recent_reports || []).map((r) => {
-              const mood = MOOD_STYLES[r.mood] || MOOD_STYLES.Neutral;
-              return (
-                <div key={r.id} className="p-4 hover:bg-gray-50 transition-colors">
-                  {/* Header */}
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                        {r.doctor?.charAt(0)}
+            {commitments.map((c) => (
+              <div key={c.id} className="p-4 hover:bg-gray-50">
+                {editingId === c.id ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Rx/Week</label>
+                        <input type="number" min="1" value={editForm.rx_per_week || ""} onChange={(e) => setEditForm({ ...editForm, rx_per_week: e.target.value })}
+                          className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2" />
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-gray-900">{r.doctor}</p>
-                        <p className="text-xs text-gray-400">{r.specialization} · {r.date}</p>
+                        <label className="text-xs text-gray-500 block mb-1">Confidence</label>
+                        <select value={editForm.confidence || ""} onChange={(e) => setEditForm({ ...editForm, confidence: e.target.value })}
+                          className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2">
+                          <option value="">No change</option>
+                          <option value="high">High</option>
+                          <option value="medium">Medium</option>
+                          <option value="low">Low</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Status</label>
+                        <select value={editForm.status || ""} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                          className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2">
+                          <option value="">No change</option>
+                          <option value="active">Active</option>
+                          <option value="fulfilled">Fulfilled</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
                       </div>
                     </div>
-                    <span className={"inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold " + mood.bg + " " + mood.text}>
-                      {mood.icon} {r.mood}
-                    </span>
+                    <div className="flex gap-2">
+                      <button onClick={() => setEditingId(null)} className="text-xs text-gray-500 px-3 py-1.5 rounded-lg hover:bg-gray-100">Cancel</button>
+                      <button onClick={() => handleUpdate(c.id)} disabled={updateMutation.isPending}
+                        className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50">
+                        {updateMutation.isPending ? "..." : "Update"}
+                      </button>
+                    </div>
                   </div>
-
-                  {/* Details grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2 ml-11">
-                    <div className="bg-blue-50 rounded-lg px-2.5 py-1.5">
-                      <p className="text-xs text-blue-500 font-medium">Products</p>
-                      <p className="text-xs font-semibold text-blue-700">{r.products?.join(", ")}</p>
-                    </div>
-                    <div className="bg-green-50 rounded-lg px-2.5 py-1.5">
-                      <p className="text-xs text-green-500 font-medium">Samples</p>
-                      <p className="text-xs font-semibold text-green-700">{r.samples} given</p>
-                    </div>
-                    <div className="bg-purple-50 rounded-lg px-2.5 py-1.5">
-                      <p className="text-xs text-purple-500 font-medium">Follow-up</p>
-                      <p className="text-xs font-semibold text-purple-700">{r.followup}</p>
-                    </div>
-                    {r.competitor && (
-                      <div className="bg-red-50 rounded-lg px-2.5 py-1.5">
-                        <p className="text-xs text-red-500 font-medium">Competitor</p>
-                        <p className="text-xs font-semibold text-red-700">{r.competitor}</p>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center text-white text-xs font-bold">
+                        {c.doctor_name?.charAt(0) || "D"}
                       </div>
-                    )}
-                  </div>
-
-                  {/* Feedback */}
-                  {r.feedback && (
-                    <div className="ml-11 bg-gray-50 rounded-lg px-3 py-2 border-l-3 border-l-indigo-300">
-                      <p className="text-xs text-gray-600 italic">"{r.feedback}"</p>
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">{c.doctor_name}</p>
+                        <p className="text-xs text-gray-400">{c.product_name} · {c.rx_per_week} Rx/week · {c.confidence}</p>
+                      </div>
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                    <div className="flex items-center gap-2">
+                      <span className={"px-2 py-0.5 rounded-md text-xs font-bold " + (c.status === "active" ? "bg-green-100 text-green-700" : c.status === "fulfilled" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600")}>{c.status}</span>
+                      <button onClick={() => { setEditingId(c.id); setEditForm({ rx_per_week: c.rx_per_week, confidence: c.confidence, status: c.status }); }}
+                        className="text-xs text-orange-500 hover:text-orange-600 font-semibold px-2 py-1 rounded hover:bg-orange-50">Edit</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>

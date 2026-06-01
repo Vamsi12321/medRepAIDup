@@ -4,6 +4,7 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { get, post as apiPost, put, del } from "@/lib/api";
 import { Icons } from "@/components/network/Icons";
 import { timeAgoIST as timeAgo, formatIST } from "@/lib/time";
+import { useNetworkToast } from "@/app/doctor/network/layout";
 
 
 const ACCENT = "indigo";
@@ -227,6 +228,7 @@ function GroupChatPanel({ groupId, groupName, isMember = true, currentUserId, on
 }
 function GroupInfoPanel({ groupId, currentUserId, youLeftAt, onClose, onDeleted, onRefreshList }) {
   const queryClient = useQueryClient();
+  const { showToast } = useNetworkToast();
   const [editing, setEditing]         = useState(false);
   const [editName, setEditName]       = useState("");
   const [editDesc, setEditDesc]       = useState("");
@@ -245,37 +247,44 @@ function GroupInfoPanel({ groupId, currentUserId, youLeftAt, onClose, onDeleted,
 
   const updateMutation = useMutation({
     mutationFn: () => put(`/api/v1/network/groups/${groupId}`, { group_name: editName, group_description: editDesc }),
-    onSuccess: () => { refetch(); onRefreshList(); setEditing(false); },
+    onSuccess: () => { refetch(); onRefreshList(); setEditing(false); showToast("Group updated."); },
+    onError: (e) => showToast(e.message || "Failed to update", "error"),
   });
 
   const removeMemberMutation = useMutation({
     mutationFn: (uid) => del(`/api/v1/network/groups/${groupId}/members/${uid}`),
-    onSuccess: () => { refetch(); onRefreshList(); },
+    onSuccess: () => { refetch(); onRefreshList(); showToast("Member removed."); },
+    onError: (e) => showToast(e.message || "Failed to remove member", "error"),
   });
 
   const makeAdminMutation = useMutation({
     mutationFn: (uid) => apiPost(`/api/v1/network/groups/${groupId}/admins/${uid}`, {}),
-    onSuccess: () => refetch(),
+    onSuccess: () => { refetch(); showToast("Admin role granted."); },
+    onError: (e) => showToast(e.message || "Failed", "error"),
   });
 
   const removeAdminMutation = useMutation({
     mutationFn: (uid) => del(`/api/v1/network/groups/${groupId}/admins/${uid}`),
-    onSuccess: () => refetch(),
+    onSuccess: () => { refetch(); showToast("Admin role removed."); },
+    onError: (e) => showToast(e.message || "Failed", "error"),
   });
 
   const leaveMutation = useMutation({
     mutationFn: () => apiPost(`/api/v1/network/groups/${groupId}/leave`, {}),
-    onSuccess: () => { onRefreshList(); onClose(); },
+    onSuccess: () => { onRefreshList(); onClose(); showToast("You left the group."); },
+    onError: (e) => showToast(e.message || "Failed to leave", "error"),
   });
 
   const clearChatMutation = useMutation({
     mutationFn: () => del(`/api/v1/network/groups/${groupId}/clear-chat`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["my-groups"] }); onDeleted(); onClose(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["my-groups"] }); onDeleted(); onClose(); showToast("Chat cleared."); },
+    onError: (e) => showToast(e.message || "Failed", "error"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => del(`/api/v1/network/groups/${groupId}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["my-groups"] }); onDeleted(); onClose(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["my-groups"] }); onDeleted(); onClose(); showToast("Group deleted."); },
+    onError: (e) => showToast(e.message || "Failed to delete", "error"),
   });
 
   return (

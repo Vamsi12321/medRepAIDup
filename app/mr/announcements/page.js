@@ -10,7 +10,7 @@ const TYPE_STYLES = {
   announcement: { icon: "📢", bg: "bg-blue-50",   border: "border-blue-200",   text: "text-blue-700" },
   alert:        { icon: "🚨", bg: "bg-red-50",    border: "border-red-200",    text: "text-red-700" },
   target:       { icon: "🎯", bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700" },
-  training:     { icon: "📚", bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-700" },
+  training:     { icon: "📚", bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700" },
 };
 
 const PRIORITY_STYLES = {
@@ -40,22 +40,14 @@ export default function CommunicationCenter() {
   const communications = data?.communications || [];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#fafbfd]">
       <MRNavbar />
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-5">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
         <Breadcrumb />
-
         {/* Header */}
-        <div className="mb-5 bg-gradient-to-r from-indigo-700 via-purple-700 to-pink-700 rounded-2xl px-5 py-5 text-white shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center">
-              <span className="text-2xl">📢</span>
-            </div>
-            <div>
-              <h1 className="text-lg font-bold leading-tight">Communication Center</h1>
-              <p className="text-purple-200 text-xs">Company updates, field alerts & announcements</p>
-            </div>
-          </div>
+        <div className="mb-6">
+          <h1 className="text-2xl font-extrabold text-gray-900">Communications</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Company updates, field alerts & announcements</p>
         </div>
 
         {/* Filters */}
@@ -70,7 +62,7 @@ export default function CommunicationCenter() {
             ].map((f) => (
               <button key={f.v} onClick={() => setFilterType(f.v)}
                 className={"px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all " + (
-                  filterType === f.v ? "bg-indigo-600 text-white shadow" : "text-gray-500 hover:bg-gray-50"
+                  filterType === f.v ? "bg-orange-500 text-white shadow" : "text-gray-500 hover:bg-gray-50"
                 )}>
                 {f.l}
               </button>
@@ -85,7 +77,7 @@ export default function CommunicationCenter() {
             ].map((f) => (
               <button key={f.v} onClick={() => setFilterPriority(f.v)}
                 className={"px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all " + (
-                  filterPriority === f.v ? "bg-indigo-600 text-white shadow" : "text-gray-500 hover:bg-gray-50"
+                  filterPriority === f.v ? "bg-orange-500 text-white shadow" : "text-gray-500 hover:bg-gray-50"
                 )}>
                 {f.l}
               </button>
@@ -111,7 +103,7 @@ export default function CommunicationCenter() {
               const p = PRIORITY_STYLES[comm.priority] || PRIORITY_STYLES.medium;
               return (
                 <div key={comm._id || comm.id} onClick={() => setSelected(comm)}
-                  className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer group overflow-hidden">
+                  className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-orange-200 transition-all cursor-pointer group overflow-hidden">
                   <div className="flex">
                     {/* Priority stripe */}
                     <div className={"w-1 flex-shrink-0 " + p.dot} />
@@ -119,7 +111,7 @@ export default function CommunicationCenter() {
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           <span className={"w-7 h-7 rounded-lg flex items-center justify-center text-sm flex-shrink-0 " + t.bg}>{t.icon}</span>
-                          <h3 className="font-bold text-gray-900 text-sm group-hover:text-indigo-600 transition-colors truncate">{comm.title}</h3>
+                          <h3 className="font-bold text-gray-900 text-sm group-hover:text-orange-600 transition-colors truncate">{comm.title}</h3>
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           <span className={"px-2 py-0.5 rounded-md text-xs font-semibold " + t.bg + " " + t.text}>
@@ -137,7 +129,7 @@ export default function CommunicationCenter() {
                         <span className="font-medium">{comm.created_by_name || comm.created_by || "Admin"}</span>
                         <span>{comm.created_at ? timeAgoIST(comm.created_at) : ""}</span>
                         {comm.attachments?.length > 0 && (
-                          <span className="flex items-center gap-1 text-indigo-500 font-medium">
+                          <span className="flex items-center gap-1 text-orange-500 font-medium">
                             📎 {comm.attachments.length} file{comm.attachments.length > 1 ? "s" : ""}
                           </span>
                         )}
@@ -175,7 +167,7 @@ function CommDetailDrawer({ commId, onClose }) {
         style={{ animation: "slideInRight 0.25s ease-out" }}>
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-700 via-purple-700 to-pink-700 px-5 py-5 flex-shrink-0">
+        <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-600 px-5 py-5 flex-shrink-0">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <span className={"w-8 h-8 rounded-lg flex items-center justify-center text-lg bg-white/20"}>{t.icon}</span>
@@ -209,7 +201,7 @@ function CommDetailDrawer({ commId, onClose }) {
             <>
           {/* Sender info */}
           <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+            <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
               {(comm.created_by_name || comm.created_by || "A").charAt(0).toUpperCase()}
             </div>
             <div>
@@ -232,10 +224,10 @@ function CommDetailDrawer({ commId, onClose }) {
               <div className="space-y-1.5">
                 {comm.attachments.map((att, i) => (
                   <a key={i} href={att.file_url || att.url} target="_blank" rel="noreferrer"
-                    className="flex items-center gap-2.5 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2.5 text-xs text-indigo-700 font-semibold hover:bg-indigo-100 transition-all group">
+                    className="flex items-center gap-2.5 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2.5 text-xs text-orange-700 font-semibold hover:bg-orange-100 transition-all group">
                     <span className="text-base">📎</span>
                     <span className="flex-1 truncate">{att.file_name || att.name || "Attachment " + (i + 1)}</span>
-                    <span className="text-indigo-400 group-hover:text-indigo-600 flex-shrink-0">↓</span>
+                    <span className="text-indigo-400 group-hover:text-orange-600 flex-shrink-0">↓</span>
                   </a>
                 ))}
               </div>
@@ -250,7 +242,7 @@ function CommDetailDrawer({ commId, onClose }) {
                 {comm.targeting.zones?.map((z) => <span key={z} className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-xs font-semibold">{z}</span>)}
                 {comm.targeting.states?.map((s) => <span key={s} className="bg-green-100 text-green-700 px-2 py-0.5 rounded-md text-xs font-semibold">{s}</span>)}
                 {comm.targeting.territories?.map((t) => <span key={t} className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-md text-xs font-semibold">{t}</span>)}
-                {comm.targeting.teams?.map((t) => <span key={t} className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-md text-xs font-semibold">{t}</span>)}
+                {comm.targeting.teams?.map((t) => <span key={t} className="bg-purple-100 text-orange-700 px-2 py-0.5 rounded-md text-xs font-semibold">{t}</span>)}
                 {comm.targeting.roles?.map((r) => <span key={r} className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded-md text-xs font-semibold">{r}</span>)}
               </div>
             </div>

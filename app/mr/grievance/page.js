@@ -43,40 +43,34 @@ export default function GrievancePage() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["grievances"] });
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#fafbfd]">
       <MRNavbar />
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-5">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
         <Breadcrumb />
-
         {/* Header */}
-        <div className="mb-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center shadow">
-              <span className="text-xl">📝</span>
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900 leading-tight">Grievance Redressal</h1>
-              <p className="text-gray-500 text-xs">Raise and track your tickets</p>
-            </div>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-extrabold text-gray-900">Grievances</h1>
+            <p className="text-sm text-gray-400 mt-0.5">Raise and track your tickets</p>
           </div>
           <button onClick={() => setShowCreate(true)}
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-xl font-bold text-xs shadow hover:shadow-md transition-all flex items-center gap-1.5">
+            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm hover:shadow-md transition-all flex items-center gap-1.5">
             ➕ New Ticket
           </button>
         </div>
 
         {/* Department tabs */}
-        <div className="flex gap-1.5 mb-4 bg-white rounded-xl p-1 shadow-sm border border-gray-100 w-fit overflow-x-auto">
+        <div className="flex gap-1.5 mb-5 overflow-x-auto pb-1">
           <button onClick={() => setActiveTab("all")}
-            className={"px-4 py-2 rounded-lg text-xs font-semibold transition-all " + (
-              activeTab === "all" ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow" : "text-gray-500 hover:bg-gray-50"
+            className={"px-4 py-2 rounded-full text-xs font-bold transition-all " + (
+              activeTab === "all" ? "bg-orange-500 text-white shadow-sm" : "bg-white text-gray-500 border border-gray-200 hover:border-gray-300"
             )}>
             All
           </button>
           {departments.map((d) => (
             <button key={d.code} onClick={() => setActiveTab(d.code)}
-              className={"px-4 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap " + (
-                activeTab === d.code ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow" : "text-gray-500 hover:bg-gray-50"
+              className={"px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap " + (
+                activeTab === d.code ? "bg-orange-500 text-white shadow-sm" : "bg-white text-gray-500 border border-gray-200 hover:border-gray-300"
               )}>
               {d.name}
             </button>
@@ -85,39 +79,39 @@ export default function GrievancePage() {
 
         {/* Tickets */}
         {isLoading ? (
-          <div className="space-y-2">
-            {[1,2,3].map((i) => <div key={i} className="h-20 bg-white rounded-xl animate-pulse border border-gray-100" />)}
+          <div className="space-y-3">
+            {[1,2,3].map((i) => <div key={i} className="h-20 bg-white rounded-2xl animate-pulse border border-gray-100" />)}
           </div>
         ) : tickets.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-xl shadow-sm border border-gray-100">
-            <span className="text-5xl">📝</span>
-            <p className="text-gray-400 mt-4 text-sm">No tickets in {activeTab}. Create one to get started.</p>
+          <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-gray-200">
+            <span className="text-4xl block mb-3">📝</span>
+            <p className="text-gray-700 font-bold text-sm mb-1">No tickets yet</p>
+            <p className="text-gray-400 text-xs">Create one to get started</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {tickets.map((ticket) => {
               const s = STATUS_STYLES[ticket.status] || STATUS_STYLES.open;
               const p = PRIORITY_STYLES[ticket.priority] || PRIORITY_STYLES.medium;
               return (
                 <div key={ticket.ticket_id || ticket._id || ticket.id} onClick={() => setSelectedTicket(ticket)}
-                  className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-purple-200 transition-all cursor-pointer">
+                  className="bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-md hover:border-orange-200 transition-all cursor-pointer">
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <h3 className="font-bold text-gray-900 text-sm flex-1 line-clamp-1">{ticket.subject}</h3>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <span className={"inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold " + s.bg + " " + s.text}>
+                      <span className={"inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border " + s.bg + " " + s.text}>
                         <span className={"w-1.5 h-1.5 rounded-full " + s.dot} />
                         {(ticket.status || "open").replace("_", " ")}
                       </span>
-                      <span className={"px-2 py-0.5 rounded-md text-xs font-semibold " + p.bg + " " + p.text}>
+                      <span className={"px-2 py-0.5 rounded-full text-[10px] font-bold " + p.bg + " " + p.text}>
                         {ticket.priority || "medium"}
                       </span>
                     </div>
                   </div>
                   <p className="text-xs text-gray-500 line-clamp-1 mb-2">{ticket.description}</p>
-                  <div className="flex items-center gap-3 text-xs text-gray-400">
-                    <span className="capitalize">{ticket.department}</span>
+                  <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                    <span className="bg-gray-50 px-2 py-0.5 rounded border border-gray-100 capitalize">{ticket.department}</span>
                     <span>{ticket.created_at ? formatIST(ticket.created_at, { day: "2-digit", month: "short" }) : ""}</span>
-                    {ticket.ticket_id && <span className="font-mono text-gray-300">#{ticket.ticket_id}</span>}
                   </div>
                 </div>
               );
@@ -177,7 +171,7 @@ function CreateTicketModal({ department, onClose, onCreated }) {
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-5 py-3 rounded-t-2xl flex items-center justify-between">
+        <div className="bg-gradient-to-r from-orange-500 to-red-500 px-5 py-3 rounded-t-2xl flex items-center justify-between">
           <h2 className="text-white font-bold text-sm">New Grievance Ticket</h2>
           <button onClick={onClose} className="text-white/70 hover:text-white text-xl">&times;</button>
         </div>
@@ -230,7 +224,7 @@ function CreateTicketModal({ department, onClose, onCreated }) {
               Cancel
             </button>
             <button type="submit" disabled={saving}
-              className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-2 rounded-xl font-bold text-xs disabled:opacity-50 transition-all">
+              className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white py-2 rounded-xl font-bold text-xs disabled:opacity-50 transition-all">
               {saving ? "Submitting..." : "Submit Ticket"}
             </button>
           </div>
@@ -255,7 +249,7 @@ function TicketDetailModal({ ticket, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-5 py-4 rounded-t-2xl">
+        <div className="bg-gradient-to-r from-orange-500 to-red-500 px-5 py-4 rounded-t-2xl">
           <div className="flex items-center justify-between mb-2">
             <span className={"inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-white/20 text-white"}>
               {(fullTicket.status || "open").replace("_", " ")}

@@ -13,21 +13,37 @@ const SEVERITY = {
 };
 
 const ACTION_ICONS = {
-  user_created:    { icon: "👤", color: "bg-green-100 text-green-700" },
-  user_updated:    { icon: "✏️", color: "bg-blue-100 text-blue-700" },
-  user_activated:  { icon: "✅", color: "bg-emerald-100 text-emerald-700" },
-  user_deactivated:{ icon: "🚫", color: "bg-red-100 text-red-700" },
-  cme_created:     { icon: "📅", color: "bg-purple-100 text-purple-700" },
-  cme_updated:     { icon: "📝", color: "bg-indigo-100 text-indigo-700" },
-  cme_deleted:     { icon: "🗑️", color: "bg-red-100 text-red-700" },
-  drug_created:    { icon: "💊", color: "bg-cyan-100 text-cyan-700" },
-  drug_updated:    { icon: "💊", color: "bg-blue-100 text-blue-700" },
-  drug_deleted:    { icon: "💊", color: "bg-red-100 text-red-700" },
+  user_created:      { icon: "👤", color: "bg-green-100 text-green-700" },
+  user_updated:      { icon: "✏️", color: "bg-blue-100 text-blue-700" },
+  user_activated:    { icon: "✅", color: "bg-emerald-100 text-emerald-700" },
+  user_deactivated:  { icon: "🚫", color: "bg-red-100 text-red-700" },
+  user_login:        { icon: "🔑", color: "bg-indigo-100 text-indigo-700" },
+  user_logout:       { icon: "🚪", color: "bg-gray-100 text-gray-600" },
+  visit_scheduled:   { icon: "📅", color: "bg-orange-100 text-orange-700" },
+  visit_completed:   { icon: "✅", color: "bg-green-100 text-green-700" },
+  visit_cancelled:   { icon: "❌", color: "bg-red-100 text-red-700" },
+  visit_checked_in:  { icon: "📍", color: "bg-teal-100 text-teal-700" },
+  visit_checked_out: { icon: "🏁", color: "bg-slate-100 text-slate-700" },
+  cme_created:       { icon: "📅", color: "bg-purple-100 text-purple-700" },
+  cme_updated:       { icon: "📝", color: "bg-indigo-100 text-indigo-700" },
+  cme_deleted:       { icon: "🗑️", color: "bg-red-100 text-red-700" },
+  drug_created:      { icon: "💊", color: "bg-cyan-100 text-cyan-700" },
+  drug_updated:      { icon: "💊", color: "bg-blue-100 text-blue-700" },
+  drug_deleted:      { icon: "💊", color: "bg-red-100 text-red-700" },
+  rcpa_created:      { icon: "📈", color: "bg-pink-100 text-pink-700" },
+  rcpa_updated:      { icon: "📊", color: "bg-violet-100 text-violet-700" },
+  settings_updated:  { icon: "⚙️", color: "bg-gray-100 text-gray-700" },
+  doctor_created:    { icon: "🩺", color: "bg-green-100 text-green-700" },
+  doctor_updated:    { icon: "🩺", color: "bg-blue-100 text-blue-700" },
+  grievance_created: { icon: "📢", color: "bg-amber-100 text-amber-700" },
+  grievance_updated: { icon: "📢", color: "bg-blue-100 text-blue-700" },
 };
 
 const ROLE_COLORS = {
-  MR:     "bg-orange-100 text-orange-700",
-  MANAGER:"bg-teal-100 text-teal-700",
+  MR:      "bg-orange-100 text-orange-700",
+  ADMIN:   "bg-purple-100 text-purple-700",
+  DOCTOR:  "bg-blue-100 text-blue-700",
+  MANAGER: "bg-teal-100 text-teal-700",
 };
 
 export default function ActivityLogsPage() {
@@ -92,7 +108,7 @@ export default function ActivityLogsPage() {
   const reset = () => { setActionType(""); setTargetType(""); setSeverity(""); setDateFrom(""); setDateTo(""); setPage(1); };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#fafbfd]">
       <CompanyNavbar />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
@@ -168,7 +184,7 @@ export default function ActivityLogsPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b border-gray-100">
                     <tr>
-                      {["Action", "Actor", "Role", "Target", "Severity", "Time"].map((h) => (
+                      {["Action", "Actor", "Role", "Target", "Details", "Severity", "IP", "Time"].map((h) => (
                         <th key={h} className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">{h}</th>
                       ))}
                     </tr>
@@ -178,6 +194,16 @@ export default function ActivityLogsPage() {
                       const sev = SEVERITY[log.severity] || SEVERITY.info;
                       const act = ACTION_ICONS[log.action_type] || { icon: "📋", color: "bg-gray-100 text-gray-600" };
                       const roleColor = ROLE_COLORS[log.actor_role] || "bg-gray-100 text-gray-600";
+                      const details = log.action_details || {};
+                      const detailSummary = details.action
+                        ? details.action + (details.doctor_name ? ` — ${details.doctor_name}` : "")
+                        : details.doctor_name
+                        ? details.doctor_name
+                        : details.email
+                        ? details.email
+                        : details.outcome
+                        ? details.outcome.slice(0, 40) + (details.outcome.length > 40 ? "…" : "")
+                        : "—";
                       return (
                         <tr key={log.log_id} onClick={() => setSelectedLog(log)}
                           className="hover:bg-purple-50/40 transition-colors cursor-pointer">
@@ -198,10 +224,16 @@ export default function ActivityLogsPage() {
                             <p className="text-xs text-gray-400">{log.target_type}</p>
                           </td>
                           <td className="px-4 py-3">
+                            <p className="text-xs text-gray-600 max-w-[180px] truncate">{detailSummary}</p>
+                          </td>
+                          <td className="px-4 py-3">
                             <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold ${sev.cls}`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${sev.dot}`} />
                               {log.severity}
                             </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="text-xs text-gray-400 font-mono">{log.ip_address || "—"}</p>
                           </td>
                           <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
                             {formatIST(log.created_at)}
@@ -323,6 +355,7 @@ function LogDetailPanel({ log, onClose }) {
               <p className="font-bold text-gray-900">{log.target_name || "—"}</p>
               <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-lg font-semibold capitalize">{log.target_type?.replace(/_/g, " ")}</span>
             </div>
+            {log.target_id && <p className="text-xs text-gray-400 font-mono break-all">ID: {log.target_id}</p>}
           </div>
 
           {/* Action details */}
@@ -341,12 +374,30 @@ function LogDetailPanel({ log, onClose }) {
               )}
               {Object.entries(log.action_details)
                 .filter(([k]) => k !== "updated_fields")
-                .map(([k, v]) => (
-                  <div key={k} className="flex items-start justify-between gap-3">
-                    <span className="text-xs text-gray-500 font-semibold capitalize flex-shrink-0">{k.replace(/_/g, " ")}</span>
-                    <span className="text-xs text-gray-800 font-medium text-right">{String(v)}</span>
-                  </div>
-                ))}
+                .map(([k, v]) => {
+                  // Format values nicely
+                  let displayValue = v;
+                  if (v === null || v === undefined) displayValue = "—";
+                  else if (typeof v === "boolean") displayValue = v ? "Yes" : "No";
+                  else if (typeof v === "object") displayValue = JSON.stringify(v);
+                  else displayValue = String(v);
+
+                  // Special styling for certain keys
+                  const isGps = k === "gps";
+                  const isMood = k === "doctor_mood";
+
+                  return (
+                    <div key={k} className="flex items-start justify-between gap-3">
+                      <span className="text-xs text-gray-500 font-semibold capitalize flex-shrink-0">{k.replace(/_/g, " ")}</span>
+                      <span className={"text-xs font-medium text-right break-all " + (
+                        isMood && v === "positive" ? "text-green-700" :
+                        isMood && v === "negative" ? "text-red-700" :
+                        isGps ? "font-mono text-gray-500" :
+                        "text-gray-800"
+                      )}>{displayValue}</span>
+                    </div>
+                  );
+                })}
             </div>
           )}
 
@@ -354,6 +405,7 @@ function LogDetailPanel({ log, onClose }) {
           <div className="bg-gray-50 rounded-2xl p-4">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Timestamp</p>
             <p className="text-sm font-semibold text-gray-800">{formatISTFull(log.created_at)}</p>
+            {log.log_id && <p className="text-xs text-gray-400 font-mono mt-1">Log ID: {log.log_id}</p>}
           </div>
 
           {/* IP / User Agent if present */}

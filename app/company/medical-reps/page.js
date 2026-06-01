@@ -5,6 +5,7 @@ import CompanyNavbar from "@/components/company/CompanyNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
 import Toast from "@/components/Toast";
 import { get, put, post, del } from "@/lib/api";
+import { formatISTDate, formatISTDateTime } from "@/lib/time";
 import { TableSkeleton } from "@/components/Skeleton";
 import { downloadCSVTemplate } from "@/lib/downloadTemplate";
 
@@ -147,14 +148,22 @@ export default function CompanyMedicalReps() {
   const [filterTerritory, setFilterTerritory] = useState("");
   const [filterStatus, setFilterStatus]       = useState("all");
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error: mrsError, refetch: refetchMrs } = useQuery({
     queryKey: ["mrs"],
-    queryFn:  () => get("/api/v1/mrs?page_size=1000").then((d) => d.mrs || []),
+    queryFn: () => get("/api/v1/mrs?page_size=1000").then((d) => {
+      if (Array.isArray(d)) return d;
+      if (Array.isArray(d?.mrs)) return d.mrs;
+      return [];
+    }),
+    gcTime: 30 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    placeholderData: (prev) => prev,
+    retry: 2,
   });
 
-  const mrs     = data || [];
+  const mrs     = Array.isArray(data) ? data : [];
   const total   = mrs.length;
-  const loading = isLoading;
+  const loading = isLoading && !data;
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["mrs"] });
 
@@ -192,90 +201,82 @@ export default function CompanyMedicalReps() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50 overflow-x-hidden">
+    <div className="min-h-screen bg-[#fafbfd] overflow-x-hidden">
       <CompanyNavbar />
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Breadcrumb />
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Medical Representatives 💼</h1>
-            <p className="text-gray-600 text-sm">Manage your field force and sales team</p>
+            <h1 className="text-2xl font-extrabold text-gray-900">Medical Representatives</h1>
+            <p className="text-gray-400 text-sm mt-0.5">Manage your field force · {total} total</p>
           </div>
           <div className="flex gap-2">
             <button onClick={() => setShowBulkModal(true)}
-              className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-2 rounded-xl font-bold shadow hover:shadow-md transition-all flex items-center gap-1.5 text-xs">
+              className="bg-white text-gray-700 border border-gray-200 px-4 py-2.5 rounded-xl font-bold hover:border-purple-300 hover:text-purple-600 transition-all flex items-center gap-1.5 text-xs">
               <span>📤</span><span>Bulk Upload</span>
             </button>
             <button onClick={() => { setSelectedMR(null); setShowModal(true); }}
-              className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-2 rounded-xl font-bold shadow hover:shadow-md transition-all flex items-center gap-1.5 text-xs">
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-1.5 text-xs">
               <span>➕</span><span>Add MR</span>
             </button>
           </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-3 gap-4 mb-6">
           {[
-            { label: "Total MRs", value: total, icon: "💼", color: "from-orange-500 to-red-500", text: "from-orange-600 to-red-600" },
-            { label: "Active", value: activeCount, icon: "✅", color: "from-green-500 to-emerald-600", text: "from-green-600 to-emerald-600" },
-            { label: "Inactive", value: total - activeCount, icon: "⏸️", color: "from-gray-400 to-gray-500", text: "from-gray-500 to-gray-600" },
+            { label: "Total", value: total, accent: "border-l-purple-400" },
+            { label: "Active", value: activeCount, accent: "border-l-emerald-400" },
+            { label: "Inactive", value: total - activeCount, accent: "border-l-gray-300" },
           ].map((s) => (
-            <div key={s.label} className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100">
-              <div className={`w-10 h-10 bg-gradient-to-br ${s.color} rounded-xl flex items-center justify-center text-xl mb-3 shadow`}>{s.icon}</div>
-              <p className={`text-3xl font-bold bg-gradient-to-r ${s.text} bg-clip-text text-transparent`}>{s.value}</p>
-              <p className="text-gray-600 font-semibold text-sm">{s.label}</p>
+            <div key={s.label} className={`bg-white rounded-xl p-4 border border-gray-100 border-l-4 ${s.accent} shadow-sm`}>
+              <p className="text-2xl font-extrabold text-gray-900">{s.value}</p>
+              <p className="text-[11px] text-gray-400 font-medium">{s.label}</p>
             </div>
           ))}
         </div>
 
         {/* Search + Filters */}
-        <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-100 mb-6 flex flex-wrap gap-3">
-          <input
-            type="text"
-            placeholder="🔍 Search by name or email..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 min-w-[200px] px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 focus:border-orange-400 text-sm transition-all outline-none"
-          />
-          <input
-            type="text"
-            placeholder="📍 Filter by territory..."
-            value={filterTerritory}
-            onChange={(e) => setFilterTerritory(e.target.value)}
-            className="flex-1 min-w-[160px] px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 focus:border-orange-400 text-sm transition-all outline-none"
-          />
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 focus:border-orange-400 text-sm bg-white font-semibold text-gray-700 outline-none"
-          >
+        <div className="flex flex-wrap gap-3 mb-6">
+          <input type="text" placeholder="Search by name or email..."
+            value={search} onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 min-w-[200px] px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-200 focus:border-purple-300 outline-none" />
+          <input type="text" placeholder="Filter by territory..."
+            value={filterTerritory} onChange={(e) => setFilterTerritory(e.target.value)}
+            className="flex-1 min-w-[160px] px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-200 focus:border-purple-300 outline-none" />
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-700 focus:ring-2 focus:ring-purple-200 outline-none">
             <option value="all">All Status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
           {(filterTerritory || filterStatus !== "all") && (
             <button onClick={() => { setFilterTerritory(""); setFilterStatus("all"); }}
-              className="px-4 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">
-              Clear
-            </button>
+              className="px-4 py-2.5 bg-gray-100 text-gray-500 rounded-xl text-xs font-bold hover:bg-gray-200">Clear</button>
           )}
         </div>
 
         {/* MR List */}
         {loading ? (
           <TableSkeleton rows={5} cols={4} />
+        ) : mrsError ? (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
+            <p className="text-red-600 font-bold text-sm mb-2">Failed to load MRs</p>
+            <p className="text-red-400 text-xs mb-4">{mrsError.message}</p>
+            <button onClick={() => refetchMrs()} className="bg-red-500 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-600">Retry</button>
+          </div>
         ) : (
           <>
             <div className="space-y-3">
               {filteredMRs.map((mr) => (
-                <div key={mr.id} className="bg-white rounded-2xl shadow border border-gray-100 hover:shadow-md transition-all p-4">
+                <div key={mr.id} className="bg-white rounded-2xl border border-gray-100 hover:border-purple-200 hover:shadow-md transition-all p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow">
+                      <div className="w-10 h-10 bg-purple-50 rounded-full flex items-center justify-center text-purple-600 font-bold text-sm flex-shrink-0 border border-purple-100">
                         {mr.name?.charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
@@ -786,78 +787,70 @@ function MRVisitsPanel({ mr, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="flex-1 bg-black/40" onClick={onClose} />
 
       {/* Panel */}
-      <div className="w-full max-w-lg bg-gray-50 shadow-2xl flex flex-col h-full overflow-hidden border-l border-gray-200">
+      <div className="w-full max-w-lg bg-[#fafbfd] shadow-2xl flex flex-col h-full overflow-hidden border-l border-gray-200 animate-[fadeSlide_0.25s_ease-out]">
 
-        {/* Header */}
-        <div className="bg-gradient-to-br from-orange-500 via-red-500 to-pink-600 p-5 flex-shrink-0 relative overflow-hidden">
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full" />
-            <div className="absolute bottom-0 left-1/3 w-24 h-24 bg-white/5 rounded-full" />
-          </div>
-          <div className="relative flex items-start justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg border border-white/30">
+        {/* Header — clean white */}
+        <div className="bg-white p-5 flex-shrink-0 border-b border-gray-100">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 bg-purple-50 rounded-full flex items-center justify-center text-purple-600 font-bold text-base border border-purple-100">
                 {mr.name?.charAt(0).toUpperCase()}
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white">{mr.name}</h2>
+                <h2 className="text-lg font-extrabold text-gray-900">{mr.name}</h2>
                 <div className="flex items-center gap-2 mt-0.5">
-                  {mr.territory && (
-                    <span className="text-xs text-orange-100 bg-white/15 px-2 py-0.5 rounded-full">📍 {mr.territory}</span>
-                  )}
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${mr.is_active ? "bg-green-400/30 text-green-100" : "bg-gray-400/30 text-gray-200"}`}>
+                  {mr.territory && <span className="text-[11px] text-gray-500">{mr.territory}</span>}
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${mr.is_active ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-gray-100 text-gray-500"}`}>
                     {mr.is_active ? "Active" : "Inactive"}
                   </span>
                 </div>
-                <p className="text-orange-200 text-xs mt-1">{mr.email}</p>
               </div>
             </div>
-            <button onClick={onClose} className="text-white/80 hover:text-white hover:bg-white/20 rounded-xl p-2 transition-all">
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg p-1.5 transition-all">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
 
-          {/* Mini stats in header */}
-          <div className="relative grid grid-cols-4 gap-2 mt-4">
+          {/* Stats row */}
+          <div className="grid grid-cols-4 gap-2">
             {[
-              { label: "Total",     value: total,       color: "bg-white/20" },
-              { label: "Scheduled", value: scheduled,   color: "bg-blue-400/30" },
-              { label: "Completed", value: completed,   color: "bg-green-400/30" },
-              { label: "Cancelled", value: cancelled,   color: "bg-red-400/30" },
+              { label: "Total", value: total, color: "text-gray-900" },
+              { label: "Scheduled", value: scheduled, color: "text-blue-600" },
+              { label: "Completed", value: completed, color: "text-emerald-600" },
+              { label: "Cancelled", value: cancelled, color: "text-red-500" },
             ].map((s) => (
-              <div key={s.label} className={`${s.color} backdrop-blur-sm rounded-xl p-2 text-center border border-white/20`}>
-                <p className="text-white font-bold text-lg leading-none">{s.value}</p>
-                <p className="text-white/70 text-xs mt-0.5">{s.label}</p>
+              <div key={s.label} className="bg-gray-50 rounded-xl p-2.5 text-center border border-gray-100">
+                <p className={`text-lg font-extrabold ${s.color}`}>{s.value}</p>
+                <p className="text-[9px] text-gray-400 font-medium uppercase">{s.label}</p>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Success rate bar */}
+        {/* Success rate */}
         {total > 0 && (
-          <div className="px-4 py-3 bg-white border-b border-gray-100 flex-shrink-0">
+          <div className="px-5 py-3 bg-white border-b border-gray-100 flex-shrink-0">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-semibold text-gray-600">Visit Success Rate</span>
-              <span className="text-xs font-bold text-green-600">{successRate}%</span>
+              <span className="text-[11px] text-gray-500 font-medium">Success Rate</span>
+              <span className="text-[11px] font-bold text-emerald-600">{successRate}%</span>
             </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full transition-all duration-500"
-                style={{ width: `${successRate}%` }} />
+            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${successRate}%` }} />
             </div>
           </div>
         )}
 
         {/* Filters */}
-        <div className="px-4 py-3 bg-white border-b border-gray-100 flex-shrink-0 space-y-2">
+        <div className="px-5 py-3 bg-white border-b border-gray-100 flex-shrink-0 space-y-2.5">
           {assignedDoctors.length > 0 && (
             <select value={filterDoctor} onChange={(e) => setFilterDoctor(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-orange-400 bg-white text-gray-700">
-              <option value="">👨‍⚕️ All Doctors</option>
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-purple-200 bg-white text-gray-700">
+              <option value="">All Doctors</option>
               {assignedDoctors.map((d) => (
                 <option key={d.id} value={d.id}>{d.name}</option>
               ))}
@@ -865,16 +858,13 @@ function MRVisitsPanel({ mr, onClose }) {
           )}
           <div className="flex gap-1.5">
             {["", "scheduled", "completed", "cancelled"].map((s) => {
-              const st = s ? STATUS_STYLES[s] : null;
               const count = s ? visits.filter((v) => v.status === s).length : total;
               return (
                 <button key={s} onClick={() => setFilterStatus(s)}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    filterStatus === s
-                      ? s ? `${st.bg} ${st.text} shadow-sm` : "bg-gray-800 text-white shadow-sm"
-                      : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                  className={`flex-1 py-2 rounded-full text-[10px] font-bold transition-all ${
+                    filterStatus === s ? "bg-purple-600 text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                   }`}>
-                  {s ? STATUS_STYLES[s].label : "All"} <span className="opacity-70">({count})</span>
+                  {s ? (STATUS_STYLES[s]?.label || s) : "All"} ({count})
                 </button>
               );
             })}
@@ -911,75 +901,199 @@ function MRVisitsPanel({ mr, onClose }) {
           ) : (
             visits.map((visit) => {
               const s = STATUS_STYLES[visit.status] || STATUS_STYLES.scheduled;
-              const isNegative = visit.outcome?.toLowerCase().includes("negative");
+              const report = visit.report || {};
+              const isNegative = report.doctor_mood === "negative";
               return (
-                <div key={visit.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all">
-                  {/* Card top accent */}
-                  <div className={`h-1 w-full ${
-                    visit.status === "completed" ? (isNegative ? "bg-red-400" : "bg-green-400") :
-                    visit.status === "cancelled" ? "bg-red-300" : "bg-blue-400"
-                  }`} />
-
-                  <div className="p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl flex items-center justify-center text-sm font-bold text-indigo-600 flex-shrink-0">
-                          {visit.doctor_name?.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="font-bold text-gray-800 text-sm">{visit.doctor_name}</p>
-                          <p className="text-xs text-gray-400">{visit.purpose}</p>
-                        </div>
-                      </div>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${s.bg} ${s.text} flex-shrink-0`}>{s.label}</span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 mb-3">
-                      {[
-                        { icon: "📅", label: "Date",     value: visit.scheduled_date },
-                        { icon: "⏰", label: "Time",     value: to12h(visit.scheduled_time) },
-                        { icon: "📍", label: "Location", value: visit.location || "—" },
-                      ].map((row) => (
-                        <div key={row.label} className="bg-gray-50 rounded-xl p-2 border border-gray-100">
-                          <p className="text-gray-400 text-xs mb-0.5">{row.icon} {row.label}</p>
-                          <p className="font-semibold text-gray-700 text-xs truncate">{row.value}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    {visit.notes && (
-                      <div className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-2 flex items-start gap-2">
-                        <span className="text-amber-500 text-xs mt-0.5">📝</span>
-                        <p className="text-xs text-amber-800">{visit.notes}</p>
-                      </div>
-                    )}
-
-                    {visit.status === "completed" && (visit.outcome || visit.feedback) && (
-                      <div className={`rounded-xl px-3 py-2 border ${isNegative ? "bg-red-50 border-red-100" : "bg-green-50 border-green-100"}`}>
-                        {visit.outcome && (
-                          <p className={`text-xs font-semibold mb-0.5 ${isNegative ? "text-red-600" : "text-green-700"}`}>
-                            {isNegative ? "👎" : "👍"} {visit.outcome}
-                          </p>
-                        )}
-                        {visit.feedback && (
-                          <p className={`text-xs ${isNegative ? "text-red-500" : "text-green-600"}`}>{visit.feedback}</p>
-                        )}
-                      </div>
-                    )}
-
-                    {visit.status === "cancelled" && visit.cancel_reason && (
-                      <div className="bg-red-50 border border-red-100 rounded-xl px-3 py-2 flex items-start gap-2">
-                        <span className="text-red-400 text-xs mt-0.5">🚫</span>
-                        <p className="text-xs text-red-600">{visit.cancel_reason}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <VisitDetailCard key={visit.id} visit={visit} s={s} report={report} isNegative={isNegative} />
               );
             })
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function VisitDetailCard({ visit, s, report, isNegative }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const MOOD = {
+    positive: { icon: "😊", label: "Positive", cls: "bg-green-100 text-green-700" },
+    neutral:  { icon: "😐", label: "Neutral",  cls: "bg-yellow-100 text-yellow-700" },
+    negative: { icon: "😞", label: "Negative", cls: "bg-red-100 text-red-700" },
+  };
+
+  const to12hLocal = (t) => {
+    if (!t) return "—";
+    const [h, m] = t.split(":").map(Number);
+    const ampm = h >= 12 ? "PM" : "AM";
+    const hour = h % 12 || 12;
+    return `${hour}:${String(m).padStart(2, "0")} ${ampm}`;
+  };
+
+  // Convert UTC timestamp to IST time string
+  const toIST = (ts) => {
+    if (!ts) return "—";
+    const s = String(ts);
+    const d = s.endsWith("Z") || s.includes("+") ? new Date(s) : new Date(s + "Z");
+    if (isNaN(d)) return "—";
+    return d.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: true });
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all">
+      <div className={`h-1 w-full ${
+        visit.status === "completed" ? (isNegative ? "bg-red-400" : "bg-green-400") :
+        visit.status === "cancelled" ? "bg-red-300" : "bg-blue-400"
+      }`} />
+
+      <button onClick={() => setExpanded(!expanded)} className="w-full p-4 text-left">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl flex items-center justify-center text-sm font-bold text-indigo-600 flex-shrink-0">
+              {visit.doctor_name?.charAt(0)}
+            </div>
+            <div>
+              <p className="font-bold text-gray-800 text-sm">{visit.doctor_name}</p>
+              <p className="text-xs text-gray-400">{visit.purpose}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${s.bg} ${s.text} flex-shrink-0`}>{s.label}</span>
+            <span className="text-gray-400 text-xs">{expanded ? "▲" : "▼"}</span>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { icon: "📅", label: "Date", value: visit.scheduled_date },
+            { icon: "⏰", label: "Time", value: to12hLocal(visit.scheduled_time) },
+            { icon: "📍", label: "Location", value: visit.location || "—" },
+          ].map((row) => (
+            <div key={row.label} className="bg-gray-50 rounded-xl p-2 border border-gray-100">
+              <p className="text-gray-400 text-xs mb-0.5">{row.icon} {row.label}</p>
+              <p className="font-semibold text-gray-700 text-xs truncate">{row.value}</p>
+            </div>
+          ))}
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-gray-100 p-4 bg-gray-50/50 space-y-3">
+          {/* Check-in / Check-out */}
+          {(visit.check_in || visit.check_out) && (
+            <div className="grid grid-cols-2 gap-2">
+              {visit.check_in && (
+                <div className="bg-white rounded-lg p-2.5 border border-gray-100">
+                  <p className="text-[10px] text-gray-400 font-medium">📍 Check-In</p>
+                  <p className="text-xs font-semibold text-gray-700">{toIST(visit.check_in.timestamp)}</p>
+                  <p className="text-[9px] text-gray-400 font-mono">{visit.check_in.latitude?.toFixed(5)}, {visit.check_in.longitude?.toFixed(5)}</p>
+                </div>
+              )}
+              {visit.check_out && (
+                <div className="bg-white rounded-lg p-2.5 border border-gray-100">
+                  <p className="text-[10px] text-gray-400 font-medium">🏁 Check-Out</p>
+                  <p className="text-xs font-semibold text-gray-700">{toIST(visit.check_out.timestamp)}</p>
+                  <p className="text-[9px] text-gray-400 font-mono">{visit.check_out.latitude?.toFixed(5)}, {visit.check_out.longitude?.toFixed(5)}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {visit.duration_minutes > 0 && (
+            <div className="bg-white rounded-lg px-3 py-2 border border-gray-100 inline-block">
+              <span className="text-xs text-gray-500">⏱️ Duration: </span>
+              <span className="text-xs font-bold text-gray-800">{visit.duration_minutes} min</span>
+            </div>
+          )}
+
+          {/* Report details */}
+          {visit.status === "completed" && Object.keys(report).length > 0 && (
+            <div className="space-y-2.5">
+              {report.doctor_mood && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">Doctor Mood:</span>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold ${MOOD[report.doctor_mood]?.cls || "bg-gray-100 text-gray-600"}`}>
+                    {MOOD[report.doctor_mood]?.icon} {MOOD[report.doctor_mood]?.label || report.doctor_mood}
+                  </span>
+                </div>
+              )}
+
+              {(report.products_discussed || []).length > 0 && (
+                <div>
+                  <p className="text-[10px] text-gray-400 font-medium mb-1">💊 Products Discussed</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {report.products_discussed.map((p, i) => (
+                      <span key={i} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md font-medium">{typeof p === "string" ? p : p.name}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-2">
+                {report.samples_given > 0 && (
+                  <div className="bg-white rounded-lg px-2.5 py-1.5 border border-gray-100">
+                    <p className="text-[10px] text-gray-400">Samples Given</p>
+                    <p className="text-xs font-bold text-gray-800">{report.samples_given}</p>
+                  </div>
+                )}
+                {report.rx_commitment != null && (
+                  <div className="bg-white rounded-lg px-2.5 py-1.5 border border-gray-100">
+                    <p className="text-[10px] text-gray-400">Rx Commitment</p>
+                    <p className={"text-xs font-bold " + (report.rx_commitment ? "text-green-700" : "text-gray-500")}>
+                      {report.rx_commitment ? `Yes (${report.expected_rx_per_month || "—"}/mo)` : "No"}
+                    </p>
+                  </div>
+                )}
+                {report.competitor_info && (
+                  <div className="bg-white rounded-lg px-2.5 py-1.5 border border-red-100">
+                    <p className="text-[10px] text-red-400">Competitor</p>
+                    <p className="text-xs font-bold text-red-700">{report.competitor_info}</p>
+                  </div>
+                )}
+                {report.follow_up_date && (
+                  <div className="bg-white rounded-lg px-2.5 py-1.5 border border-gray-100">
+                    <p className="text-[10px] text-gray-400">Follow-up</p>
+                    <p className="text-xs font-bold text-purple-700">{formatISTDate(report.follow_up_date)}</p>
+                  </div>
+                )}
+              </div>
+
+              {report.outcome && (
+                <div className={`rounded-lg px-3 py-2 border-l-3 ${isNegative ? "border-l-red-400 bg-red-50 border border-red-100" : "border-l-green-400 bg-green-50 border border-green-100"}`}>
+                  <p className="text-[10px] text-gray-400 font-medium mb-0.5">Outcome</p>
+                  <p className={`text-xs font-medium ${isNegative ? "text-red-700" : "text-green-700"}`}>{report.outcome}</p>
+                </div>
+              )}
+
+              {report.notes && (
+                <div className="bg-white rounded-lg px-3 py-2 border-l-3 border-l-gray-300 border border-gray-100">
+                  <p className="text-[10px] text-gray-400 font-medium mb-0.5">Report Notes</p>
+                  <p className="text-xs text-gray-600 italic">{report.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {visit.notes && (
+            <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+              <p className="text-[10px] text-amber-500 font-medium mb-0.5">📝 Visit Notes</p>
+              <p className="text-xs text-amber-800">{visit.notes}</p>
+            </div>
+          )}
+
+          {visit.status === "cancelled" && visit.cancel_reason && (
+            <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              <p className="text-[10px] text-red-400 font-medium mb-0.5">🚫 Cancel Reason</p>
+              <p className="text-xs text-red-600">{visit.cancel_reason}</p>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-3 text-[10px] text-gray-400 pt-1">
+            <span>Created: {formatISTDateTime(visit.created_at)}</span>
+            {visit.completed_at && <span>Completed: {formatISTDateTime(visit.completed_at)}</span>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
