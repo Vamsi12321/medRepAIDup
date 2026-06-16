@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import MRNavbar from "@/components/mr/MRNavbar";
+import { formatISTDate } from "@/lib/time";
 import { get, put } from "@/lib/api";
 import ChangePasswordSection from "@/components/ChangePasswordSection";
 
@@ -58,7 +59,7 @@ export default function MRProfile() {
   const initials = profile?.full_name?.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "MR";
 
   if (isLoading) return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#fafbfd]">
       <MRNavbar />
       <main className="max-w-4xl mx-auto px-4 py-10">
         <div className="space-y-4">{[1,2,3].map((i) => <div key={i} className="h-24 bg-gray-100 rounded-2xl animate-pulse" />)}</div>
@@ -67,37 +68,45 @@ export default function MRProfile() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#fafbfd]">
       <MRNavbar />
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {success && <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm font-medium">{success}</div>}
+
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-extrabold text-gray-900">My Profile</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Manage your account details</p>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left — avatar + basic info */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-200 text-center">
+            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm text-center">
               <div className="relative inline-block mb-4">
                 {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="avatar" className="w-24 h-24 rounded-2xl object-cover mx-auto shadow-lg" />
+                  <img src={profile.avatar_url} alt="avatar" className="w-20 h-20 rounded-full object-cover mx-auto shadow-sm border-2 border-gray-100" />
                 ) : (
-                  <div className="w-24 h-24 bg-gradient-to-br from-orange-600 to-red-600 rounded-2xl flex items-center justify-center text-white text-3xl font-bold mx-auto shadow-lg">
+                  <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 text-2xl font-bold mx-auto border-2 border-orange-200">
                     {initials}
                   </div>
                 )}
-                <div className="absolute bottom-1 right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white" />
+                <div className="absolute bottom-0 right-0 w-5 h-5 bg-green-500 rounded-full border-2 border-white" />
               </div>
-              <h2 className="text-xl font-bold text-gray-900">{profile?.full_name}</h2>
-              <p className="text-orange-600 font-semibold text-sm mt-1">Medical Representative</p>
-              {profile?.territory && <p className="text-gray-500 text-xs mt-1">📍 {profile.territory}</p>}
-              {(profile?.zone || profile?.state) && (
-                <p className="text-gray-400 text-xs mt-0.5">
-                  {[profile.zone, profile.state].filter(Boolean).join(", ")}
+              <h2 className="text-lg font-bold text-gray-900">{profile?.full_name}</h2>
+              <p className="text-orange-600 font-semibold text-xs mt-0.5">Medical Representative</p>
+              {profile?.territory && (
+                <p className="text-gray-500 text-xs mt-2 flex items-center justify-center gap-1">
+                  <svg className="w-3 h-3 text-orange-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/></svg>
+                  {profile.territory}
                 </p>
               )}
-              {profile?.location && <p className="text-gray-400 text-xs mt-0.5">{profile.location}</p>}
-              {profile?.bio && <p className="text-gray-600 text-sm mt-3 leading-relaxed">{profile.bio}</p>}
+              {(profile?.zone || profile?.state) && (
+                <p className="text-gray-400 text-[11px] mt-0.5">{[profile.zone, profile.state].filter(Boolean).join(", ")}</p>
+              )}
+              {profile?.bio && <p className="text-gray-600 text-xs mt-3 leading-relaxed">{profile.bio}</p>}
               <button onClick={startEdit}
-                className="mt-4 w-full bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-xl font-semibold text-sm transition-all">
+                className="mt-4 w-full bg-orange-500 hover:bg-orange-600 text-white py-2.5 rounded-xl font-bold text-xs transition-all">
                 Edit Profile
               </button>
             </div>
@@ -105,7 +114,7 @@ export default function MRProfile() {
 
           {/* Right — details */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-200">
+            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
               <h3 className="font-bold text-gray-900 mb-4">Profile Details</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="bg-orange-50 border border-orange-100 rounded-xl p-3">
@@ -138,7 +147,7 @@ export default function MRProfile() {
                 </div>
                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
                   <p className="text-xs text-gray-600 font-semibold mb-1">Member Since</p>
-                  <p className="text-sm font-bold text-gray-800 truncate">{profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : "—"}</p>
+                  <p className="text-sm font-bold text-gray-800 truncate">{profile?.created_at ? formatISTDate(profile.created_at) : "—"}</p>
                 </div>
               </div>
             </div>

@@ -52,7 +52,7 @@ export default function CompanyCMEEvents() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50">
+    <div className="min-h-screen bg-[#fafbfd]">
       <CompanyNavbar />
       <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8">
         <Breadcrumb />

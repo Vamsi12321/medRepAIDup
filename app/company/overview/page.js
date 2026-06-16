@@ -46,66 +46,69 @@ export default function CompanyOverview() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50">
+    <div className="min-h-screen bg-[#fafbfd]">
       <CompanyNavbar />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Breadcrumb />
 
-        {/* Welcome banner */}
-        <div className="mb-6 sm:mb-8 bg-gradient-to-br from-purple-600 via-pink-600 to-rose-600 rounded-2xl p-5 sm:p-7 shadow-lg text-white">
-          <h1 className="text-2xl sm:text-3xl font-bold mb-1">Welcome back, {userName}! 👋</h1>
-          <p className="text-purple-100 text-sm sm:text-base">{companyName} Dashboard</p>
+        {/* Welcome */}
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-8">
+          <div>
+            <p className="text-xs text-gray-400 font-medium uppercase tracking-wider mb-1">{companyName}</p>
+            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Welcome, {userName}</h1>
+          </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 mb-6 sm:mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {statCards.map((s, i) => (
-            <Link key={i} href={s.link}>
-              <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all cursor-pointer">
-                <div className={`w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br ${s.color} rounded-xl flex items-center justify-center text-xl sm:text-2xl mb-3 sm:mb-4 shadow-md`}>
-                  {s.icon}
+            <Link key={i} href={s.link} className="group">
+              <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-200 group-hover:-translate-y-0.5">
+                <div className={`w-10 h-10 bg-gradient-to-br ${s.color} rounded-xl flex items-center justify-center text-lg mb-3 shadow-sm group-hover:scale-110 transition-transform`}>
+                  <span className="text-white">{s.icon}</span>
                 </div>
-                <p className="text-2xl sm:text-4xl font-bold text-gray-800 mb-1 sm:mb-2">
-                  {loading ? <span className="animate-pulse text-gray-300">—</span> : s.value}
+                <p className="text-2xl font-extrabold text-gray-900 mb-0.5">
+                  {loading ? <span className="inline-block w-8 h-6 bg-gray-100 rounded animate-pulse" /> : s.value}
                 </p>
-                <p className="text-gray-600 font-semibold text-xs sm:text-base">{s.label}</p>
+                <p className="text-[11px] text-gray-400 font-medium">{s.label}</p>
               </div>
             </Link>
           ))}
         </div>
 
-        <div className="grid grid-cols-1 gap-6">
-          {/* Recent Activity */}
-          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100">
-            <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2">
-              <span>📊</span> Recent Activity
-            </h2>
+        {/* Recent Activity */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-base font-bold text-gray-900">Recent Activity</h2>
+            <Link href="/company/activity-logs" className="text-xs text-purple-600 font-bold hover:text-purple-700">View All →</Link>
+          </div>
+          <div className="p-4">
             {loading ? (
               <div className="space-y-3">
                 {[1,2,3,4].map((i) => (
                   <div key={i} className="flex items-center gap-3 animate-pulse">
-                    <div className="w-9 h-9 bg-gray-200 rounded-lg flex-shrink-0" />
+                    <div className="w-9 h-9 bg-gray-100 rounded-lg flex-shrink-0" />
                     <div className="flex-1 space-y-1.5">
-                      <div className="h-3 bg-gray-200 rounded w-3/4" />
-                      <div className="h-2.5 bg-gray-100 rounded w-1/3" />
+                      <div className="h-3 bg-gray-100 rounded-lg w-3/4" />
+                      <div className="h-2.5 bg-gray-50 rounded w-1/3" />
                     </div>
                   </div>
                 ))}
               </div>
             ) : activity.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center py-6">No recent activity yet.</p>
+              <p className="text-gray-400 text-xs text-center py-8">No recent activity yet.</p>
             ) : (
-              <div className="space-y-3">
+              <div className="divide-y divide-gray-50">
                 {activity.slice(0, 8).map((a, i) => {
                   const meta = ACTIVITY_ICONS[a.type] || { icon: "📌", color: "from-gray-400 to-gray-500" };
                   return (
-                    <div key={i} className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 border border-gray-100 hover:shadow-sm transition-all">
-                      <div className={`w-9 h-9 bg-gradient-to-br ${meta.color} rounded-lg flex items-center justify-center shadow flex-shrink-0`}>
-                        <span className="text-base">{meta.icon}</span>
+                    <div key={i} className="flex items-center gap-3 py-3 hover:bg-gray-50/50 transition-colors px-1 rounded-lg">
+                      <div className={`w-9 h-9 bg-gradient-to-br ${meta.color} rounded-lg flex items-center justify-center shadow-sm flex-shrink-0`}>
+                        <span className="text-sm text-white">{meta.icon}</span>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-gray-800 text-sm truncate">{a.description || a.title}</p>
-                        <p className="text-xs text-gray-400">{timeAgo(a.timestamp)}</p>
+                        <p className="font-semibold text-gray-800 text-xs truncate">{a.description || a.title}</p>
+                        <p className="text-[10px] text-gray-400">{timeAgo(a.timestamp)}</p>
                       </div>
                     </div>
                   );

@@ -91,7 +91,7 @@ export default function CompanyProfile() {
   const initial   = company?.company_name?.charAt(0)?.toUpperCase() || "C";
 
   if (isLoading) return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#fafbfd]">
       <CompanyNavbar />
       <main className="max-w-4xl mx-auto px-4 py-10 space-y-4">
         {[1,2,3].map((i) => <div key={i} className="h-24 bg-gray-100 rounded-2xl animate-pulse" />)}
@@ -100,7 +100,7 @@ export default function CompanyProfile() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#fafbfd]">
       <CompanyNavbar />
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {success && <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm font-medium">{success}</div>}

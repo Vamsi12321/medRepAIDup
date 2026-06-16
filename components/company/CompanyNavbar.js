@@ -2,7 +2,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { logout } from "@/lib/auth";
+import { get } from "@/lib/api";
 
 const PAGE_TITLES = {
   "/company/overview":        { title: "Overview",        icon: "🏠", sub: "Company dashboard" },
@@ -25,6 +27,24 @@ export default function CompanyNavbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [companyName, setCompanyName] = useState("My Company");
   const [isGeneralAdmin, setIsGeneralAdmin] = useState(false);
+  const queryClient = useQueryClient();
+
+  const prefetchOnHover = (path) => {
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+    if (path === "/company/overview") {
+      queryClient.prefetchQuery({ queryKey: ["company-overview"], queryFn: () => get("/api/v1/admin/dashboard"), staleTime: 5 * 60 * 1000 });
+    } else if (path === "/company/medical-reps") {
+      queryClient.prefetchQuery({ queryKey: ["mrs"], queryFn: () => get("/api/v1/mrs?page_size=1000").then((d) => d.mrs || []), staleTime: 5 * 60 * 1000 });
+    } else if (path === "/company/sfe") {
+      queryClient.prefetchQuery({ queryKey: ["sfe-dashboard", month, year], queryFn: () => get("/api/v1/sfe/dashboard", { month, year }), staleTime: 5 * 60 * 1000 });
+    } else if (path === "/company/doctors") {
+      queryClient.prefetchQuery({ queryKey: ["doctors"], queryFn: () => get("/api/v1/doctors?page_size=1000").then((d) => Array.isArray(d) ? d : (d?.doctors || [])), staleTime: 5 * 60 * 1000 });
+    } else if (path === "/company/drug-management") {
+      queryClient.prefetchQuery({ queryKey: ["drugs"], queryFn: () => get("/api/v1/drugs?limit=500"), staleTime: 5 * 60 * 1000 });
+    }
+  };
 
   useEffect(() => {
     setCompanyName(localStorage.getItem("companyName") || "My Company");
@@ -92,6 +112,7 @@ export default function CompanyNavbar() {
                 <Link
                   key={item.path}
                   href={item.path}
+                  onMouseEnter={() => prefetchOnHover(item.path)}
                   className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                     pathname === item.path
                       ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow"

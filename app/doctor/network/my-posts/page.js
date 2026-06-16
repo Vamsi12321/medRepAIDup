@@ -5,6 +5,7 @@ import { get, post as apiPost, del } from "@/lib/api";
 import { Icons } from "@/components/network/Icons";
 import { timeAgoIST as timeAgo, formatIST } from "@/lib/time";
 import { CommentsSection } from "@/app/doctor/network/feed/page";
+import { useNetworkToast } from "@/app/doctor/network/layout";
 
 
 export default function MyPostsPage() {
@@ -65,11 +66,13 @@ export default function MyPostsPage() {
 function MyPostCard({ post, currentUserId, accentColor = "indigo", onDeleted }) {
   const [showComments, setShowComments]   = useState(false);
   const [commentsCount, setCommentsCount] = useState(post.comments_count || 0);
+  const { showToast } = useNetworkToast();
   const accent = accentColor;
 
   const deleteMutation = useMutation({
     mutationFn: () => del(`/api/v1/network/posts/${post.post_id}`),
-    onSuccess: onDeleted,
+    onSuccess: () => { onDeleted(); showToast("Post deleted."); },
+    onError: (e) => showToast(e.message || "Failed to delete post", "error"),
   });
 
   return (

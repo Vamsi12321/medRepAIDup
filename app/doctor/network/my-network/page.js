@@ -5,6 +5,7 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { get, post as apiPost, del } from "@/lib/api";
 import { Icons } from "@/components/network/Icons";
 import UserProfileModal from "@/components/network/UserProfileModal";
+import { useNetworkToast } from "@/app/doctor/network/layout";
 
 function Avatar({ name, role }) {
   return (
@@ -34,6 +35,7 @@ function Skeleton() {
 export default function MyNetworkPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { showToast } = useNetworkToast();
   const [subTab, setSubTab] = useState("connections");
   const [viewingUserId, setViewingUserId] = useState(null);
 
@@ -53,15 +55,16 @@ export default function MyNetworkPage() {
     );
   };
 
-  const acceptMutation  = useMutation({ mutationFn: (id)  => apiPost("/api/v1/network/connections/requests/" + id + "/accept", {}), onSuccess: invalidateAll });
-  const rejectMutation  = useMutation({ mutationFn: (id)  => apiPost("/api/v1/network/connections/requests/" + id + "/reject", {}), onSuccess: invalidateAll });
-  const cancelMutation  = useMutation({ mutationFn: (id)  => del("/api/v1/network/connections/requests/" + id + "/cancel"),         onSuccess: invalidateAll });
-  const removeMutation  = useMutation({ mutationFn: (id)  => del("/api/v1/network/connections/" + id),                              onSuccess: invalidateAll });
-  const blockMutation   = useMutation({ mutationFn: (uid) => apiPost("/api/v1/network/connections/" + uid + "/block", {}),           onSuccess: invalidateAll });
-  const unblockMutation = useMutation({ mutationFn: (uid) => del("/api/v1/network/connections/" + uid + "/unblock"),                 onSuccess: invalidateAll });
+  const acceptMutation  = useMutation({ mutationFn: (id)  => apiPost("/api/v1/network/connections/requests/" + id + "/accept", {}), onSuccess: () => { invalidateAll(); showToast("Request accepted!"); }, onError: (e) => showToast(e.message || "Failed", "error") });
+  const rejectMutation  = useMutation({ mutationFn: (id)  => apiPost("/api/v1/network/connections/requests/" + id + "/reject", {}), onSuccess: () => { invalidateAll(); showToast("Request rejected."); }, onError: (e) => showToast(e.message || "Failed", "error") });
+  const cancelMutation  = useMutation({ mutationFn: (id)  => del("/api/v1/network/connections/requests/" + id + "/cancel"),         onSuccess: () => { invalidateAll(); showToast("Request cancelled."); }, onError: (e) => showToast(e.message || "Failed", "error") });
+  const removeMutation  = useMutation({ mutationFn: (id)  => del("/api/v1/network/connections/" + id),                              onSuccess: () => { invalidateAll(); showToast("Connection removed."); }, onError: (e) => showToast(e.message || "Failed", "error") });
+  const blockMutation   = useMutation({ mutationFn: (uid) => apiPost("/api/v1/network/connections/" + uid + "/block", {}),           onSuccess: () => { invalidateAll(); showToast("User blocked."); }, onError: (e) => showToast(e.message || "Failed", "error") });
+  const unblockMutation = useMutation({ mutationFn: (uid) => del("/api/v1/network/connections/" + uid + "/unblock"),                 onSuccess: () => { invalidateAll(); showToast("User unblocked."); }, onError: (e) => showToast(e.message || "Failed", "error") });
   const messageMutation = useMutation({
     mutationFn: (uid) => apiPost("/api/v1/network/chat/conversations/" + uid, {}),
     onSuccess: () => router.push("/doctor/network/messages"),
+    onError: (e) => showToast(e.message || "Failed to open chat", "error"),
   });
 
   const subTabs = [

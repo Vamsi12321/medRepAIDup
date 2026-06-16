@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import MRNavbar from "@/components/mr/MRNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
+import { formatISTDate } from "@/lib/time";
 import { get, post } from "@/lib/api";
 
 const mrId = () => typeof window !== "undefined" ? localStorage.getItem("userId") : null;
@@ -51,39 +52,38 @@ export default function MRDoctors() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50">
+    <div className="min-h-screen bg-[#fafbfd]">
       <MRNavbar />
       <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8">
         <Breadcrumb />
-
-        {/* Header */}
+{/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">My Doctors 👨‍⚕️</h1>
-            <p className="text-gray-500 text-sm">Doctors assigned to you</p>
+            <h1 className="text-2xl font-extrabold text-gray-900">My Doctors</h1>
+            <p className="text-gray-400 text-sm mt-0.5">{assignedDoctors.length} doctor{assignedDoctors.length !== 1 ? "s" : ""} assigned to you</p>
           </div>
           <button onClick={() => setShowRequestModal(true)}
-            className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 text-sm">
+            className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2 text-xs">
             <span>➕</span><span>Request Doctor</span>
           </button>
         </div>
 
         {/* Tabs + Search */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-          <div className="flex space-x-2 bg-white rounded-xl p-1.5 shadow-sm border border-gray-100 w-fit">
+          <div className="flex gap-2">
             <button onClick={() => setActiveTab("doctors")}
-              className={`px-5 py-2 rounded-lg font-semibold text-sm transition-all ${activeTab === "doctors" ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow" : "text-gray-600 hover:bg-gray-50"}`}>
-              👨‍⚕️ Doctors ({assignedDoctors.length})
+              className={`px-4 py-2 rounded-full font-bold text-xs transition-all ${activeTab === "doctors" ? "bg-orange-500 text-white shadow-sm" : "bg-white text-gray-500 border border-gray-200 hover:border-gray-300"}`}>
+              🩺 Doctors ({assignedDoctors.length})
             </button>
             <button onClick={() => setActiveTab("requests")}
-              className={`px-5 py-2 rounded-lg font-semibold text-sm transition-all ${activeTab === "requests" ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow" : "text-gray-600 hover:bg-gray-50"}`}>
-              📋 My Requests ({doctorRequests.length})
+              className={`px-4 py-2 rounded-full font-bold text-xs transition-all ${activeTab === "requests" ? "bg-orange-500 text-white shadow-sm" : "bg-white text-gray-500 border border-gray-200 hover:border-gray-300"}`}>
+              📋 Requests ({doctorRequests.length})
             </button>
           </div>
           {activeTab === "doctors" && assignedDoctors.length > 0 && (
-            <input type="text" placeholder="🔍 Search doctors..."
+            <input type="text" placeholder="Search doctors..."
               value={search} onChange={(e) => setSearch(e.target.value)}
-              className="w-full sm:w-64 px-4 py-2 bg-white border-2 border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none shadow-sm" />
+              className="w-full sm:w-64 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-orange-200 focus:border-orange-300 outline-none" />
           )}
         </div>
 
@@ -93,88 +93,94 @@ export default function MRDoctors() {
             {isLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 animate-pulse">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-11 h-11 bg-gray-200 rounded-full" />
+                  <div key={i} className="bg-white rounded-2xl p-5 border border-gray-100 animate-pulse">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-12 h-12 bg-gray-100 rounded-full" />
                       <div className="flex-1 space-y-2">
-                        <div className="h-3.5 bg-gray-200 rounded w-3/4" />
-                        <div className="h-2.5 bg-gray-100 rounded w-1/2" />
+                        <div className="h-3.5 bg-gray-100 rounded-lg w-3/4" />
+                        <div className="h-2.5 bg-gray-50 rounded w-1/2" />
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <div className="h-3 bg-gray-100 rounded w-full" />
-                      <div className="h-3 bg-gray-100 rounded w-2/3" />
+                      <div className="h-3 bg-gray-50 rounded w-full" />
+                      <div className="h-3 bg-gray-50 rounded w-2/3" />
                     </div>
                   </div>
                 ))}
               </div>
             ) : filteredDoctors.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-100">
-                <span className="text-5xl">👨‍⚕️</span>
-                <p className="text-gray-500 mt-4 font-medium text-sm">
-                  {assignedDoctors.length === 0 ? "No doctors assigned yet." : "No doctors match your search."}
+              <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-gray-200">
+                <span className="text-4xl block mb-3">🩺</span>
+                <p className="text-gray-700 font-bold text-sm mb-1">
+                  {assignedDoctors.length === 0 ? "No doctors assigned yet" : "No doctors match your search"}
                 </p>
+                <p className="text-gray-400 text-xs">Request a doctor to get started</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredDoctors.map((doctor) => (
-                  <div key={doctor.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all overflow-hidden">
-                    <div className="h-1 w-full bg-gradient-to-r from-orange-400 via-red-400 to-pink-400" />
-                    <div className="p-5">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                          {doctor.name?.charAt(0)?.toUpperCase()}
+                {filteredDoctors.map((doctor) => {
+                  const cls = doctor.classification;
+                  const clsStyle = cls === "A" ? "bg-red-50 text-red-600 border-red-100" : cls === "B" ? "bg-amber-50 text-amber-600 border-amber-100" : "bg-gray-50 text-gray-500 border-gray-200";
+                  return (
+                    <div key={doctor.id} className="group bg-white rounded-2xl border border-gray-100 hover:border-orange-200 hover:shadow-lg transition-all duration-200 overflow-hidden">
+                      <div className="p-5">
+                        {/* Doctor avatar + name */}
+                        <div className="flex items-start gap-3 mb-4">
+                          <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center text-orange-600 font-bold text-sm flex-shrink-0 border border-orange-100 group-hover:scale-105 transition-transform">
+                            {doctor.name?.charAt(0)?.toUpperCase()}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-bold text-gray-900 text-sm truncate">{doctor.name}</h3>
+                              {cls && <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${clsStyle}`}>{cls}</span>}
+                            </div>
+                            {doctor.specialization && <p className="text-xs text-orange-600 font-medium mt-0.5">{doctor.specialization}</p>}
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <h3 className="font-bold text-gray-800 text-sm truncate">{doctor.name}</h3>
-                          <p className="text-xs text-gray-400 truncate">{doctor.email}</p>
-                        </div>
-                      </div>
-                      <div className="space-y-1.5 text-xs">
-                        {doctor.specialization && (
-                          <div className="flex items-center gap-2">
-                            <span>🩺</span>
-                            <span className="text-gray-700 font-medium">{doctor.specialization}</span>
-                          </div>
-                        )}
-                        {doctor.hospital && (
-                          <div className="flex items-center gap-2">
-                            <span>🏥</span>
-                            <span className="text-gray-600">{doctor.hospital}</span>
-                          </div>
-                        )}
-                        {doctor.phone && (
-                          <div className="flex items-center gap-2">
-                            <span>📞</span>
-                            <span className="text-gray-600">{doctor.phone}</span>
-                          </div>
-                        )}
-                        {doctor.address && (
-                          <div className="flex items-center gap-2">
-                            <span>📍</span>
-                            <span className="text-gray-500 truncate">{doctor.address}</span>
-                          </div>
-                        )}
-                      </div>
 
-                      {/* Added by / Approved by */}
-                      {(doctor.added_by || doctor.approved_by) && (
-                        <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap gap-2">
-                          {doctor.added_by && (
-                            <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md font-medium">
-                              Added by: {doctor.added_by.name} ({doctor.added_by.role})
-                            </span>
+                        {/* Details */}
+                        <div className="space-y-2 text-xs">
+                          {doctor.hospital && (
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <span className="text-gray-400">🏥</span>
+                              <span className="truncate">{doctor.hospital}</span>
+                            </div>
                           )}
-                          {doctor.approved_by && (
-                            <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-md font-medium">
-                              Approved by: {doctor.approved_by.name}
-                            </span>
+                          {doctor.phone && (
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <span className="text-gray-400">📞</span>
+                              <span>{doctor.phone}</span>
+                            </div>
+                          )}
+                          {doctor.address && (
+                            <div className="flex items-center gap-2 text-gray-500">
+                              <span className="text-gray-400">📍</span>
+                              <span className="truncate">{doctor.address}</span>
+                            </div>
+                          )}
+                          {doctor.email && (
+                            <div className="flex items-center gap-2 text-gray-500">
+                              <span className="text-gray-400">✉️</span>
+                              <span className="truncate">{doctor.email}</span>
+                            </div>
                           )}
                         </div>
-                      )}
+
+                        {/* Footer badges */}
+                        <div className="mt-4 pt-3 border-t border-gray-50 flex flex-wrap gap-1.5">
+                          {doctor.added_by && (
+                            <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium border border-blue-100">
+                              Added: {doctor.added_by.name}
+                            </span>
+                          )}
+                          {doctor.is_active === false && (
+                            <span className="text-[10px] bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-medium border border-red-100">Inactive</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>
@@ -285,7 +291,7 @@ export default function MRDoctors() {
 
                       {/* Date */}
                       {req.created_at && (
-                        <p className="text-xs text-gray-400 mt-3">Requested: {new Date(req.created_at).toLocaleDateString()}</p>
+                        <p className="text-xs text-gray-400 mt-3">Requested: {formatISTDate(req.created_at)}</p>
                       )}
                     </div>
                   </div>

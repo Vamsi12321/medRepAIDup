@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
+import { formatISTDateTime } from "@/lib/time";
 import { get, post, del, put } from "@/lib/api";
 import { sessionExpired } from "@/lib/auth";
 
@@ -26,6 +27,26 @@ export default function AdminCommunications() {
   });
 
   const communications = data?.communications || [];
+
+  // Fetch MR list to resolve IDs to names in targeting
+  const { data: mrsListData } = useQuery({
+    queryKey: ["company-mrs"],
+    queryFn: () => get("/api/v1/mrs").then((r) => r.mrs || []),
+    staleTime: 10 * 60 * 1000,
+  });
+  const mrNameMap = (mrsListData || []).reduce((acc, m) => { acc[m.id || m._id] = m.name; return acc; }, {});
+
+  const resolveTargeting = (targeting) => {
+    if (!targeting) return "All MRs";
+    const parts = [];
+    if (targeting.zones?.length) parts.push(...targeting.zones);
+    if (targeting.states?.length) parts.push(...targeting.states);
+    if (targeting.territories?.length) parts.push(...targeting.territories);
+    if (targeting.specific_mrs?.length) {
+      parts.push(...targeting.specific_mrs.map((id) => mrNameMap[id] || id));
+    }
+    return parts.length > 0 ? parts.join(", ") : "All MRs";
+  };
 
   const createMutation = useMutation({
     mutationFn: (formData) => {
@@ -72,7 +93,7 @@ export default function AdminCommunications() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#fafbfd]">
       <CompanyNavbar />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-5">
         <Breadcrumb />
@@ -142,7 +163,7 @@ export default function AdminCommunications() {
                   <h3 className="font-bold text-gray-900 text-sm">{c.title}</h3>
                   <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
                     <span>By: {c.created_by_name || c.created_by || "Admin"}</span>
-                    {c.targeting && <span>Sent to: {Object.values(c.targeting).flat().filter(Boolean).join(", ") || "All MRs"}</span>}
+                    {c.targeting && <span>Sent to: {resolveTargeting(c.targeting)}</span>}
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2 flex-shrink-0">
@@ -585,6 +606,14 @@ function AdminCommDetailDrawer({ commId, onClose }) {
     staleTime: 30000,
   });
 
+  // Fetch MR list to resolve IDs to names
+  const { data: mrsData } = useQuery({
+    queryKey: ["company-mrs"],
+    queryFn: () => get("/api/v1/mrs").then((r) => r.mrs || []),
+    staleTime: 10 * 60 * 1000,
+  });
+  const mrNames = (mrsData || []).reduce((acc, m) => { acc[m.id || m._id] = m.name; return acc; }, {});
+
   const TYPE_STYLES = {
     announcement: { icon: "📢", bg: "bg-blue-100", text: "text-blue-700" },
     alert:        { icon: "🚨", bg: "bg-red-100",  text: "text-red-700" },
@@ -619,7 +648,7 @@ function AdminCommDetailDrawer({ commId, onClose }) {
                 {comm.priority}
               </span>
               <span className="text-purple-200 text-xs">
-                {comm.created_at ? new Date(comm.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : ""}
+                {comm.created_at ? formatISTDateTime(comm.created_at) : ""}
               </span>
               {comm.is_active === false && <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-red-500/30 text-white">Inactive</span>}
             </div>
@@ -660,8 +689,11 @@ function AdminCommDetailDrawer({ commId, onClose }) {
                     {comm.targeting.zones?.map((z) => <span key={z} className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-xs font-semibold">Zone: {z}</span>)}
                     {comm.targeting.states?.map((s) => <span key={s} className="bg-green-100 text-green-700 px-2 py-0.5 rounded-md text-xs font-semibold">State: {s}</span>)}
                     {comm.targeting.territories?.map((t) => <span key={t} className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-md text-xs font-semibold">Territory: {t}</span>)}
-                    {comm.targeting.specific_mrs?.map((m) => <span key={m} className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-md text-xs font-semibold">MR: {m}</span>)}
-                    {Object.values(comm.targeting).every((arr) => arr.length === 0) && (
+                    {comm.targeting.specific_mrs?.map((m) => {
+                      const mrName = mrNames[m] || m;
+                      return <span key={m} className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-md text-xs font-semibold">MR: {mrName}</span>;
+                    })}
+                    {Object.values(comm.targeting).every((arr) => !arr || arr.length === 0) && (
                       <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-md text-xs font-semibold">All MRs</span>
                     )}
                   </div>

@@ -3,9 +3,11 @@ import { useState } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { get, post as apiPost } from "@/lib/api";
 import { Icons } from "@/components/network/Icons";
+import { useNetworkToast } from "@/app/doctor/network/layout";
 
 export default function DiscoverPage() {
   const queryClient = useQueryClient();
+  const { showToast } = useNetworkToast();
   const [search, setSearch]   = useState("");
   const [roleFilter, setRole] = useState("");
   const [page, setPage]       = useState(1);
@@ -32,11 +34,13 @@ export default function DiscoverPage() {
 
   const connectMutation = useMutation({
     mutationFn: (uid) => apiPost("/api/v1/network/connections/request/" + uid, {}),
-    onSuccess: invalidateAll,
+    onSuccess: () => { invalidateAll(); showToast("Connection request sent!"); },
+    onError: (err) => showToast(err.message || "Failed to send request", "error"),
   });
   const blockMutation = useMutation({
     mutationFn: (uid) => apiPost("/api/v1/network/connections/" + uid + "/block", {}),
-    onSuccess: invalidateAll,
+    onSuccess: () => { invalidateAll(); showToast("User blocked."); },
+    onError: (err) => showToast(err.message || "Failed to block user", "error"),
   });
 
   return (

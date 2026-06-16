@@ -7,6 +7,7 @@ import Toast from "@/components/Toast";
 import { get, put, post, del } from "@/lib/api";
 import { TableSkeleton } from "@/components/Skeleton";
 import { downloadCSVTemplate } from "@/lib/downloadTemplate";
+import LocationMapPicker from "@/components/LocationMapPicker";
 
 const DOCTOR_HEADERS = ["name","email","phone","specialization","classification","hospital","license_number","address"];
 const DOCTOR_SAMPLE  = [["Dr. Sarah Sharma","sharma@gmail.com","+919876543210","Cardiologist","A","City Hospital","MH12345","123 Medical Street, Mumbai"]];
@@ -149,14 +150,23 @@ export default function CompanyDoctors() {
   const [filterStatus, setFilterStatus]                 = useState("all");
   const [filterSpecialization, setFilterSpecialization] = useState("");
 
-  const { data, isLoading ,refetch} = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["doctors"],
-    queryFn:  () => get("/api/v1/doctors?page_size=1000").then((d) => d.doctors || []),
+    queryFn: () => get("/api/v1/doctors?page_size=1000").then((d) => {
+      if (Array.isArray(d)) return d;
+      if (Array.isArray(d?.doctors)) return d.doctors;
+      if (Array.isArray(d?.data)) return d.data;
+      return [];
+    }),
+    gcTime: 30 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    placeholderData: (prev) => prev,
+    retry: 2,
   });
 
-  const doctors = data || [];
+  const doctors = Array.isArray(data) ? data : [];
   const total   = doctors.length;
-  const loading = isLoading;
+  const loading = isLoading && !data;
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["doctors"] });
 
@@ -202,92 +212,88 @@ export default function CompanyDoctors() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50 overflow-x-hidden">
+    <div className="min-h-screen bg-[#fafbfd] overflow-x-hidden">
       <CompanyNavbar />
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Breadcrumb />
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Doctors Management 👨‍⚕️</h1>
-            <p className="text-gray-600 text-sm">Manage healthcare professionals on your platform</p>
+            <h1 className="text-2xl font-extrabold text-gray-900">Doctors</h1>
+            <p className="text-gray-400 text-sm mt-0.5">Manage healthcare professionals · {total} total</p>
           </div>
           <div className="flex gap-2">
             <button onClick={() => setShowRequests(true)}
-              className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-3 py-2 rounded-xl font-bold shadow hover:shadow-md transition-all flex items-center gap-1.5 text-xs">
+              className="bg-white text-gray-700 border border-gray-200 px-4 py-2.5 rounded-xl font-bold hover:border-amber-300 hover:text-amber-600 transition-all flex items-center gap-1.5 text-xs">
               <span>📋</span><span>Requests</span>
             </button>
             <button onClick={() => setShowBulkModal(true)}
-              className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-2 rounded-xl font-bold shadow hover:shadow-md transition-all flex items-center gap-1.5 text-xs">
+              className="bg-white text-gray-700 border border-gray-200 px-4 py-2.5 rounded-xl font-bold hover:border-purple-300 hover:text-purple-600 transition-all flex items-center gap-1.5 text-xs">
               <span>📤</span><span>Bulk Upload</span>
             </button>
             <button onClick={() => { setSelectedDoctor(null); setShowModal(true); }}
-              className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-2 rounded-xl font-bold shadow hover:shadow-md transition-all flex items-center gap-1.5 text-xs">
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-1.5 text-xs">
               <span>➕</span><span>Add Doctor</span>
             </button>
           </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-3 gap-4 mb-6">
           {[
-            { label: "Total Doctors", value: total, icon: "👨‍⚕️", color: "from-blue-500 to-indigo-600", text: "from-blue-600 to-indigo-600" },
-            { label: "Active", value: activeCount, icon: "✅", color: "from-green-500 to-emerald-600", text: "from-green-600 to-emerald-600" },
-            { label: "Inactive", value: total - activeCount, icon: "⏸️", color: "from-gray-400 to-gray-500", text: "from-gray-500 to-gray-600" },
+            { label: "Total", value: total, accent: "border-l-purple-400" },
+            { label: "Active", value: activeCount, accent: "border-l-emerald-400" },
+            { label: "Inactive", value: total - activeCount, accent: "border-l-gray-300" },
           ].map((s) => (
-            <div key={s.label} className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100">
-              <div className={`w-10 h-10 bg-gradient-to-br ${s.color} rounded-xl flex items-center justify-center text-xl mb-3 shadow`}>{s.icon}</div>
-              <p className={`text-3xl font-bold bg-gradient-to-r ${s.text} bg-clip-text text-transparent`}>{s.value}</p>
-              <p className="text-gray-600 font-semibold text-sm">{s.label}</p>
+            <div key={s.label} className={`bg-white rounded-xl p-4 border border-gray-100 border-l-4 ${s.accent} shadow-sm`}>
+              <p className="text-2xl font-extrabold text-gray-900">{s.value}</p>
+              <p className="text-[11px] text-gray-400 font-medium">{s.label}</p>
             </div>
           ))}
         </div>
 
         {/* Search + Filters */}
-        <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-100 mb-6 flex flex-wrap gap-3">
-          <input
-            type="text"
-            placeholder="🔍 Search by name, email, hospital or specialization..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 min-w-[220px] px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-200 focus:border-purple-500 text-sm transition-all"
-          />
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-200 focus:border-purple-500 text-sm bg-white font-semibold text-gray-700"
-          >
+        <div className="flex flex-wrap gap-3 mb-6">
+          <input type="text" placeholder="Search by name, email, hospital..."
+            value={search} onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 min-w-[220px] px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-200 focus:border-purple-300 outline-none" />
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-700 focus:ring-2 focus:ring-purple-200 outline-none">
             <option value="all">All Status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
           {(filterStatus !== "all") && (
-            <button onClick={() => { setFilterStatus("all"); }}
-              className="px-4 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">
-              Clear
-            </button>
+            <button onClick={() => setFilterStatus("all")}
+              className="px-4 py-2.5 bg-gray-100 text-gray-500 rounded-xl text-xs font-bold hover:bg-gray-200">Clear</button>
           )}
         </div>
 
         {/* Table / Cards */}
         {loading ? (
           <div className="space-y-2">{[1,2,3,4,5].map((i) => <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
+            <p className="text-red-600 font-bold text-sm mb-2">Failed to load doctors</p>
+            <p className="text-red-400 text-xs mb-4">{error.message}</p>
+            <button onClick={() => refetch()} className="bg-red-500 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-600">Retry</button>
+          </div>
         ) : (
           <>
             {/* Desktop table */}
-            <div className="hidden md:block bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
+                  <thead className="bg-gray-50 border-b border-gray-100">
                     <tr>
-                      <th className="px-4 py-3 text-left font-bold text-xs">Doctor</th>
-                      <th className="px-4 py-3 text-left font-bold text-xs">Specialization</th>
-                      <th className="px-4 py-3 text-left font-bold text-xs">Class</th>
-                      <th className="px-4 py-3 text-left font-bold text-xs">Hospital</th>
-                      <th className="px-4 py-3 text-left font-bold text-xs">Added By</th>
+                      <th className="px-4 py-3 text-left font-bold text-[10px] text-gray-500 uppercase tracking-wider">Doctor</th>
+                      <th className="px-4 py-3 text-left font-bold text-[10px] text-gray-500 uppercase tracking-wider">Specialization</th>
+                      <th className="px-4 py-3 text-left font-bold text-[10px] text-gray-500 uppercase tracking-wider">Class</th>
+                      <th className="px-4 py-3 text-left font-bold text-[10px] text-gray-500 uppercase tracking-wider">Hospital</th>
+                      <th className="px-4 py-3 text-left font-bold text-[10px] text-gray-500 uppercase tracking-wider">Added By</th>
                       <th className="px-4 py-3 text-left font-bold text-xs">Status</th>
                       <th className="px-4 py-3 text-center font-bold text-xs">Actions</th>
                     </tr>
@@ -443,6 +449,8 @@ function DoctorModal({ doctor, onClose, onSaved }) {
     hospital:       doctor?.hospital       || "",
     license_number: doctor?.license_number || "",
     address:        doctor?.address        || "",
+    latitude:       doctor?.latitude       || "",
+    longitude:      doctor?.longitude      || "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -461,6 +469,8 @@ function DoctorModal({ doctor, onClose, onSaved }) {
           hospital:       form.hospital,
           license_number: form.license_number,
           address:        form.address,
+          ...(form.latitude  && { latitude:  parseFloat(form.latitude)  }),
+          ...(form.longitude && { longitude: parseFloat(form.longitude) }),
         };
         await put(`/api/v1/doctors/${doctor.id}`, body);
       } else {
@@ -474,6 +484,8 @@ function DoctorModal({ doctor, onClose, onSaved }) {
           hospital:       form.hospital,
           license_number: form.license_number,
           address:        form.address,
+          ...(form.latitude  && { latitude:  parseFloat(form.latitude)  }),
+          ...(form.longitude && { longitude: parseFloat(form.longitude) }),
         };
         await post(`/api/v1/doctors`, body);
       }
@@ -541,7 +553,20 @@ function DoctorModal({ doctor, onClose, onSaved }) {
             </div>
             {field("Hospital", "hospital", "text", "City Hospital")}
             {field("License Number", "license_number", "text", "MH12345")}
-            {field("Address", "address", "text", "123 Medical Street, Mumbai")}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                Location / Address
+                <span className="ml-2 text-[10px] text-purple-500 font-normal">Search, drop pin, or use GPS</span>
+              </label>
+              <LocationMapPicker
+                value={form.address}
+                lat={form.latitude}
+                lng={form.longitude}
+                onChange={({ address, latitude, longitude }) =>
+                  setForm((f) => ({ ...f, address, latitude: String(latitude), longitude: String(longitude) }))
+                }
+              />
+            </div>
           </div>
 
           <div className="flex space-x-3 pt-2">

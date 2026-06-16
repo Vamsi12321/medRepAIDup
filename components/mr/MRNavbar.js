@@ -1,8 +1,8 @@
-﻿"use client";
+"use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { logout } from "@/lib/auth";
 import { get } from "@/lib/api";
 import NotificationBell from "@/components/NotificationBell";
@@ -11,6 +11,8 @@ const PAGE_TITLES = {
   "/mr/dashboard":      { title: "Dashboard",      icon: "🏠", sub: "Your overview" },
   "/mr/doctors":        { title: "My Doctors",     icon: "🩺", sub: "Manage your doctor list" },
   "/mr/visits":         { title: "Visits",         icon: "📅", sub: "Track your visits" },
+  "/mr/dcr":            { title: "DCR",            icon: "📋", sub: "Daily Call Report" },
+  "/mr/sfe":            { title: "SFE",            icon: "📊", sub: "Sales force effectiveness" },
   "/mr/drug-search":    { title: "Drug Search",    icon: "🔍", sub: "Search & analyze drugs" },
   "/mr/announcements":  { title: "Comms Center",   icon: "📢", sub: "Company communications" },
   "/mr/grievance":      { title: "Grievance",      icon: "📝", sub: "Raise & track tickets" },
@@ -22,11 +24,32 @@ export default function MRNavbar() {
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const mrId = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+  const prefetchOnHover = (path) => {
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+    if (path === "/mr/dashboard") {
+      queryClient.prefetchQuery({ queryKey: ["mr-dashboard"], queryFn: () => get("/api/v1/dashboard"), staleTime: 2 * 60 * 1000 });
+    } else if (path === "/mr/doctors") {
+      queryClient.prefetchQuery({ queryKey: ["mr-doctors"], queryFn: () => get("/api/v1/doctors"), staleTime: 5 * 60 * 1000 });
+    } else if (path === "/mr/visits") {
+      queryClient.prefetchQuery({ queryKey: ["visits", mrId, "", "", ""], queryFn: () => get("/api/v1/visits"), staleTime: 0 });
+    } else if (path === "/mr/sfe") {
+      queryClient.prefetchQuery({ queryKey: ["sfe-mcr", month, year], queryFn: () => get("/api/v1/sfe/mcr", { month, year }), staleTime: 5 * 60 * 1000 });
+    } else if (path === "/mr/announcements") {
+      queryClient.prefetchQuery({ queryKey: ["communications"], queryFn: () => get("/api/v1/communications"), staleTime: 2 * 60 * 1000 });
+    }
+  };
 
   const navItems = [
     { name: "Dashboard",     path: "/mr/dashboard",     icon: "🏠" },
     { name: "My Doctors",    path: "/mr/doctors",       icon: "🩺" },
     { name: "Visits",        path: "/mr/visits",        icon: "📅" },
+    { name: "DCR",           path: "/mr/dcr",           icon: "📋" },
+    { name: "SFE",           path: "/mr/sfe",           icon: "📊" },
     { name: "Drug Search",   path: "/mr/drug-search",   icon: "🔍" },
     { name: "Comms",         path: "/mr/announcements", icon: "📢" },
     { name: "Grievance",     path: "/mr/grievance",     icon: "📝" },
@@ -81,6 +104,7 @@ export default function MRNavbar() {
                 <Link
                   key={item.path}
                   href={item.path}
+                  onMouseEnter={() => prefetchOnHover(item.path)}
                   className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
                     pathname === item.path
                       ? "bg-gradient-to-r from-orange-600 to-red-600 text-white shadow"
