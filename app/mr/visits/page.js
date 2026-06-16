@@ -94,7 +94,19 @@ export default function MRVisits() {
   };
 
   // Actions
-  const handleCheckIn = async (visitId) => {
+  const handleCheckIn = async (visitId, scheduledDate) => {
+    // Only allow check-in on the scheduled date
+    const todayStr = new Date().toISOString().split("T")[0];
+    if (scheduledDate && scheduledDate !== todayStr) {
+      const scheduled = new Date(scheduledDate + "T00:00:00");
+      const today     = new Date(todayStr + "T00:00:00");
+      if (scheduled > today) {
+        alert(`This visit is scheduled for ${scheduledDate}. You can only check in on the day of the visit.`);
+      } else {
+        alert(`This visit was scheduled for ${scheduledDate}. You can no longer check in — the scheduled date has passed.`);
+      }
+      return;
+    }
     setActionLoading(visitId);
     try {
       const gps = await getGPS();
@@ -149,6 +161,26 @@ export default function MRVisits() {
   const handleReport = async (visitId, reportData) => {
     try {
       await put(`/api/v1/visits/${visitId}/report`, reportData);
+
+      // Auto-schedule follow-up visit if a follow_up_date was provided
+      if (reportData.follow_up_date) {
+        const visit = visits.find((v) => v.id === visitId);
+        if (visit) {
+          try {
+            await post("/api/v1/visits", {
+              doctor_id: visit.doctor_id,
+              scheduled_date: reportData.follow_up_date,
+              scheduled_time: visit.scheduled_time || "09:00",
+              purpose: "Follow-up",
+              location: visit.location || "",
+              notes: `Auto-scheduled follow-up from visit on ${visit.scheduled_date}`,
+            });
+          } catch {
+            // Follow-up scheduling failure is non-critical — don't block the report submission
+          }
+        }
+      }
+
       invalidateAll();
       setShowReportForm(null);
     } catch (err) {
@@ -169,6 +201,7 @@ export default function MRVisits() {
   const upcoming = visits.filter((v) => v.status === "scheduled" || v.status === "checked_in" || v.status === "checked_out");
   const history = visits.filter((v) => v.status === "completed" || v.status === "cancelled");
   const filteredHistory = historyFilter === "all" ? history : history.filter((v) => v.status === historyFilter);
+
   const displayed = activeTab === "upcoming" ? upcoming : filteredHistory;
 
   const canCheckIn = !activeVisit && pendingReports < 2;
@@ -308,7 +341,7 @@ export default function MRVisits() {
                 visit={visit}
                 canCheckIn={canCheckIn}
                 actionLoading={actionLoading}
-                onCheckIn={() => handleCheckIn(visit.id)}
+                onCheckIn={() => handleCheckIn(visit.id, visit.scheduled_date)}
                 onCheckOut={() => handleCheckOut(visit.id)}
                 onCancelCheckIn={(reason) => handleCancelCheckIn(visit.id, reason)}
                 onCancel={(reason) => handleCancel(visit.id, reason)}
@@ -391,135 +424,162 @@ function VisitCard({ visit, canCheckIn, actionLoading, onCheckIn, onCheckOut, on
   const [cancelReason, setCancelReason] = useState("");
   const [showCancelCheckin, setShowCancelCheckin] = useState(false);
   const [cancelCheckinReason, setCancelCheckinReason] = useState("");
+  const [expanded, setExpanded] = useState(false);
 
   const s = STATUS_STYLES[visit.status] || STATUS_STYLES.scheduled;
+  const report = visit.report || {};
+  const isCompleted = visit.status === "completed";
+  const isCancelled = visit.status === "cancelled";
+
+  // Score color based on mood/outcome
+  const moodColor = report.doctor_mood === "positive" ? "bg-orange-100 text-orange-600" :
+                    report.doctor_mood === "negative" ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-500";
 
   return (
-    <div className={`bg-white rounded-2xl p-5 shadow-sm border transition-all ${
-      visit.status === "checked_in" ? "border-amber-200 bg-amber-50/30" :
-      visit.status === "checked_out" ? "border-purple-200 bg-purple-50/20" :
-      "border-gray-100 hover:shadow-md"
+    <div className={`bg-white rounded-2xl border transition-all hover:shadow-md overflow-hidden ${
+      visit.status === "checked_in" ? "border-amber-200" :
+      visit.status === "checked_out" ? "border-purple-200" :
+      isCancelled ? "border-red-100 opacity-75" :
+      "border-gray-100"
     }`}>
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <h3 className="font-bold text-gray-800 text-sm">{visit.doctor_name}</h3>
-          <p className="text-xs text-gray-400 mt-0.5">{visit.purpose} · {visit.location || "—"}</p>
+      {/* Main row */}
+      <div className="flex items-center gap-4 p-4">
+        {/* Left: Doctor info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-bold text-gray-900 text-sm truncate">{visit.doctor_name}</h3>
+            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold flex-shrink-0 ${s.color || `${s.bg} ${s.text}`}`}>{s.label}</span>
+          </div>
+          <p className="text-xs text-gray-400">{visit.purpose}{visit.location ? ` · ${visit.location}` : ""}</p>
+          <div className="flex items-center gap-2 mt-1.5 text-[10px] text-gray-500 flex-wrap">
+            <span className="bg-gray-50 border border-gray-100 px-2 py-0.5 rounded">📅 {visit.scheduled_date}</span>
+            <span className="bg-gray-50 border border-gray-100 px-2 py-0.5 rounded">⏰ {to12h(visit.scheduled_time)}</span>
+            {visit.duration_minutes > 0 && <span className="bg-gray-50 border border-gray-100 px-2 py-0.5 rounded">⏱️ {visit.duration_minutes}m</span>}
+          </div>
         </div>
-        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${s.bg} ${s.text}`}>{s.label}</span>
-      </div>
 
-      <div className="flex flex-wrap gap-2 mb-3 text-xs">
-        <span className="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg font-medium">📅 {visit.scheduled_date}</span>
-        <span className="bg-orange-50 text-orange-700 px-2.5 py-1 rounded-lg font-medium">⏰ {to12h(visit.scheduled_time)}</span>
-        {visit.duration_minutes > 0 && <span className="bg-green-50 text-green-700 px-2.5 py-1 rounded-lg font-medium">⏱️ {visit.duration_minutes} min</span>}
-      </div>
+        {/* Middle: Report summary (if completed) */}
+        {isCompleted && report.outcome && (
+          <div className="hidden sm:flex flex-col items-start gap-1 min-w-[140px] max-w-[200px]">
+            <p className="text-[10px] text-gray-400 font-medium">Outcome</p>
+            <p className="text-[11px] text-gray-700 font-medium line-clamp-2">{report.outcome}</p>
+            {report.samples_given > 0 && (
+              <p className="text-[10px] text-gray-500">{report.samples_given} samples · {report.rx_commitment ? "✅ Rx committed" : "No commitment"}</p>
+            )}
+          </div>
+        )}
 
-      {/* Completed visit report summary */}
-      {visit.status === "completed" && visit.report && (
-        <div className="bg-green-50 rounded-lg p-2.5 mb-3 text-xs border border-green-100 space-y-1">
-          {visit.report.outcome && <p><span className="font-semibold text-green-700">Outcome:</span> {visit.report.outcome}</p>}
-          {visit.report.doctor_mood && <p><span className="font-semibold text-green-700">Mood:</span> {visit.report.doctor_mood === "positive" ? "😊 Positive" : visit.report.doctor_mood === "negative" ? "😞 Negative" : "😐 Neutral"}</p>}
-          {(visit.report.products_discussed || []).length > 0 && (
-            <p><span className="font-semibold text-green-700">Products:</span> {visit.report.products_discussed.map((p) => typeof p === "string" ? p : p.name).join(", ")}</p>
+        {/* Right: Actions */}
+        <div className="flex flex-col gap-1.5 flex-shrink-0">
+          {visit.status === "scheduled" && (
+            <>
+              {(() => {
+                const todayStr = new Date().toISOString().split("T")[0];
+                const isToday  = !visit.scheduled_date || visit.scheduled_date === todayStr;
+                const isPast   = visit.scheduled_date && visit.scheduled_date < todayStr;
+                const isFuture = visit.scheduled_date && visit.scheduled_date > todayStr;
+                return (
+                  <div className="flex flex-col gap-1">
+                    <button onClick={onCheckIn}
+                      disabled={!canCheckIn || actionLoading === visit.id || !isToday}
+                      title={isFuture ? `Scheduled for ${visit.scheduled_date} — check in on that day` : isPast ? `Missed — scheduled date ${visit.scheduled_date} has passed` : ""}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-[11px] shadow-sm transition-all disabled:opacity-40 whitespace-nowrap">
+                      {actionLoading === visit.id ? "..." : "📍 Check In"}
+                    </button>
+                    {isFuture && <p className="text-[9px] text-blue-500 font-medium text-center">Scheduled: {visit.scheduled_date}</p>}
+                    {isPast   && <p className="text-[9px] text-red-400 font-medium text-center">Date passed</p>}
+                  </div>
+                );
+              })()}
+              <div className="flex gap-1">
+                <button onClick={onReschedule} className="flex-1 bg-blue-50 text-blue-600 px-2.5 py-1.5 rounded-lg font-bold text-[10px] hover:bg-blue-100 transition-all text-center">Reschedule</button>
+                <button onClick={() => setShowCancelReason(true)} className="flex-1 bg-red-50 text-red-500 px-2.5 py-1.5 rounded-lg font-bold text-[10px] hover:bg-red-100 transition-all text-center">Cancel</button>
+              </div>
+            </>
           )}
-          {visit.report.samples_given > 0 && <p><span className="font-semibold text-green-700">Samples:</span> {visit.report.samples_given}</p>}
-          {visit.report.rx_commitment && <p><span className="font-semibold text-green-700">Rx Commitment:</span> Yes{visit.report.expected_rx_per_month ? ` (${visit.report.expected_rx_per_month}/mo)` : ""}</p>}
-          {visit.report.competitor_info && <p><span className="font-semibold text-green-700">Competitor:</span> {visit.report.competitor_info}</p>}
-          {visit.report.follow_up_date && <p><span className="font-semibold text-green-700">Follow-up:</span> {formatISTDate(visit.report.follow_up_date)}</p>}
-          {visit.report.notes && <p><span className="font-semibold text-green-700">Notes:</span> {visit.report.notes}</p>}
+          {visit.status === "checked_in" && (
+            <>
+              <button onClick={onCheckOut} disabled={actionLoading === visit.id}
+                className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl font-bold text-[11px] shadow-sm transition-all disabled:opacity-50 whitespace-nowrap">
+                {actionLoading === visit.id ? "..." : "🚪 Check Out"}
+              </button>
+              <button onClick={() => setShowCancelCheckin(true)} className="bg-gray-50 text-gray-600 px-2.5 py-1.5 rounded-lg font-bold text-[10px] hover:bg-gray-100 border border-gray-200 transition-all text-center">Cancel Check-in</button>
+            </>
+          )}
+          {visit.status === "checked_out" && (
+            <button onClick={onReport} className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-bold text-[11px] shadow-sm transition-all whitespace-nowrap">📋 Submit Report</button>
+          )}
+          {(isCompleted || isCancelled) && (
+            <button onClick={() => setExpanded(!expanded)} className="bg-gray-50 hover:bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg font-bold text-[10px] border border-gray-200 transition-all text-center">
+              {expanded ? "▲ Less" : "▼ Details"}
+            </button>
+          )}
         </div>
-      )}
-
-      {/* Check-in/Check-out GPS info */}
-      {visit.status === "completed" && (visit.check_in || visit.check_out) && (
-        <div className="bg-blue-50 rounded-lg p-2.5 mb-3 text-xs border border-blue-100 flex flex-wrap gap-3">
-          {visit.check_in && (() => {
-            const s = String(visit.check_in.timestamp);
-            const d = s.endsWith("Z") || s.includes("+") ? new Date(s) : new Date(s + "Z");
-            const t = !isNaN(d) ? d.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: true }) : "—";
-            return <span className="text-blue-700">📍 In: {t}</span>;
-          })()}
-          {visit.check_out && (() => {
-            const s = String(visit.check_out.timestamp);
-            const d = s.endsWith("Z") || s.includes("+") ? new Date(s) : new Date(s + "Z");
-            const t = !isNaN(d) ? d.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: true }) : "—";
-            return <span className="text-blue-700">🏁 Out: {t}</span>;
-          })()}
-          {visit.duration_minutes > 0 && <span className="text-blue-700">⏱️ {visit.duration_minutes} min</span>}
-        </div>
-      )}
-
-      {/* Cancelled reason */}
-      {visit.status === "cancelled" && visit.cancel_reason && (
-        <div className="bg-red-50 rounded-lg p-2.5 mb-3 text-xs text-red-600 border border-red-100">
-          <span className="font-semibold">Reason:</span> {visit.cancel_reason}
-        </div>
-      )}
-
-      {/* Action buttons based on status */}
-      <div className="flex flex-wrap gap-2">
-        {visit.status === "scheduled" && (
-          <>
-            <button onClick={onCheckIn} disabled={!canCheckIn || actionLoading === visit.id}
-              className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm hover:shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-              {actionLoading === visit.id ? "Getting GPS..." : "📍 Check In"}
-            </button>
-            <button onClick={onReschedule}
-              className="bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-blue-100 border border-blue-100 transition-all">
-              Reschedule
-            </button>
-            <button onClick={() => setShowCancelReason(true)}
-              className="bg-red-50 text-red-600 px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-red-100 border border-red-100 transition-all">
-              Cancel
-            </button>
-          </>
-        )}
-
-        {visit.status === "checked_in" && (
-          <>
-            <button onClick={onCheckOut} disabled={actionLoading === visit.id}
-              className="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm hover:shadow-md transition-all disabled:opacity-50">
-              {actionLoading === visit.id ? "Getting GPS..." : "🚪 Check Out"}
-            </button>
-            <button onClick={() => setShowCancelCheckin(true)}
-              className="bg-gray-50 text-gray-600 px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-gray-100 border border-gray-200 transition-all">
-              Cancel Check-in
-            </button>
-          </>
-        )}
-
-        {visit.status === "checked_out" && (
-          <button onClick={onReport}
-            className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm hover:shadow-md transition-all">
-            📋 Submit Report
-          </button>
-        )}
       </div>
 
-      {/* Cancel visit reason input */}
+      {/* Expanded details */}
+      {expanded && (
+        <div className="border-t border-gray-100 p-4 bg-gray-50/50 animate-[fadeSlide_0.2s_ease-out]">
+          {isCompleted && report && Object.keys(report).length > 0 && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {report.doctor_mood && (
+                  <div className="bg-white rounded-lg px-2.5 py-2 border border-gray-100">
+                    <p className="text-[9px] text-gray-400 uppercase">Mood</p>
+                    <p className="text-xs font-bold">{report.doctor_mood === "positive" ? "😊 Positive" : report.doctor_mood === "negative" ? "😞 Negative" : "😐 Neutral"}</p>
+                  </div>
+                )}
+                {report.samples_given != null && (
+                  <div className="bg-white rounded-lg px-2.5 py-2 border border-gray-100">
+                    <p className="text-[9px] text-gray-400 uppercase">Samples</p>
+                    <p className="text-xs font-bold">{report.samples_given}</p>
+                  </div>
+                )}
+                {report.rx_commitment != null && (
+                  <div className="bg-white rounded-lg px-2.5 py-2 border border-gray-100">
+                    <p className="text-[9px] text-gray-400 uppercase">Rx</p>
+                    <p className={`text-xs font-bold ${report.rx_commitment ? "text-emerald-600" : "text-gray-500"}`}>{report.rx_commitment ? `Yes (${report.expected_rx_per_month || "—"}/month)` : "No"}</p>
+                  </div>
+                )}
+                {report.competitor_info && (
+                  <div className="bg-white rounded-lg px-2.5 py-2 border border-red-100">
+                    <p className="text-[9px] text-red-400 uppercase">Competitor</p>
+                    <p className="text-xs font-bold text-red-600">{report.competitor_info}</p>
+                  </div>
+                )}
+              </div>
+              {(visit.check_in || visit.check_out) && (
+                <div className="flex gap-3 text-[10px] text-blue-700">
+                  {visit.check_in && (() => { const ts = String(visit.check_in.timestamp); const d = ts.endsWith("Z") || ts.includes("+") ? new Date(ts) : new Date(ts + "Z"); return <span>📍 In: {!isNaN(d) ? d.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: true }) : "—"}</span>; })()}
+                  {visit.check_out && (() => { const ts = String(visit.check_out.timestamp); const d = ts.endsWith("Z") || ts.includes("+") ? new Date(ts) : new Date(ts + "Z"); return <span>🏁 Out: {!isNaN(d) ? d.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: true }) : "—"}</span>; })()}
+                </div>
+              )}
+              {report.outcome && <div className="bg-white rounded-lg px-3 py-2 border-l-3 border-l-indigo-300 border border-gray-100"><p className="text-[9px] text-gray-400">Outcome</p><p className="text-xs text-gray-700">{report.outcome}</p></div>}
+              {report.notes && <div className="bg-white rounded-lg px-3 py-2 border border-gray-100"><p className="text-[9px] text-gray-400">Notes</p><p className="text-xs text-gray-600 italic">{report.notes}</p></div>}
+            </div>
+          )}
+          {isCancelled && visit.cancel_reason && (
+            <p className="text-xs text-red-600"><span className="font-semibold">Reason:</span> {visit.cancel_reason}</p>
+          )}
+        </div>
+      )}
+
+      {/* Cancel reason inputs */}
       {showCancelReason && (
-        <div className="mt-3 bg-red-50 rounded-xl p-3 border border-red-100 space-y-2">
-          <input type="text" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)}
-            placeholder="Reason for cancellation..."
-            className="w-full px-3 py-2 border border-red-200 rounded-lg text-xs outline-none" />
+        <div className="mx-4 mb-4 bg-red-50 rounded-xl p-3 border border-red-100 space-y-2">
+          <input type="text" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Reason for cancellation..." className="w-full px-3 py-2 border border-red-200 rounded-lg text-xs outline-none" />
           <div className="flex gap-2">
             <button onClick={() => setShowCancelReason(false)} className="flex-1 bg-gray-100 text-gray-600 py-1.5 rounded-lg text-xs font-semibold">Back</button>
-            <button onClick={() => { onCancel(cancelReason); setShowCancelReason(false); }} disabled={cancelReason.length < 5}
-              className="flex-1 bg-red-500 text-white py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50">Cancel Visit</button>
+            <button onClick={() => { onCancel(cancelReason); setShowCancelReason(false); }} disabled={cancelReason.length < 5} className="flex-1 bg-red-500 text-white py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50">Cancel Visit</button>
           </div>
         </div>
       )}
-
-      {/* Cancel check-in reason input */}
       {showCancelCheckin && (
-        <div className="mt-3 bg-amber-50 rounded-xl p-3 border border-amber-100 space-y-2">
-          <input type="text" value={cancelCheckinReason} onChange={(e) => setCancelCheckinReason(e.target.value)}
-            placeholder="Why cancel check-in? (e.g. Doctor unavailable)"
-            className="w-full px-3 py-2 border border-amber-200 rounded-lg text-xs outline-none" />
+        <div className="mx-4 mb-4 bg-amber-50 rounded-xl p-3 border border-amber-100 space-y-2">
+          <input type="text" value={cancelCheckinReason} onChange={(e) => setCancelCheckinReason(e.target.value)} placeholder="Why cancel check-in?" className="w-full px-3 py-2 border border-amber-200 rounded-lg text-xs outline-none" />
           <div className="flex gap-2">
             <button onClick={() => setShowCancelCheckin(false)} className="flex-1 bg-gray-100 text-gray-600 py-1.5 rounded-lg text-xs font-semibold">Back</button>
-            <button onClick={() => { onCancelCheckIn(cancelCheckinReason); setShowCancelCheckin(false); }} disabled={cancelCheckinReason.length < 5}
-              className="flex-1 bg-amber-500 text-white py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50">Cancel Check-in</button>
+            <button onClick={() => { onCancelCheckIn(cancelCheckinReason); setShowCancelCheckin(false); }} disabled={cancelCheckinReason.length < 5} className="flex-1 bg-amber-500 text-white py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50">Cancel Check-in</button>
           </div>
         </div>
       )}
@@ -536,6 +596,11 @@ function ScheduleForm({ assignedDoctors, onClose, onSubmit }) {
     e.preventDefault();
     if (!form.doctor_id || !form.scheduled_date || !form.scheduled_time || !form.purpose || !form.location) {
       setError("Doctor, date, time, purpose, and location are required");
+      return;
+    }
+    const todayStr = new Date().toISOString().split("T")[0];
+    if (form.scheduled_date < todayStr) {
+      setError("Cannot schedule a visit in the past. Please select today or a future date.");
       return;
     }
     onSubmit(form);
@@ -562,7 +627,15 @@ function ScheduleForm({ assignedDoctors, onClose, onSubmit }) {
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1">Date *</label>
               <input type="date" value={form.scheduled_date} min={new Date().toISOString().split("T")[0]}
-                onChange={(e) => setForm({ ...form, scheduled_date: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setForm({ ...form, scheduled_date: val });
+                  if (val && val < new Date().toISOString().split("T")[0]) {
+                    setError("Cannot schedule a visit in the past. Please select today or a future date.");
+                  } else {
+                    setError("");
+                  }
+                }}
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-300" />
             </div>
             <div>
@@ -756,6 +829,11 @@ function RescheduleForm({ visit, onClose, onSubmit }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.scheduled_date || !form.scheduled_time) return;
+    const todayStr = new Date().toISOString().split("T")[0];
+    if (form.scheduled_date < todayStr) {
+      alert("Cannot reschedule to a past date. Please select today or a future date.");
+      return;
+    }
     onSubmit(form);
   };
 

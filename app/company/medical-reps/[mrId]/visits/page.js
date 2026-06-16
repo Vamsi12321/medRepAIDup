@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
+import DoctorVisitStatusCard from "@/components/DoctorVisitStatusCard";
 import { get } from "@/lib/api";
 import { formatISTDate, formatISTDateTime } from "@/lib/time";
 
@@ -26,6 +27,7 @@ const to12h = (t) => {
 export default function AdminMRVisits() {
   const { mrId } = useParams();
   const [filterStatus, setFilterStatus] = useState("");
+  const [viewMode, setViewMode] = useState("visits"); // visits | doctors
 
   const { data: mrData } = useQuery({
     queryKey: ["mr-detail", mrId],
@@ -42,6 +44,50 @@ export default function AdminMRVisits() {
 
   const visits = visitsResponse?.visits || [];
   const filtered = filterStatus ? visits.filter((v) => v.status === filterStatus) : visits;
+
+  // Calculate doctor visit status
+  const getDoctorVisitStatus = () => {
+    const doctorMap = {};
+    const assignedDoctors = mrData?.assigned_doctors || [];
+    
+    // Initialize all assigned doctors
+    assignedDoctors.forEach((doc) => {
+      doctorMap[doc.id] = {
+        ...doc,
+        doctor_name: doc.name,
+        visit_count: 0,
+        visit_status: "never_visited",
+        last_visited: null,
+        target_visits: 3,
+      };
+    });
+
+    // Count visits per doctor
+    visits.filter((v) => v.status === "completed").forEach((v) => {
+      if (doctorMap[v.doctor_id]) {
+        doctorMap[v.doctor_id].visit_count += 1;
+        const visitDate = new Date(v.completed_at);
+        if (!doctorMap[v.doctor_id].last_visited || visitDate > new Date(doctorMap[v.doctor_id].last_visited)) {
+          doctorMap[v.doctor_id].last_visited = v.completed_at;
+        }
+      }
+    });
+
+    // Update status
+    Object.values(doctorMap).forEach((doc) => {
+      if (doc.visit_count > 0) {
+        doc.visit_status = "visited";
+      } else {
+        doc.visit_status = "never_visited";
+      }
+    });
+
+    return Object.values(doctorMap);
+  };
+
+  const allDoctorStatus = getDoctorVisitStatus();
+  const visitedDoctors = allDoctorStatus.filter((d) => d.visit_status === "visited");
+  const notVisitedDoctors = allDoctorStatus.filter((d) => d.visit_status === "never_visited");
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -66,6 +112,22 @@ export default function AdminMRVisits() {
 
         <h1 className="text-xl font-bold text-gray-900 mb-4">📅 Visit History — {mrData?.name || "MR"}</h1>
 
+        {/* View Mode Tabs */}
+        <div className="flex gap-2 mb-5 bg-white rounded-xl p-1.5 shadow-sm border border-gray-100 w-fit">
+          {[
+            { id: "visits", label: "📋 All Visits" },
+            { id: "doctors", label: "👨‍⚕️ Doctor Status" },
+          ].map((m) => (
+            <button
+              key={m.id}
+              onClick={() => setViewMode(m.id)}
+              className={`px-4 py-2 rounded-lg font-semibold text-xs transition-all ${viewMode === m.id ? "bg-indigo-600 text-white shadow" : "text-gray-600 hover:bg-gray-50"}`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
           {[
@@ -82,30 +144,81 @@ export default function AdminMRVisits() {
           ))}
         </div>
 
-        {/* Filter */}
-        <div className="flex gap-2 mb-4 flex-wrap">
-          {["", "scheduled", "checked_in", "checked_out", "completed", "cancelled"].map((st) => (
-            <button key={st} onClick={() => setFilterStatus(st)}
-              className={"px-3 py-1.5 rounded-lg text-xs font-semibold transition-all " + (filterStatus === st ? "bg-indigo-600 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50")}>
-              {st ? (STATUS_STYLES[st]?.label || st) : "All"}
-            </button>
-          ))}
-        </div>
+        {/* View content based on mode */}
+        {viewMode === "visits" ? (
+          <>
+            {/* Filter */}
+            <div className="flex gap-2 mb-4 flex-wrap">
+              {["", "scheduled", "checked_in", "checked_out", "completed", "cancelled"].map((st) => (
+                <button key={st} onClick={() => setFilterStatus(st)}
+                  className={"px-3 py-1.5 rounded-lg text-xs font-semibold transition-all " + (filterStatus === st ? "bg-indigo-600 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50")}>
+                  {st ? (STATUS_STYLES[st]?.label || st) : "All"}
+                </button>
+              ))}
+            </div>
 
-        {/* Visits List */}
-        {isLoading ? (
-          <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-32 bg-white rounded-2xl animate-pulse border border-gray-100" />)}</div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-100">
-            <span className="text-5xl">📅</span>
-            <p className="text-gray-500 mt-4 font-medium text-sm">No visits found</p>
-          </div>
+            {/* Visits List */}
+            {isLoading ? (
+              <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-32 bg-white rounded-2xl animate-pulse border border-gray-100" />)}</div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-100">
+                <span className="text-5xl">📅</span>
+                <p className="text-gray-500 mt-4 font-medium text-sm">No visits found</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filtered.map((visit) => (
+                  <AdminVisitCard key={visit.id} visit={visit} />
+                ))}
+              </div>
+            )}
+          </>
         ) : (
-          <div className="space-y-3">
-            {filtered.map((visit) => (
-              <AdminVisitCard key={visit.id} visit={visit} />
-            ))}
-          </div>
+          <>
+            {/* Doctor Status View */}
+            {isLoading ? (
+              <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-28 bg-white rounded-2xl animate-pulse border border-gray-100" />)}</div>
+            ) : (
+              <div className="space-y-5">
+                {/* Visited Doctors */}
+                {visitedDoctors.length > 0 && (
+                  <div>
+                    <p className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                      <span className="w-5 h-5 bg-emerald-100 rounded flex items-center justify-center text-[10px]">✅</span>
+                      Visited ({visitedDoctors.length})
+                    </p>
+                    <div className="space-y-3">
+                      {visitedDoctors.map((doc) => (
+                        <DoctorVisitStatusCard key={doc.id} doctor={doc} variant="admin" />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Not Visited Doctors */}
+                {notVisitedDoctors.length > 0 && (
+                  <div>
+                    <p className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                      <span className="w-5 h-5 bg-red-100 rounded flex items-center justify-center text-[10px]">❌</span>
+                      Not Visited ({notVisitedDoctors.length})
+                    </p>
+                    <div className="space-y-3">
+                      {notVisitedDoctors.map((doc) => (
+                        <DoctorVisitStatusCard key={doc.id} doctor={doc} variant="admin" />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {allDoctorStatus.length === 0 && (
+                  <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-100">
+                    <span className="text-5xl">👨‍⚕️</span>
+                    <p className="text-gray-500 mt-4 font-medium text-sm">No doctors assigned</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>
@@ -191,7 +304,7 @@ function AdminVisitCard({ visit }) {
                   <div className="bg-white rounded-lg px-2.5 py-1.5 border border-gray-100">
                     <p className="text-[10px] text-gray-400 font-medium">Rx Commitment</p>
                     <p className={"text-xs font-semibold " + (report.rx_commitment ? "text-green-700" : "text-gray-500")}>
-                      {report.rx_commitment ? `Yes (${report.expected_rx_per_month || "—"}/mo)` : "No"}
+                      {report.rx_commitment ? `Yes (${report.expected_rx_per_month || "—"}/month)` : "No"}
                     </p>
                   </div>
                 )}

@@ -109,7 +109,7 @@ export default function SFEPage() {
 
         {activeTab === "mcr"  && <MCRSection month={month} year={year} />}
         {activeTab === "mvc"  && <MVCSection month={month} year={year} />}
-        {activeTab === "rcpa" && <RCPASection month={month} year={year} />}
+        {activeTab === "rcpa" && <RCPASection month={month} year={year} assignedDrugs={mrInfo?.assigned_drugs || []} assignedDoctors={mrInfo?.assigned_doctors || []} />}
       </main>
     </div>
   );
@@ -159,6 +159,7 @@ function ErrorBox({ message }) {
 
 // ── MCR Section ───────────────────────────────────────────────────────────────
 function MCRSection({ month, year }) {
+  const [filterTab, setFilterTab] = useState("all");
   const { data, isLoading, error } = useQuery({
     queryKey: ["sfe-mcr", month, year],
     queryFn: () => get("/api/v1/sfe/mcr", { month, year }),
@@ -173,49 +174,62 @@ function MCRSection({ month, year }) {
   const pctBg = pct >= 90 ? "bg-emerald-500" : pct >= 75 ? "bg-orange-400" : "bg-red-500";
   const pctLabel = pct >= 90 ? "Excellent" : pct >= 75 ? "Good" : pct >= 60 ? "Needs Improvement" : "Critical";
 
+  const visited = s.visited || [];
+  const notVisited = s.not_visited || [];
+  
+  const displayed = filterTab === "all" ? [...visited, ...notVisited] : 
+                    filterTab === "visited" ? visited : 
+                    notVisited;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
       {/* Left: Doctor Details */}
       <div className="lg:col-span-2 space-y-4">
-        {/* Visited Doctors */}
-        {(s.visited || []).length > 0 && (
-          <div>
-            <p className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-              <span className="w-5 h-5 bg-emerald-100 rounded flex items-center justify-center text-[10px]">✅</span>
-              Visited ({s.visited.length})
-            </p>
-            <div className="space-y-2.5">
-              {s.visited.map((d, i) => (
-                <DoctorVisitCard key={i} doctor={d} />
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Filter Tabs */}
+        <div className="flex gap-2 bg-white rounded-xl p-1.5 shadow-sm border border-gray-100 w-fit sticky top-20 z-10">
+          {[
+            { id: "all", label: `📋 All (${visited.length + notVisited.length})` },
+            { id: "visited", label: `✅ Visited (${visited.length})` },
+            { id: "not-visited", label: `❌ Not Visited (${notVisited.length})` },
+          ].map((tab) => (
+            <button key={tab.id} onClick={() => setFilterTab(tab.id)}
+              className={`px-4 py-2 rounded-lg font-semibold text-xs transition-all whitespace-nowrap ${
+                filterTab === tab.id 
+                  ? "bg-orange-500 text-white shadow" 
+                  : "text-gray-600 hover:bg-gray-50"
+              }`}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-        {/* Not Visited Doctors */}
-        {(s.not_visited || []).length > 0 && (
-          <div>
-            <p className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-              <span className="w-5 h-5 bg-red-100 rounded flex items-center justify-center text-[10px]">❌</span>
-              Not Visited ({s.not_visited.length})
+        {/* Doctor cards */}
+        {displayed.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-gray-100">
+            <span className="text-4xl block mb-3">{filterTab === "visited" ? "✅" : "❌"}</span>
+            <p className="text-gray-500 font-medium text-sm">
+              {filterTab === "visited" ? "No visited doctors" : filterTab === "not-visited" ? "No unvisited doctors" : "No doctors"}
             </p>
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="divide-y divide-gray-50">
-                {s.not_visited.map((d, i) => (
-                  <div key={i} className="px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 bg-red-50 rounded-full flex items-center justify-center text-red-500 text-xs font-bold border border-red-100">{d.doctor_name?.charAt(0)}</div>
-                      <div>
-                        <p className="text-xs font-bold text-gray-800">{d.doctor_name}</p>
-                        <p className="text-[10px] text-gray-400">Last visited: {d.last_visited ? formatISTDate(d.last_visited) : "Never"}</p>
-                      </div>
-                    </div>
-                    <span className={"px-2 py-0.5 rounded-full font-bold text-[10px] border " + (d.classification === "A" ? "bg-red-50 text-red-600 border-red-100" : d.classification === "B" ? "bg-amber-50 text-amber-600 border-amber-100" : "bg-gray-50 text-gray-500 border-gray-200")}>{d.classification}</span>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {displayed.map((d, i) => (
+              filterTab === "not-visited" ? (
+                <div key={i} className="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50/50 transition-colors bg-white rounded-2xl border border-gray-100 shadow-sm">
+                  <div className="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center text-red-500 text-sm font-bold border border-red-100 flex-shrink-0">
+                    {d.doctor_name?.charAt(0)?.toUpperCase()}
                   </div>
-                ))}
-              </div>
-            </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-gray-900 truncate">{d.doctor_name}</p>
+                    <p className="text-[11px] text-gray-400">Last visited: {d.last_visited ? formatISTDate(d.last_visited) : "Never"}</p>
+                  </div>
+                  <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black border flex-shrink-0 ${d.classification === "A" ? "bg-red-50 text-red-600 border-red-200" : d.classification === "B" ? "bg-amber-50 text-amber-600 border-amber-200" : "bg-gray-50 text-gray-500 border-gray-200"}`}>{d.classification}</span>
+                </div>
+              ) : (
+                <DoctorVisitCard key={i} doctor={d} />
+              )
+            ))}
           </div>
         )}
       </div>
@@ -292,8 +306,8 @@ function DoctorVisitCard({ doctor }) {
       {/* Doctor Header */}
       <button onClick={() => setExpanded(!expanded)} className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center text-orange-600 text-sm font-bold border border-orange-100">
-            {d.doctor_name?.charAt(0)}
+          <div className="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center text-orange-600 text-sm font-bold border border-orange-100 flex-shrink-0">
+            {d.doctor_name?.charAt(0)?.toUpperCase()}
           </div>
           <div className="text-left">
             <p className="text-sm font-bold text-gray-900">{d.doctor_name}</p>
@@ -301,7 +315,7 @@ function DoctorVisitCard({ doctor }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className={"px-2 py-0.5 rounded-full font-bold text-[10px] border " + (d.classification === "A" ? "bg-red-50 text-red-600 border-red-100" : d.classification === "B" ? "bg-amber-50 text-amber-600 border-amber-100" : "bg-gray-50 text-gray-500 border-gray-200")}>{d.classification}</span>
+          <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black border flex-shrink-0 ${d.classification === "A" ? "bg-red-50 text-red-600 border-red-200" : d.classification === "B" ? "bg-amber-50 text-amber-600 border-amber-200" : "bg-gray-50 text-gray-500 border-gray-200"}`}>{d.classification}</span>
           <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-transform duration-200 ${expanded ? "bg-orange-100 rotate-180" : "bg-gray-100"}`}>
             <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
           </div>
@@ -364,7 +378,7 @@ function DoctorVisitCard({ doctor }) {
                   {v.rx_commitment != null && (
                     <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
                       <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider">Rx Commitment</p>
-                      <p className={"text-xs font-bold mt-0.5 " + (v.rx_commitment ? "text-emerald-700" : "text-gray-500")}>{v.rx_commitment ? `Yes (${v.expected_rx_per_month || "—"}/mo)` : "No"}</p>
+                      <p className={"text-xs font-bold mt-0.5 " + (v.rx_commitment ? "text-emerald-700" : "text-gray-500")}>{v.rx_commitment ? `Yes (${v.expected_rx_per_month || "—"}/month)` : "No"}</p>
                     </div>
                   )}
                   {v.follow_up_date && (
@@ -552,10 +566,10 @@ function MVCSection({ month, year }) {
 }
 
 // ── RCPA Section ──────────────────────────────────────────────────────────────
-function RCPASection({ month, year }) {
+function RCPASection({ month, year, assignedDrugs = [], assignedDoctors = [] }) {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ doctor_id: "", product_id: "", rx_per_week: "", confidence: "medium", visit_id: "" });
+  const [form, setForm] = useState({ doctor_id: "", product_id: "", rx_per_month: "", confidence: "medium", visit_id: "" });
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
 
@@ -564,24 +578,12 @@ function RCPASection({ month, year }) {
     queryFn: () => get("/api/v1/sfe/rcpa", { month, year }),
   });
 
-  const { data: doctors } = useQuery({
-    queryKey: ["mr-doctors-list"],
-    queryFn: () => get("/api/v1/doctors", { page_size: 500 }).then((r) => r.doctors || []),
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: products } = useQuery({
-    queryKey: ["products-list"],
-    queryFn: () => get("/api/v1/drugs", { page_size: 500 }).then((r) => r.drugs || r.products || r),
-    staleTime: 5 * 60 * 1000,
-  });
-
   const createMutation = useMutation({
     mutationFn: (body) => post("/api/v1/sfe/rcpa", body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sfe-rcpa"] });
       setShowForm(false);
-      setForm({ doctor_id: "", product_id: "", rx_per_week: "", confidence: "medium", visit_id: "" });
+      setForm({ doctor_id: "", product_id: "", rx_per_month: "", confidence: "medium", visit_id: "" });
     },
   });
 
@@ -595,14 +597,14 @@ function RCPASection({ month, year }) {
 
   const handleCreate = (e) => {
     e.preventDefault();
-    const body = { ...form, rx_per_week: parseInt(form.rx_per_week) };
+    const body = { ...form, rx_per_month: parseInt(form.rx_per_month) };
     if (!body.visit_id) delete body.visit_id;
     createMutation.mutate(body);
   };
 
   const handleUpdate = (id) => {
     const body = {};
-    if (editForm.rx_per_week) body.rx_per_week = parseInt(editForm.rx_per_week);
+    if (editForm.rx_per_month) body.rx_per_month = parseInt(editForm.rx_per_month);
     if (editForm.confidence) body.confidence = editForm.confidence;
     if (editForm.status) body.status = editForm.status;
     updateMutation.mutate({ id, body });
@@ -640,7 +642,7 @@ function RCPASection({ month, year }) {
               <select value={form.doctor_id} onChange={(e) => setForm({ ...form, doctor_id: e.target.value })} required
                 className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2">
                 <option value="">Select doctor</option>
-                {(doctors || []).map((d) => <option key={d.id || d._id} value={d.id || d._id}>{d.name || d.full_name}</option>)}
+                {assignedDoctors.map((d) => <option key={d.id || d._id} value={d.id || d._id}>{d.name || d.full_name}</option>)}
               </select>
             </div>
             <div>
@@ -648,12 +650,12 @@ function RCPASection({ month, year }) {
               <select value={form.product_id} onChange={(e) => setForm({ ...form, product_id: e.target.value })} required
                 className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2">
                 <option value="">Select product</option>
-                {(Array.isArray(products) ? products : []).map((p) => <option key={p.id || p._id} value={p.id || p._id}>{p.name || p.brand_name}</option>)}
+                {assignedDrugs.map((p) => <option key={p.id || p._id} value={p.id || p._id}>{p.name || p.brand_name}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500 font-medium mb-1 block">Rx/Week *</label>
-              <input type="number" min="1" value={form.rx_per_week} onChange={(e) => setForm({ ...form, rx_per_week: e.target.value })} required
+              <label className="text-xs text-gray-500 font-medium mb-1 block">Rx/Month *</label>
+              <input type="number" min="1" value={form.rx_per_month} onChange={(e) => setForm({ ...form, rx_per_month: e.target.value })} required
                 className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2" placeholder="e.g. 15" />
             </div>
             <div>
@@ -692,8 +694,8 @@ function RCPASection({ month, year }) {
                   <div className="space-y-3">
                     <div className="grid grid-cols-3 gap-3">
                       <div>
-                        <label className="text-xs text-gray-500 block mb-1">Rx/Week</label>
-                        <input type="number" min="1" value={editForm.rx_per_week || ""} onChange={(e) => setEditForm({ ...editForm, rx_per_week: e.target.value })}
+                        <label className="text-xs text-gray-500 block mb-1">Rx/Month</label>
+                        <input type="number" min="1" value={editForm.rx_per_month || ""} onChange={(e) => setEditForm({ ...editForm, rx_per_month: e.target.value })}
                           className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2" />
                       </div>
                       <div>
@@ -733,12 +735,12 @@ function RCPASection({ month, year }) {
                       </div>
                       <div>
                         <p className="text-sm font-bold text-gray-900">{c.doctor_name}</p>
-                        <p className="text-xs text-gray-400">{c.product_name} · {c.rx_per_week} Rx/week · {c.confidence}</p>
+                        <p className="text-xs text-gray-400">{c.product_name} · {c.rx_per_month} Rx/month · {c.confidence}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={"px-2 py-0.5 rounded-md text-xs font-bold " + (c.status === "active" ? "bg-green-100 text-green-700" : c.status === "fulfilled" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600")}>{c.status}</span>
-                      <button onClick={() => { setEditingId(c.id); setEditForm({ rx_per_week: c.rx_per_week, confidence: c.confidence, status: c.status }); }}
+                      <button onClick={() => { setEditingId(c.id); setEditForm({ rx_per_month: c.rx_per_month, confidence: c.confidence, status: c.status }); }}
                         className="text-xs text-orange-500 hover:text-orange-600 font-semibold px-2 py-1 rounded hover:bg-orange-50">Edit</button>
                     </div>
                   </div>

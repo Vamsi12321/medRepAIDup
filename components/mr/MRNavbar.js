@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -11,6 +11,7 @@ const PAGE_TITLES = {
   "/mr/dashboard":      { title: "Dashboard",      icon: "🏠", sub: "Your overview" },
   "/mr/doctors":        { title: "My Doctors",     icon: "🩺", sub: "Manage your doctor list" },
   "/mr/visits":         { title: "Visits",         icon: "📅", sub: "Track your visits" },
+  "/mr/dcr":            { title: "DCR",            icon: "📋", sub: "Daily Call Report" },
   "/mr/sfe":            { title: "SFE",            icon: "📊", sub: "Sales force effectiveness" },
   "/mr/drug-search":    { title: "Drug Search",    icon: "🔍", sub: "Search & analyze drugs" },
   "/mr/announcements":  { title: "Comms Center",   icon: "📢", sub: "Company communications" },
@@ -25,7 +26,6 @@ export default function MRNavbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // Prefetch common page data in background so navigation feels instant
   const mrId = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
   const prefetchOnHover = (path) => {
     const now = new Date();
@@ -48,6 +48,7 @@ export default function MRNavbar() {
     { name: "Dashboard",     path: "/mr/dashboard",     icon: "🏠" },
     { name: "My Doctors",    path: "/mr/doctors",       icon: "🩺" },
     { name: "Visits",        path: "/mr/visits",        icon: "📅" },
+    { name: "DCR",           path: "/mr/dcr",           icon: "📋" },
     { name: "SFE",           path: "/mr/sfe",           icon: "📊" },
     { name: "Drug Search",   path: "/mr/drug-search",   icon: "🔍" },
     { name: "Comms",         path: "/mr/announcements", icon: "📢" },

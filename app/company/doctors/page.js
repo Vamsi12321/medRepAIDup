@@ -7,6 +7,7 @@ import Toast from "@/components/Toast";
 import { get, put, post, del } from "@/lib/api";
 import { TableSkeleton } from "@/components/Skeleton";
 import { downloadCSVTemplate } from "@/lib/downloadTemplate";
+import LocationMapPicker from "@/components/LocationMapPicker";
 
 const DOCTOR_HEADERS = ["name","email","phone","specialization","classification","hospital","license_number","address"];
 const DOCTOR_SAMPLE  = [["Dr. Sarah Sharma","sharma@gmail.com","+919876543210","Cardiologist","A","City Hospital","MH12345","123 Medical Street, Mumbai"]];
@@ -448,6 +449,8 @@ function DoctorModal({ doctor, onClose, onSaved }) {
     hospital:       doctor?.hospital       || "",
     license_number: doctor?.license_number || "",
     address:        doctor?.address        || "",
+    latitude:       doctor?.latitude       || "",
+    longitude:      doctor?.longitude      || "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -466,6 +469,8 @@ function DoctorModal({ doctor, onClose, onSaved }) {
           hospital:       form.hospital,
           license_number: form.license_number,
           address:        form.address,
+          ...(form.latitude  && { latitude:  parseFloat(form.latitude)  }),
+          ...(form.longitude && { longitude: parseFloat(form.longitude) }),
         };
         await put(`/api/v1/doctors/${doctor.id}`, body);
       } else {
@@ -479,6 +484,8 @@ function DoctorModal({ doctor, onClose, onSaved }) {
           hospital:       form.hospital,
           license_number: form.license_number,
           address:        form.address,
+          ...(form.latitude  && { latitude:  parseFloat(form.latitude)  }),
+          ...(form.longitude && { longitude: parseFloat(form.longitude) }),
         };
         await post(`/api/v1/doctors`, body);
       }
@@ -546,7 +553,20 @@ function DoctorModal({ doctor, onClose, onSaved }) {
             </div>
             {field("Hospital", "hospital", "text", "City Hospital")}
             {field("License Number", "license_number", "text", "MH12345")}
-            {field("Address", "address", "text", "123 Medical Street, Mumbai")}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                Location / Address
+                <span className="ml-2 text-[10px] text-purple-500 font-normal">Search, drop pin, or use GPS</span>
+              </label>
+              <LocationMapPicker
+                value={form.address}
+                lat={form.latitude}
+                lng={form.longitude}
+                onChange={({ address, latitude, longitude }) =>
+                  setForm((f) => ({ ...f, address, latitude: String(latitude), longitude: String(longitude) }))
+                }
+              />
+            </div>
           </div>
 
           <div className="flex space-x-3 pt-2">

@@ -1040,7 +1040,7 @@ function VisitDetailCard({ visit, s, report, isNegative }) {
                   <div className="bg-white rounded-lg px-2.5 py-1.5 border border-gray-100">
                     <p className="text-[10px] text-gray-400">Rx Commitment</p>
                     <p className={"text-xs font-bold " + (report.rx_commitment ? "text-green-700" : "text-gray-500")}>
-                      {report.rx_commitment ? `Yes (${report.expected_rx_per_month || "—"}/mo)` : "No"}
+                      {report.rx_commitment ? `Yes (${report.expected_rx_per_month || "—"}/month)` : "No"}
                     </p>
                   </div>
                 )}

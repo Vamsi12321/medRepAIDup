@@ -645,7 +645,7 @@ export default function LandingPage() {
             {[
               { metric: "MCR", value: "84%", label: "Doctor Coverage", sub: "42/50 doctors visited", color: "border-l-blue-500 bg-blue-50/50" },
               { metric: "MVC", value: "76%", label: "Frequency Hit", sub: "Class A/B/C compliance", color: "border-l-purple-500 bg-purple-50/50" },
-              { metric: "RCPA", value: "142", label: "Rx/Week", sub: "Committed prescriptions", color: "border-l-green-500 bg-green-50/50" },
+              { metric: "RCPA", value: "142", label: "Rx/Month", sub: "Committed prescriptions", color: "border-l-green-500 bg-green-50/50" },
               { metric: "GPS", value: "99%", label: "Verified", sub: "Location-stamped visits", color: "border-l-orange-500 bg-orange-50/50" },
             ].map((item, i) => (
               <Reveal key={item.metric} delay={i * 80}>
