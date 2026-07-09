@@ -148,11 +148,33 @@ function DrugCard({ drug, matchScore, matchedEntities }) {
   // Smart search results have flat fields; regular drugs use field_values
   const name         = drug.drug_name   || getVal(drug, "drug_name")   || drug.brand_name || getVal(drug, "brand_name") || "Drug";
   const brandName    = drug.brand_name  || getVal(drug, "brand_name");
-  const drugClass    = drug.drug_class || getVal(drug, "drug_class");
-  const manufacturer = drug.manufacturer || getVal(drug, "manufacturer");
-  const indications  = Array.isArray(drug.indications) ? drug.indications.join(", ") : (drug.indications || getVal(drug, "indications"));
-  const dosage       = drug.dosage_strength || getVal(drug, "dosage_strength") || getVal(drug, "dosage");
   const specialization = drug.specialization || getVal(drug, "specialization");
+
+  // Build facts dynamically from field_values (skip name/brand shown in header)
+  const skipKeys = ["drug_name", "brand_name", "specialization"];
+  const facts = [];
+  if (drug.field_values?.length > 0) {
+    drug.field_values.forEach((fv) => {
+      if (skipKeys.includes(fv.key)) return;
+      if (!fv.value || (Array.isArray(fv.value) && fv.value.length === 0)) return;
+      if (fv.type === "textarea" || fv.type === "url") return;
+      const val = Array.isArray(fv.value) ? fv.value.join(", ") : String(fv.value);
+      if (val.length > 80) return;
+      facts.push({ label: fv.key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()), value: val });
+    });
+  } else {
+    ["drug_class","manufacturer","indications","dosage_strength"].forEach((k) => {
+      const v = drug[k];
+      if (!v) return;
+      const val = Array.isArray(v) ? v.join(", ") : String(v);
+      facts.push({ label: k.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()), value: val });
+    });
+  }
+  // Add pricing from drug.packaging
+  const pkgPrice = drug.packaging?.selling_price ?? drug.packaging?.pricing?.selling_price;
+  if (pkgPrice != null) {
+    facts.push({ label: `Price/${drug.packaging.sales_unit || "Pack"}`, value: `₹${pkgPrice}` });
+  }
 
   return (
     <Link href={`/drug-details/${drug._id}`}>
@@ -175,12 +197,7 @@ function DrugCard({ drug, matchScore, matchedEntities }) {
           </div>
 
           <div className="space-y-1.5 mb-4">
-            {[
-              { label: "Drug Class",    value: drugClass },
-              { label: "Manufacturer",  value: manufacturer },
-              { label: "Indications",   value: indications },
-              { label: "Dosage",        value: dosage },
-            ].filter((r) => r.value).map((row) => (
+            {facts.slice(0, 5).map((row) => (
               <div key={row.label} className="flex items-start justify-between text-xs gap-2">
                 <span className="text-gray-400 font-medium flex-shrink-0">{row.label}</span>
                 <span className="text-gray-800 font-semibold text-right line-clamp-1">{row.value}</span>

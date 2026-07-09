@@ -5,6 +5,7 @@ import MRNavbar from "@/components/mr/MRNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
 import { formatISTDate } from "@/lib/time";
 import { get, post } from "@/lib/api";
+import LocationMapPicker from "@/components/LocationMapPicker";
 
 const mrId = () => typeof window !== "undefined" ? localStorage.getItem("userId") : null;
 
@@ -317,6 +318,7 @@ function RequestDoctorModal({ onClose, onSuccess }) {
   const [form, setForm] = useState({
     name: "", email: "", phone: "", specialization: "",
     hospital: "", license_number: "", address: "",
+    latitude: "", longitude: "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -334,6 +336,8 @@ function RequestDoctorModal({ onClose, onSuccess }) {
         hospital: form.hospital || undefined,
         license_number: form.license_number || undefined,
         address: form.address || undefined,
+        ...(form.latitude  && { latitude:  parseFloat(form.latitude)  }),
+        ...(form.longitude && { longitude: parseFloat(form.longitude) }),
       });
       setStep(3);
       onSuccess();
@@ -433,10 +437,15 @@ function RequestDoctorModal({ onClose, onSuccess }) {
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1.5">Address</label>
-                <input type="text" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })}
-                  placeholder="123 Medical Street, Mumbai"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400" />
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">Clinic Location</label>
+                <LocationMapPicker
+                  value={form.address}
+                  lat={form.latitude}
+                  lng={form.longitude}
+                  onChange={({ address, latitude, longitude }) =>
+                    setForm((f) => ({ ...f, address, latitude: String(latitude), longitude: String(longitude) }))
+                  }
+                />
               </div>
               <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
                 <p className="text-xs text-gray-500">

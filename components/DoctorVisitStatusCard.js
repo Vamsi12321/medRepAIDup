@@ -17,7 +17,12 @@ export default function DoctorVisitStatusCard({
   // Extract data
   const docName = doctor.doctor_name || doctor.name || "Unknown";
   const specialty = doctor.specialty || doctor.doctor_specialty || "—";
-  const area = doctor.location || doctor.area || doctor.city || "—";
+  const rawLocation = doctor.location;
+  const locationStr = rawLocation && typeof rawLocation === "object"
+    ? rawLocation.location_name || rawLocation.temporary_location?.name || rawLocation.name || ""
+    : rawLocation || "";
+  const area = locationStr || doctor.area || doctor.city || "—";
+
   const classification = doctor.classification || doctor.doctor_class || "—";
   const visitStatus = doctor.visit_status || doctor.status || "not_visited"; // never_visited | not_visited | visited
   const visitCount = doctor.visit_count || doctor.total_visits || 0;

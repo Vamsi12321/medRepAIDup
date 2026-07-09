@@ -8,6 +8,61 @@ import { downloadCSVTemplate } from "@/lib/downloadTemplate";
 
 const FIELD_TYPES = ["text", "textarea", "number", "date", "select", "url"];
 
+// ── Searchable Select Dropdown ────────────────────────────────────────────────
+function SearchableSelect({ options, value, onChange, placeholder }) {
+  const [open, setOpen] = React.useState(false);
+  const [search, setSearch] = React.useState("");
+  const ref = React.useRef(null);
+
+  React.useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = search.trim()
+    ? options.filter((o) => o.toLowerCase().includes(search.toLowerCase()))
+    : options;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => setOpen(!open)}
+        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-left bg-white flex items-center justify-between focus:ring-2 focus:ring-indigo-200 outline-none">
+        <span className={value ? "text-gray-800" : "text-gray-400"}>{value || placeholder}</span>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-hidden flex flex-col">
+          <div className="p-2 border-b border-gray-100 flex-shrink-0">
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search..."
+              autoFocus
+              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-md text-xs outline-none focus:ring-2 focus:ring-indigo-200" />
+          </div>
+          <div className="overflow-y-auto flex-1">
+            {value && (
+              <button type="button" onClick={() => { onChange(""); setOpen(false); setSearch(""); }}
+                className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 border-b border-gray-50">
+                ✕ Clear selection
+              </button>
+            )}
+            {filtered.length === 0 ? (
+              <p className="px-3 py-3 text-xs text-gray-400 text-center">No matching options</p>
+            ) : (
+              filtered.map((o) => (
+                <button key={o} type="button" onClick={() => { onChange(o); setOpen(false); setSearch(""); }}
+                  className={`w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 transition-colors ${value === o ? "bg-indigo-50 text-indigo-700 font-semibold" : "text-gray-700"}`}>
+                  {o}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const formatKey = (key) => key?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "";
 
 // Read from top-level field first, then fall back to field_values array
@@ -162,7 +217,9 @@ export default function CompanyDrugManagement() {
                   const specialization = drug.specialization || getVal(drug, "specialization");
 
                   // Build display fields — deduplicated by key
-                  const SKIP = new Set(["_id","__v","template_id","field_values","created_at","updated_at","is_active","company_id","drug_name","brand_name","drug_class","specialization","brochure_url","search_text"]);
+                  const PRICING_CARD_KEYS = new Set(["pack_type","units_per_pack","packs_per_box","pack_price","box_price","mrp","price_per_drug","price"]);
+                  const SKIP = new Set(["_id","__v","template_id","field_values","created_at","updated_at","is_active","company_id","drug_name","brand_name","drug_class","specialization","brochure_url","search_text",
+                    "pack_type","units_per_pack","packs_per_box","pack_price","box_price","mrp","price_per_drug","price"]);
                   const ORDERED = ["manufacturer","indications","symptoms","side_effects","mechanism_of_action","dosage_strength","dosage_form","route"];
                   const seenKeys = new Set();
                   const displayFields = [];
@@ -262,6 +319,25 @@ export default function CompanyDrugManagement() {
                           <p className="col-span-2 text-xs text-gray-400 text-center">+{displayFields.length - 6} more fields</p>
                         )}
                       </div>
+
+                      {/* Pricing Strip */}
+                      {(() => {
+                        const pkg = drug.packaging;
+                        if (!pkg) return null;
+                        const sp = pkg.selling_price ?? pkg.pricing?.selling_price;
+                        if (sp == null) return null;
+                        const bp = pkg.box_price ?? pkg.pricing?.box_pricing?.box_price;
+                        const mrp = pkg.mrp ?? pkg.pricing?.mrp;
+                        const maxDisc = pkg.max_discount_percent ?? pkg.pricing?.max_discount_percent;
+                        return (
+                          <div className="mx-4 mb-2 grid grid-cols-3 gap-1.5 bg-emerald-50 rounded-xl p-2.5 border border-emerald-100">
+                            <div className="text-center"><p className="text-[8px] text-emerald-600 font-bold uppercase">/{pkg.sales_unit || "pack"}</p><p className="text-xs font-extrabold text-emerald-800">₹{sp}</p></div>
+                            {bp != null && <div className="text-center"><p className="text-[8px] text-teal-600 font-bold uppercase">/box</p><p className="text-xs font-extrabold text-teal-800">₹{bp}</p></div>}
+                            {mrp != null && <div className="text-center"><p className="text-[8px] text-amber-600 font-bold uppercase">MRP</p><p className="text-xs font-extrabold text-amber-800">₹{mrp}</p></div>}
+                            {maxDisc != null && <div className="text-center"><p className="text-[8px] text-red-500 font-bold uppercase">Max Disc</p><p className="text-xs font-extrabold text-red-700">{maxDisc}%</p></div>}
+                          </div>
+                        );
+                      })()}
 
                       {/* Actions */}
                       <div className="px-4 pb-4 pt-1 space-y-2">
@@ -558,6 +634,288 @@ function FieldRow({ field, onUpdate, onDelete, isEditing, onEdit, onCancel, savi
   );
 }
 
+// ── Packaging Rules — built from template.packaging_metadata at runtime ───────
+// Fallback used only if backend hasn't returned packaging_metadata yet
+const PACKAGING_RULES_FALLBACK = {
+  "Tablet":    { salesUnits: ["Strip", "Bottle", "Blister Pack"], measureUnits: ["Tablet"] },
+  "Capsule":   { salesUnits: ["Strip", "Bottle"],                 measureUnits: ["Capsule"] },
+  "Syrup":     { salesUnits: ["Bottle"],                          measureUnits: ["ml"] },
+  "Injection": { salesUnits: ["Vial", "Ampoule", "Prefilled Syringe"], measureUnits: ["ml", "mg", "g"] },
+  "Cream":     { salesUnits: ["Tube", "Jar"],                     measureUnits: ["g"] },
+  "Drops":     { salesUnits: ["Bottle"],                          measureUnits: ["ml"] },
+  "Powder":    { salesUnits: ["Sachet", "Bottle", "Box"],         measureUnits: ["g", "mg"] },
+  "Inhaler":   { salesUnits: ["Inhaler"],                         measureUnits: ["Dose"] },
+};
+
+// Convert template.packaging_metadata array → lookup object
+function buildPackagingRules(packagingMetadata) {
+  if (!Array.isArray(packagingMetadata) || packagingMetadata.length === 0) {
+    return PACKAGING_RULES_FALLBACK;
+  }
+  const rules = {};
+  packagingMetadata.forEach((m) => {
+    rules[m.dosage_form] = {
+      salesUnits:   m.sales_units        || [],
+      measureUnits: m.measurement_units  || [],
+    };
+  });
+  return rules;
+}
+
+const PACKAGING_KEYS = new Set([
+  "sales_unit", "pack_quantity", "measurement_unit",
+  "sales_units_per_box", "selling_price", "mrp", "max_discount_percent",
+  "box_pricing_mode", "box_discount_percent", "box_price",
+]);
+
+// ── PackagingSection Component ────────────────────────────────────────────────
+function PackagingSection({ dosageForm, packagingRules, formData, onChange }) {
+  const rules = (packagingRules || PACKAGING_RULES_FALLBACK)[dosageForm] || null;
+
+  const salesUnit       = formData.sales_unit           || "";
+  const packQty         = formData.pack_quantity         || "";
+  const measureUnit     = formData.measurement_unit      || "";
+  const unitsPerBox     = formData.sales_units_per_box   || "";
+  const sellingPrice    = parseFloat(formData.selling_price) || 0;
+  const mrp             = formData.mrp                   || "";
+  const boxMode         = formData.box_pricing_mode      || "auto";
+  const boxDiscount     = parseFloat(formData.box_discount_percent) || 0;
+  const customBoxPrice  = parseFloat(formData.box_price) || 0;
+  const unitsPerBoxNum  = parseFloat(unitsPerBox) || 0;
+
+  // Calculated box price
+  const calcBoxPrice = (() => {
+    if (!sellingPrice || !unitsPerBoxNum) return null;
+    if (boxMode === "auto")     return sellingPrice * unitsPerBoxNum;
+    if (boxMode === "discount") return sellingPrice * unitsPerBoxNum * (1 - boxDiscount / 100);
+    if (boxMode === "custom")   return customBoxPrice || null;
+    return null;
+  })();
+
+  const inp = "w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-emerald-300 transition-all";
+
+  if (!dosageForm) {
+    return (
+      <div className="bg-emerald-50 border border-dashed border-emerald-200 rounded-xl p-4 text-center">
+        <span className="text-2xl block mb-1">📦</span>
+        <p className="text-xs text-emerald-600 font-medium">Select a Dosage Form above to configure packaging & pricing</p>
+      </div>
+    );
+  }
+
+  if (!rules) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-center">
+        <p className="text-xs text-gray-400">No packaging rules defined for <strong>{dosageForm}</strong>. Use standard fields below.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Step 1: Sales Unit */}
+      <div>
+        <label className="block text-xs font-bold text-gray-600 mb-1.5">
+          Sales Unit <span className="text-red-500">*</span>
+          <span className="ml-1 text-gray-400 font-normal">— how you sell a single unit</span>
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {rules.salesUnits.map((u) => (
+            <button key={u} type="button"
+              onClick={() => onChange("sales_unit", u)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all ${
+                salesUnit === u
+                  ? "bg-emerald-500 text-white border-emerald-500 shadow-sm"
+                  : "bg-white text-gray-600 border-gray-200 hover:border-emerald-300"
+              }`}>
+              {u}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Step 2: Pack Size */}
+      {salesUnit && (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-gray-600 mb-1">Pack Quantity <span className="text-red-500">*</span></label>
+            <input type="number" min="1" value={packQty}
+              onChange={(e) => onChange("pack_quantity", e.target.value)}
+              placeholder={`How many ${rules.measureUnits[0]}s per ${salesUnit}`}
+              className={inp} />
+            {packQty && measureUnit && (
+              <p className="text-[10px] text-emerald-600 mt-0.5 font-medium">1 {salesUnit} = {packQty} {measureUnit}{packQty > 1 ? "s" : ""}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-600 mb-1">Measurement Unit <span className="text-red-500">*</span></label>
+            {rules.measureUnits.length === 1 ? (
+              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 font-semibold">
+                {rules.measureUnits[0]}
+                {formData.measurement_unit !== rules.measureUnits[0] && onChange("measurement_unit", rules.measureUnits[0])}
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {rules.measureUnits.map((m) => (
+                  <button key={m} type="button"
+                    onClick={() => onChange("measurement_unit", m)}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all ${
+                      measureUnit === m
+                        ? "bg-emerald-500 text-white border-emerald-500"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-emerald-300"
+                    }`}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {salesUnit && (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-gray-600 mb-1">
+              Selling Price (per {salesUnit}) <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">₹</span>
+              <input type="number" min="0" step="0.01" value={formData.selling_price || ""}
+                onChange={(e) => onChange("selling_price", e.target.value)}
+                placeholder="0.00"
+                className={inp + " pl-7"} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-600 mb-1">MRP (optional)</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">₹</span>
+              <input type="number" min="0" step="0.01" value={formData.mrp || ""}
+                onChange={(e) => onChange("mrp", e.target.value)}
+                placeholder="0.00"
+                className={inp + " pl-7"} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-600 mb-1">
+              Max Discount % <span className="text-red-500">*</span>
+              <span className="ml-1 text-gray-400 font-normal text-[9px]">ceiling for RCPA approvals</span>
+            </label>
+            <input type="number" min="0" max="100" step="0.5" value={formData.max_discount_percent || ""}
+              onChange={(e) => onChange("max_discount_percent", e.target.value)}
+              placeholder="e.g. 15"
+              className={inp} />
+          </div>
+        </div>
+      )}
+
+      {/* Step 4: Box Config */}
+      {salesUnit && sellingPrice > 0 && (
+        <div className="border border-gray-200 rounded-xl p-4 bg-gray-50 space-y-3">
+          <p className="text-xs font-bold text-gray-600 uppercase tracking-wide">📦 Box Packaging (Optional)</p>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Number of {salesUnit}s per Box
+            </label>
+            <input type="number" min="1" value={formData.sales_units_per_box || ""}
+              onChange={(e) => onChange("sales_units_per_box", e.target.value)}
+              placeholder={`e.g. 20 ${salesUnit}s per Box`}
+              className={inp} />
+          </div>
+
+          {/* Box Pricing Mode */}
+          {unitsPerBoxNum > 0 && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1.5">Box Pricing Mode</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "auto",     label: "Auto",     desc: `₹${sellingPrice} × ${unitsPerBoxNum}` },
+                    { id: "discount", label: "Discount",  desc: "% off box total" },
+                    { id: "custom",   label: "Custom",    desc: "Set fixed price" },
+                  ].map((m) => (
+                    <button key={m.id} type="button"
+                      onClick={() => onChange("box_pricing_mode", m.id)}
+                      className={`py-2 px-3 rounded-lg border-2 text-left transition-all ${
+                        boxMode === m.id
+                          ? "bg-indigo-50 border-indigo-400 text-indigo-700"
+                          : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+                      }`}>
+                      <p className="text-[11px] font-bold">{m.label}</p>
+                      <p className="text-[9px] text-gray-400 mt-0.5">{m.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {boxMode === "discount" && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Discount %</label>
+                  <input type="number" min="0" max="100" step="0.5" value={formData.box_discount_percent || ""}
+                    onChange={(e) => onChange("box_discount_percent", e.target.value)}
+                    placeholder="e.g. 10"
+                    className={inp + " max-w-[120px]"} />
+                </div>
+              )}
+              {boxMode === "custom" && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Custom Box Price</label>
+                  <div className="relative max-w-[160px]">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">₹</span>
+                    <input type="number" min="0" step="0.01" value={formData.box_price || ""}
+                      onChange={(e) => onChange("box_price", e.target.value)}
+                      placeholder="0.00"
+                      className={inp + " pl-7"} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Live Preview */}
+      {salesUnit && packQty && sellingPrice > 0 && (
+        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
+          <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide mb-3">📋 Packaging Summary</p>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="bg-white rounded-lg p-2 border border-emerald-100">
+              <p className="text-[9px] text-gray-400 font-bold uppercase">Sales Unit</p>
+              <p className="font-bold text-gray-800">{salesUnit}</p>
+            </div>
+            <div className="bg-white rounded-lg p-2 border border-emerald-100">
+              <p className="text-[9px] text-gray-400 font-bold uppercase">Pack Size</p>
+              <p className="font-bold text-gray-800">{packQty} {measureUnit || rules.measureUnits[0]}{packQty > 1 ? "s" : ""}</p>
+            </div>
+            <div className="bg-white rounded-lg p-2 border border-emerald-100">
+              <p className="text-[9px] text-gray-400 font-bold uppercase">Selling Price</p>
+              <p className="font-bold text-emerald-700">₹{sellingPrice} / {salesUnit}</p>
+            </div>
+            {mrp && (
+              <div className="bg-white rounded-lg p-2 border border-amber-100">
+                <p className="text-[9px] text-gray-400 font-bold uppercase">MRP</p>
+                <p className="font-bold text-amber-700">₹{mrp}</p>
+              </div>
+            )}
+            {unitsPerBoxNum > 0 && (
+              <div className="bg-white rounded-lg p-2 border border-teal-100">
+                <p className="text-[9px] text-gray-400 font-bold uppercase">Box Contains</p>
+                <p className="font-bold text-teal-700">{unitsPerBoxNum} {salesUnit}s</p>
+              </div>
+            )}
+            {calcBoxPrice !== null && (
+              <div className="bg-white rounded-lg p-2 border border-indigo-100">
+                <p className="text-[9px] text-gray-400 font-bold uppercase">Box Price</p>
+                <p className="font-bold text-indigo-700">₹{calcBoxPrice.toFixed(2)}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AddFieldRow({ onSave, onCancel, saving, nextOrder }) {
   const [label, setLabel]   = useState("");
   const [type, setType]     = useState("text");
@@ -609,27 +967,52 @@ function AddFieldRow({ onSave, onCancel, saving, nextOrder }) {
 // ── Drug Modal (Add / Edit) ───────────────────────────────────────────────────
 function DrugModal({ template, drug, onClose, onSaved }) {
   const isEdit = !!drug;
+
+  // Build packaging rules from backend template metadata (or fallback)
+  const packagingRules = React.useMemo(() => buildPackagingRules(template.packaging_metadata), [template.packaging_metadata]);
+
   // Build initial form from existing drug field_values (GET response format)
   const initForm = () => {
     if (!drug) return {};
     const form = {};
-    // Primary: read from field_values array — has correct field_ids and all values
     (drug.field_values || []).forEach((fv) => {
       const v = fv.value;
       form[fv.key] = Array.isArray(v) ? v.join(", ") : (v ?? "");
     });
-    // Fallback: top-level fields not covered by field_values
     Object.entries(drug).forEach(([k, v]) => {
-      if (form[k] !== undefined) return; // already set from field_values
-      if (["_id","__v","template_id","field_values","created_at","updated_at","is_active","company_id","search_text"].includes(k)) return;
+      if (form[k] !== undefined) return;
+      if (["_id","__v","template_id","field_values","created_at","updated_at","is_active","company_id","search_text","packaging"].includes(k)) return;
       if (v === null || v === undefined) return;
       form[k] = Array.isArray(v) ? v.join(", ") : String(v);
     });
     return form;
   };
-  const [formData, setFormData] = useState(initForm);
-  const [saving, setSaving]     = useState(false);
-  const [error, setError]       = useState("");
+
+  // Init packaging from drug.packaging if editing
+  const initPackaging = () => {
+    if (!drug?.packaging) return {};
+    const p = drug.packaging;
+    // Handle both flat and nested (pricing sub-object) structures from backend
+    const pricing = p.pricing || {};
+    const boxPricing = pricing.box_pricing || {};
+    return {
+      sales_unit:            p.sales_unit            || "",
+      pack_quantity:         p.pack_quantity          != null ? String(p.pack_quantity)          : "",
+      measurement_unit:      p.measurement_unit       || "",
+      selling_price:         (p.selling_price ?? pricing.selling_price) != null ? String(p.selling_price ?? pricing.selling_price) : "",
+      mrp:                   (p.mrp ?? pricing.mrp) != null ? String(p.mrp ?? pricing.mrp) : "",
+      max_discount_percent:  (p.max_discount_percent ?? pricing.max_discount_percent) != null ? String(p.max_discount_percent ?? pricing.max_discount_percent) : "",
+      sales_units_per_box:   p.sales_units_per_box    != null ? String(p.sales_units_per_box)    : "",
+      box_pricing_mode:      p.box_pricing_mode ?? boxPricing.mode ?? "auto",
+      box_discount_percent:  (p.box_discount_percent ?? boxPricing.discount_percent) != null ? String(p.box_discount_percent ?? boxPricing.discount_percent) : "",
+      box_price:             (p.box_price ?? boxPricing.box_price) != null ? String(p.box_price ?? boxPricing.box_price) : "",
+    };
+  };
+
+  const [formData, setFormData]         = useState(initForm);
+  const [packagingData, setPackagingData] = useState(initPackaging);
+  const [saving, setSaving]             = useState(false);
+  const [error, setError]               = useState("");
 
   const visibleFields = template.fields?.filter((f) => f.visible) || [];
 
@@ -651,13 +1034,15 @@ function DrugModal({ template, drug, onClose, onSaved }) {
     let field_values;
 
     if (isEdit) {
-      // PUT — use existing drug's field_ids to update in-place (no duplicates)
+      // PUT — send all visible fields (use existing field_id if available, template field_id for new ones)
       const existingFvMap = Object.fromEntries(
         (drug.field_values || []).map((fv) => [fv.key, fv.field_id])
       );
-      field_values = visibleFields
-        .filter((f) => existingFvMap[f.key] !== undefined)
-        .map((f) => ({ field_id: existingFvMap[f.key], key: f.key, value: buildValue(f) }));
+      field_values = visibleFields.map((f) => ({
+        field_id: existingFvMap[f.key] || f.field_id,
+        key: f.key,
+        value: buildValue(f),
+      }));
     } else {
       // POST — use template's field_ids for all visible fields
       field_values = visibleFields.map((f) => ({
@@ -668,10 +1053,26 @@ function DrugModal({ template, drug, onClose, onSaved }) {
     }
 
     try {
+      const payload = { field_values };
+      // Add packaging object if any packaging data was filled
+      if (packagingData.sales_unit || packagingData.selling_price) {
+        const pkg = {};
+        if (packagingData.sales_unit)           pkg.sales_unit           = packagingData.sales_unit;
+        if (packagingData.pack_quantity)         pkg.pack_quantity         = parseFloat(packagingData.pack_quantity);
+        if (packagingData.measurement_unit)      pkg.measurement_unit      = packagingData.measurement_unit;
+        if (packagingData.selling_price)         pkg.selling_price         = parseFloat(packagingData.selling_price);
+        if (packagingData.mrp)                   pkg.mrp                   = parseFloat(packagingData.mrp);
+        if (packagingData.max_discount_percent)  pkg.max_discount_percent  = parseFloat(packagingData.max_discount_percent);
+        if (packagingData.sales_units_per_box)   pkg.sales_units_per_box   = parseFloat(packagingData.sales_units_per_box);
+        if (packagingData.box_pricing_mode)      pkg.box_pricing_mode      = packagingData.box_pricing_mode;
+        if (packagingData.box_discount_percent)  pkg.box_discount_percent  = parseFloat(packagingData.box_discount_percent);
+        if (packagingData.box_price)             pkg.box_price             = parseFloat(packagingData.box_price);
+        payload.packaging = pkg;
+      }
       if (isEdit) {
-        await put(`/api/v1/drugs/${drug._id}`, { field_values });
+        await put(`/api/v1/drugs/${drug._id}`, payload);
       } else {
-        await post("/api/v1/drugs", { template_id: template._id, field_values });
+        await post("/api/v1/drugs", { template_id: template._id, ...payload });
       }
       onSaved();
       onClose();
@@ -705,10 +1106,12 @@ function DrugModal({ template, drug, onClose, onSaved }) {
           placeholder={"Enter " + (f.label?.toLowerCase() || "value") + "..."} />
       );
       case "select": return (
-        <select className={base + " bg-white"} value={val} onChange={(e) => onChange(e.target.value)}>
-          <option value="">Select {f.label?.toLowerCase() || "option"}</option>
-          {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
+        <SearchableSelect
+          options={f.options || []}
+          value={val}
+          onChange={onChange}
+          placeholder={"Select " + (f.label?.toLowerCase() || "option")}
+        />
       );
       case "date":   return <input type="date"   className={base} value={val} onChange={(e) => onChange(e.target.value)} />;
       case "number": return <input type="number" className={base} value={val} onChange={(e) => onChange(e.target.value)} placeholder={"Enter " + (f.label?.toLowerCase() || "value")} />;
@@ -738,6 +1141,36 @@ function DrugModal({ template, drug, onClose, onSaved }) {
   const fixedVisible   = visibleFields.filter((f) => f.is_fixed);
   const dynamicVisible = visibleFields.filter((f) => !f.is_fixed);
 
+  // Split fixed fields: packaging keys go to PackagingSection, rest go to Standard Fields grid
+  const packagingFieldKeys = new Set([...PACKAGING_KEYS, "dosage_form"]);
+  const standardFixed  = fixedVisible.filter((f) => !packagingFieldKeys.has(f.key));
+  const hasPackagingFields = true; // always show packaging section
+  const dosageFormField = fixedVisible.find((f) => f.key === "dosage_form");
+  const currentDosageForm = formData.dosage_form || "";
+
+  const handlePackagingChange = (key, val) => {
+    setPackagingData((p) => {
+      const next = { ...p, [key]: val };
+      // When dosage form changes in formData, reset all packaging fields
+      if (key === "dosage_form") {
+        Object.keys(next).forEach((k) => { if (k !== "dosage_form") next[k] = ""; });
+        const rules = packagingRules[val];
+        if (rules?.measureUnits?.length === 1) next.measurement_unit = rules.measureUnits[0];
+      }
+      // When sales unit changes, reset downstream packaging fields
+      if (key === "sales_unit") {
+        ["pack_quantity","measurement_unit","sales_units_per_box","box_pricing_mode","box_discount_percent","box_price"].forEach((k) => { next[k] = ""; });
+        const rules = packagingRules[formData.dosage_form];
+        if (rules?.measureUnits?.length === 1) next.measurement_unit = rules.measureUnits[0];
+      }
+      return next;
+    });
+    // dosage_form is also a template field — keep formData in sync
+    if (key === "dosage_form") {
+      setFormData((p) => ({ ...p, dosage_form: val }));
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[88vh] flex flex-col">
@@ -763,11 +1196,12 @@ function DrugModal({ template, drug, onClose, onSaved }) {
             <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-xs">{error}</div>
           )}
 
-          {/* Fixed fields */}
+          {/* Fixed fields — exclude packaging keys (handled by PackagingSection) */}
+          {standardFixed.length > 0 && (
           <div>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Standard Fields</p>
             <div className="grid grid-cols-2 gap-3">
-              {fixedVisible.map((f) => (
+              {standardFixed.map((f) => (
                 <div key={f.field_id} className={f.type === "textarea" || f.type === "array" || f.type === "file" ? "col-span-2" : ""}>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">
                     {f.label || formatKey(f.key)}{f.required && <span className="text-red-500 ml-0.5">*</span>}
@@ -777,6 +1211,47 @@ function DrugModal({ template, drug, onClose, onSaved }) {
               ))}
             </div>
           </div>
+          )}
+
+          {/* Dosage Form selector (if exists in template) */}
+          {dosageFormField && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">
+                {dosageFormField.label || "Dosage Form"}{dosageFormField.required && <span className="text-red-500 ml-0.5">*</span>}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {(dosageFormField.options?.length > 0 ? dosageFormField.options : Object.keys(packagingRules)).map((opt) => (
+                  <button key={opt} type="button"
+                    onClick={() => handlePackagingChange("dosage_form", opt)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all ${
+                      currentDosageForm === opt
+                        ? "bg-indigo-500 text-white border-indigo-500 shadow-sm"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"
+                    }`}>
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Packaging & Pricing Section */}
+          {hasPackagingFields && (
+            <div className="border border-emerald-200 rounded-2xl overflow-hidden">
+              <div className="px-4 py-2.5 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-200 flex items-center gap-2">
+                <span className="text-base">📦</span>
+                <p className="text-xs font-bold text-emerald-800 uppercase tracking-wide">Packaging & Pricing</p>
+              </div>
+              <div className="p-4">
+                <PackagingSection
+                  dosageForm={currentDosageForm}
+                  packagingRules={packagingRules}
+                  formData={packagingData}
+                  onChange={handlePackagingChange}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Dynamic fields */}
           {dynamicVisible.length > 0 && (

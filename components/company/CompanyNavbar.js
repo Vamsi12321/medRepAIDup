@@ -13,6 +13,7 @@ const PAGE_TITLES = {
   "/company/doctors":         { title: "Doctors",         icon: "🩺", sub: "Doctor network" },
   "/company/medical-reps":    { title: "Medical Reps",    icon: "💼", sub: "Your field team" },
   "/company/sfe":             { title: "SFE Analytics",   icon: "📊", sub: "Sales force effectiveness" },
+  "/company/analytics":       { title: "RCPA Analytics",  icon: "📈", sub: "Revenue & prescription intelligence" },
   "/company/communications":  { title: "Communications",  icon: "📢", sub: "Send announcements & alerts" },
   "/company/grievances":      { title: "Grievances",      icon: "📝", sub: "Manage MR tickets" },
   "/company/activity-logs":   { title: "Activity Logs",   icon: "📋", sub: "Track all activity" },
@@ -61,6 +62,7 @@ export default function CompanyNavbar() {
     { name: "Doctors",    path: "/company/doctors",         icon: "🩺" },
     { name: "MRs",        path: "/company/medical-reps",    icon: "💼" },
     { name: "SFE",        path: "/company/sfe",             icon: "📊" },
+    { name: "Analytics",  path: "/company/analytics",       icon: "📈" },
     { name: "Comms",      path: "/company/communications",  icon: "📢" },
     { name: "Grievances", path: "/company/grievances",      icon: "📝" },
     { name: "Logs",       path: "/company/activity-logs",   icon: "📋" },
@@ -133,10 +135,10 @@ export default function CompanyNavbar() {
               </Link>
               <button
                 onClick={handleLogout}
-                className="hidden lg:flex items-center px-2 py-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                className="hidden lg:flex items-center justify-center w-9 h-9 text-red-500 hover:bg-red-50 rounded-lg transition-all"
                 title="Logout"
               >
-                <span className="text-sm">🚪</span>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
               </button>
 
               <button

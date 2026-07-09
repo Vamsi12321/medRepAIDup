@@ -6,6 +6,8 @@ import Breadcrumb from "@/components/Breadcrumb";
 import { get, post, put } from "@/lib/api";
 import { formatIST } from "@/lib/time";
 
+const formatLoc = (loc) => loc && typeof loc === "object" ? loc.location_name || loc.temporary_location?.name || "" : loc || "";
+
 const STATUS_STYLES = {
   upcoming:    { bg: "bg-green-100",  text: "text-green-700",  label: "Upcoming" },
   completed:   { bg: "bg-blue-100",   text: "text-blue-700",   label: "Completed" },
@@ -147,7 +149,7 @@ export default function CompanyCMEEvents() {
                           : null,
                         // Fallback to location string if no mode set
                         !event.event_mode && event.location
-                          ? { icon: "📍", label: "Location", value: event.location }
+                          ? { icon: "📍", label: "Location", value: formatLoc(event.location) }
                           : null,
                       ].filter(Boolean).filter((r) => r.value).map((row) => (
                         <div key={row.label} className="flex items-start gap-2 bg-gray-50 rounded-lg px-2.5 py-1.5">

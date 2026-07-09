@@ -7,6 +7,8 @@ import Link from "next/link";
 import { formatISTDate } from "@/lib/time";
 import { get } from "@/lib/api";
 
+const formatLoc = (loc) => loc && typeof loc === "object" ? loc.location_name || loc.temporary_location?.name || "" : loc || "";
+
 const STATUS_STYLES = {
   scheduled:   { dot: "bg-blue-500", label: "Scheduled", color: "text-blue-700 bg-blue-50 border-blue-100" },
   checked_in:  { dot: "bg-amber-500", label: "In Progress", color: "text-amber-700 bg-amber-50 border-amber-100" },
@@ -168,7 +170,7 @@ export default function MRDashboard() {
                             <span>{visit.scheduled_date ? formatISTDate(visit.scheduled_date) : "—"}</span>
                             <span className="text-gray-300">·</span>
                             <span>{visit.scheduled_time || "—"}</span>
-                            {visit.location && <><span className="text-gray-300">·</span><span className="truncate max-w-[100px]">{visit.location}</span></>}
+                            {formatLoc(visit.location) && <><span className="text-gray-300">·</span><span className="truncate max-w-[100px]">{formatLoc(visit.location)}</span></>}
                           </p>
                         </div>
                         <div className="flex flex-col items-end gap-1 flex-shrink-0">

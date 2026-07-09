@@ -121,3 +121,25 @@ select:disabled,
   opacity: 1;
   transform: translateY(0);
 }
+
+/* Custom Scrollbar for SFE and Admin scrollable elements */
+.scrollbar-sfe::-webkit-scrollbar {
+  height: 4px; /* Height of horizontal scrollbar */
+  width: 4px;  /* Width of vertical scrollbar */
+}
+.scrollbar-sfe::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-sfe::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* slate-300 */
+  border-radius: 9999px;
+}
+.scrollbar-sfe::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8; /* slate-400 */
+}
+/* Firefox support */
+.scrollbar-sfe {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+

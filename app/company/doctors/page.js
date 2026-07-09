@@ -7,7 +7,7 @@ import Toast from "@/components/Toast";
 import { get, put, post, del } from "@/lib/api";
 import { TableSkeleton } from "@/components/Skeleton";
 import { downloadCSVTemplate } from "@/lib/downloadTemplate";
-import LocationMapPicker from "@/components/LocationMapPicker";
+import DoctorLocationsModal from "@/components/DoctorLocationsModal";
 
 const DOCTOR_HEADERS = ["name","email","phone","specialization","classification","hospital","license_number","address"];
 const DOCTOR_SAMPLE  = [["Dr. Sarah Sharma","sharma@gmail.com","+919876543210","Cardiologist","A","City Hospital","MH12345","123 Medical Street, Mumbai"]];
@@ -143,6 +143,8 @@ export default function CompanyDoctors() {
   const [toast, setToast]               = useState(null);
   const [showModal, setShowModal]       = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [showLocations, setShowLocations]   = useState(false);
+  const [locationsDoctor, setLocationsDoctor] = useState(null);
   const [confirmDelete, setConfirmDelete]   = useState(null);
   const [showBulkModal, setShowBulkModal]   = useState(false);
   const [showRequests, setShowRequests]     = useState(false);
@@ -159,7 +161,7 @@ export default function CompanyDoctors() {
       return [];
     }),
     gcTime: 30 * 60 * 1000,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
     placeholderData: (prev) => prev,
     retry: 2,
   });
@@ -168,7 +170,7 @@ export default function CompanyDoctors() {
   const total   = doctors.length;
   const loading = isLoading && !data;
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["doctors"] });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["doctors"], refetchType: "all" });
 
   const handleDelete = async () => {
     try {
@@ -327,15 +329,17 @@ export default function CompanyDoctors() {
                           ) : <span className="text-xs text-gray-400">—</span>}
                         </td>
                         <td className="px-4 py-3">
-                          <button onClick={() => handleToggleStatus(doctor)}
-                            className={`relative w-9 h-5 rounded-full transition-colors duration-300 ${doctor.is_active ? "bg-green-500" : "bg-gray-300"}`}>
-                            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-300 ${doctor.is_active ? "translate-x-4" : "translate-x-0.5"}`} />
+                           <button onClick={() => handleToggleStatus(doctor)}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full p-0.5 transition-colors duration-300 focus:outline-none ${doctor.is_active ? "bg-green-500" : "bg-gray-300"}`}>
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-300 ${doctor.is_active ? "translate-x-4" : "translate-x-0"}`} />
                           </button>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center gap-1.5">
                             <button onClick={() => { setSelectedDoctor(doctor); setShowModal(true); }}
                               className="bg-blue-100 text-blue-600 px-2.5 py-1 rounded-lg font-semibold hover:bg-blue-200 transition-all text-xs">Edit</button>
+                            <button onClick={() => { setLocationsDoctor(doctor); setShowLocations(true); }}
+                              className="bg-purple-100 text-purple-600 px-2.5 py-1 rounded-lg font-semibold hover:bg-purple-200 transition-all text-xs">📍 Locations</button>
                             <button onClick={() => setConfirmDelete(doctor)}
                               className="bg-red-100 text-red-600 px-2.5 py-1 rounded-lg font-semibold hover:bg-red-200 transition-all text-xs">Delete</button>
                           </div>
@@ -371,8 +375,8 @@ export default function CompanyDoctors() {
                       <p className="text-xs text-gray-400 truncate">{doctor.email}</p>
                     </div>
                     <button onClick={() => handleToggleStatus(doctor)}
-                      className={`relative w-9 h-5 rounded-full flex-shrink-0 transition-colors duration-300 ${doctor.is_active ? "bg-green-500" : "bg-gray-300"}`}>
-                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-300 ${doctor.is_active ? "translate-x-4" : "translate-x-0.5"}`} />
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full p-0.5 transition-colors duration-300 focus:outline-none ${doctor.is_active ? "bg-green-500" : "bg-gray-300"}`}>
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-300 ${doctor.is_active ? "translate-x-4" : "translate-x-0"}`} />
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-1.5 mb-2">
@@ -394,6 +398,8 @@ export default function CompanyDoctors() {
                   <div className="flex gap-1.5">
                     <button onClick={() => { setSelectedDoctor(doctor); setShowModal(true); }}
                       className="flex-1 bg-blue-100 text-blue-600 py-1.5 rounded-lg font-semibold text-xs hover:bg-blue-200 transition-all">Edit</button>
+                    <button onClick={() => { setLocationsDoctor(doctor); setShowLocations(true); }}
+                      className="flex-1 bg-purple-100 text-purple-600 py-1.5 rounded-lg font-semibold text-xs hover:bg-purple-200 transition-all">📍 Locations</button>
                     <button onClick={() => setConfirmDelete(doctor)}
                       className="flex-1 bg-red-100 text-red-600 py-1.5 rounded-lg font-semibold text-xs hover:bg-red-200 transition-all">Delete</button>
                   </div>
@@ -409,6 +415,12 @@ export default function CompanyDoctors() {
           doctor={selectedDoctor}
           onClose={() => setShowModal(false)}
           onSaved={(msg) => { invalidate(); setToast({ message: msg, type: "success" }); }}
+        />
+      )}
+      {showLocations && locationsDoctor && (
+        <DoctorLocationsModal
+          doctor={locationsDoctor}
+          onClose={() => { setShowLocations(false); setLocationsDoctor(null); invalidate(); }}
         />
       )}
 
@@ -553,19 +565,17 @@ function DoctorModal({ doctor, onClose, onSaved }) {
             </div>
             {field("Hospital", "hospital", "text", "City Hospital")}
             {field("License Number", "license_number", "text", "MH12345")}
+            {field("Address", "address", "text", "e.g. 123 Medical Street, Mumbai")}
             <div className="md:col-span-2">
-              <label className="block text-sm font-bold text-gray-700 mb-1.5">
-                Location / Address
-                <span className="ml-2 text-[10px] text-purple-500 font-normal">Search, drop pin, or use GPS</span>
-              </label>
-              <LocationMapPicker
-                value={form.address}
-                lat={form.latitude}
-                lng={form.longitude}
-                onChange={({ address, latitude, longitude }) =>
-                  setForm((f) => ({ ...f, address, latitude: String(latitude), longitude: String(longitude) }))
-                }
-              />
+              <div className="bg-purple-50 border border-purple-100 rounded-xl px-4 py-3 flex items-start gap-3 mt-2">
+                <span className="text-xl leading-none">📍</span>
+                <div>
+                  <p className="text-xs font-bold text-purple-900 mb-0.5">Location setup required for MR check-ins</p>
+                  <p className="text-[11px] text-purple-700 leading-relaxed">
+                    After saving this doctor, you <span className="font-bold">must</span> manage their clinic locations & geofencing using the <span className="font-bold px-1.5 py-0.5 bg-white rounded border border-purple-200">📍 Locations</span> button on their card. MRs cannot check-in until a location is added.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 

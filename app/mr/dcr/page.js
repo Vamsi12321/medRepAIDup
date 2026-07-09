@@ -12,6 +12,8 @@ const today = () => new Date().toISOString().split("T")[0];
 const MOOD_ICON = { positive: "😊", neutral: "😐", negative: "😞" };
 const MOOD_LABEL = { positive: "Positive", neutral: "Neutral", negative: "Negative" };
 
+const formatLoc = (loc) => loc && typeof loc === "object" ? loc.location_name || loc.temporary_location?.name || "" : loc || "";
+
 export default function MRDCRPage() {
   const [selectedDate, setSelectedDate] = useState(today());
   const [showPrintPreview, setShowPrintPreview] = useState(false);
@@ -55,7 +57,6 @@ export default function MRDCRPage() {
 
   // Stats
   const totalSamples  = completed.reduce((a, v) => a + (v.report?.samples_given || 0), 0);
-  const rxCommits     = completed.filter((v) => v.report?.rx_commitment).length;
   const followUps     = completed.filter((v) => v.report?.follow_up_date).length;
   const competitors   = completed.filter((v) => v.report?.competitor_info).length;
   const moodCounts    = { positive: 0, neutral: 0, negative: 0 };
@@ -105,35 +106,83 @@ export default function MRDCRPage() {
           </div>
         </div>
 
-        {/* Calendar strip */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-5">
-          <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-3">
-            {new Date(yr, mo-1).toLocaleString("default", { month: "long", year: "numeric" })} — Activity Calendar
-          </p>
-          <div className="flex gap-1.5 overflow-x-auto pb-1">
-            {calDays.map(({ date, day, count }) => {
-              const isSelected = date === selectedDate;
-              const isFuture   = date > today();
-              return (
-                <button key={date} onClick={() => !isFuture && setSelectedDate(date)} disabled={isFuture}
-                  className={`flex-shrink-0 w-10 h-10 rounded-xl flex flex-col items-center justify-center text-[10px] font-bold transition-all border ${
-                    isSelected     ? "bg-orange-500 text-white border-orange-500 shadow-sm"
-                    : count > 0    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                    : isFuture     ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed"
-                    :                "bg-gray-50 text-gray-400 border-gray-100 hover:bg-gray-100"
-                  }`}>
-                  <span>{day}</span>
-                  {count > 0 && !isSelected && <span className="w-1 h-1 bg-emerald-500 rounded-full mt-0.5" />}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex items-center gap-4 mt-2">
-            {[{ color:"bg-emerald-500", label:"Visits done" },{ color:"bg-orange-500", label:"Selected" },{ color:"bg-gray-200", label:"No visits" }].map((l) => (
-              <span key={l.label} className="flex items-center gap-1.5 text-[10px] text-gray-400">
-                <span className={`w-2 h-2 rounded-full ${l.color}`} />{l.label}
-              </span>
-            ))}
+        {/* Calendar + MR Info Block */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-5">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+            
+            {/* Left Side: MR Info */}
+            <div className="md:col-span-5 space-y-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-red-400 rounded-2xl flex items-center justify-center text-white font-black text-base shadow-sm shadow-orange-200">
+                  {(mrInfo?.name || mrName || "M").charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-gray-900 leading-tight">{mrInfo?.name || mrName}</h3>
+                  <p className="text-xs text-gray-400 font-medium mt-0.5">
+                    {mrInfo?.territory ? `${mrInfo.territory} · ${mrInfo.zone}` : "Field Representative"}
+                  </p>
+                </div>
+              </div>
+
+              {mrInfo && (
+                <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-2.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400 font-medium">Email</span>
+                    <span className="font-semibold text-gray-700">{mrInfo.email || "—"}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400 font-medium">Phone</span>
+                    <span className="font-semibold text-gray-700">{mrInfo.phone || "—"}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400 font-medium font-semibold">Territory</span>
+                    <span className="font-semibold text-gray-700">{mrInfo.territory || "—"}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Vertical Divider */}
+            <div className="hidden md:block md:col-span-1 self-stretch border-r border-gray-100 my-1" />
+
+            {/* Right Side: Calendar */}
+            <div className="md:col-span-6 flex flex-col">
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                {new Date(yr, mo-1).toLocaleString("default", { month: "long", year: "numeric" })} — Activity Calendar
+              </p>
+              <div className="grid grid-cols-7 gap-1.5 bg-gray-50/60 p-3 rounded-2xl border border-gray-100/80">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+                  <div key={d} className="text-center text-[9px] font-bold text-gray-400 uppercase tracking-wider py-1">{d}</div>
+                ))}
+                {Array.from({ length: new Date(yr, mo - 1, 1).getDay() }).map((_, idx) => (
+                  <div key={`spacer-${idx}`} className="w-8 h-8" />
+                ))}
+                {calDays.map(({ date, day, count }) => {
+                  const isSelected = date === selectedDate;
+                  const isFuture   = date > today();
+                  return (
+                    <button key={date} onClick={() => !isFuture && setSelectedDate(date)} disabled={isFuture}
+                      className={`w-8 h-8 rounded-lg flex flex-col items-center justify-center text-xs font-bold transition-all border relative ${
+                        isSelected     ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-200/60 scale-105"
+                        : count > 0    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100/80 hover:scale-105"
+                        : isFuture     ? "bg-gray-50/50 text-gray-300 border-gray-50 cursor-not-allowed"
+                        :                "bg-white text-gray-600 border-gray-100 hover:bg-gray-50 hover:border-gray-200 hover:scale-105"
+                      }`}>
+                      <span>{day}</span>
+                      {count > 0 && (
+                        <span className={`absolute bottom-0.5 w-1 h-1 rounded-full ${isSelected ? "bg-white" : "bg-emerald-500"}`} />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex flex-wrap items-center gap-3.5 mt-3 text-[10px] text-gray-400 font-semibold">
+                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-orange-500" /> Selected</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-50 border border-emerald-200" /> Visits Done</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-white border border-gray-100" /> No Visits</span>
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -149,11 +198,10 @@ export default function MRDCRPage() {
         ) : (
           <div className="space-y-4">
             {/* Stats */}
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+            <div className="grid grid-cols-5 sm:grid-cols-5 gap-3">
               {[
                 { label:"Visits",      value: completed.length, color:"text-purple-700",  bg:"bg-purple-50 border-purple-100",  icon:"📅" },
                 { label:"Samples",     value: totalSamples,     color:"text-blue-700",    bg:"bg-blue-50 border-blue-100",      icon:"💉" },
-                { label:"Rx Commits",  value: rxCommits,        color:"text-emerald-700", bg:"bg-emerald-50 border-emerald-100",icon:"✅" },
                 { label:"Follow-ups",  value: followUps,        color:"text-orange-700",  bg:"bg-orange-50 border-orange-100",  icon:"📆" },
                 { label:"Competitors", value: competitors,      color:"text-red-700",     bg:"bg-red-50 border-red-100",        icon:"⚔️" },
                 { label:"Products",    value: productsSet.size, color:"text-indigo-700",  bg:"bg-indigo-50 border-indigo-100",  icon:"💊" },
@@ -186,11 +234,10 @@ export default function MRDCRPage() {
                       <div className="w-7 h-7 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600 font-bold text-xs flex-shrink-0">{i+1}</div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-gray-900 truncate">{v.doctor_name}</p>
-                        <p className="text-[11px] text-gray-400">{v.purpose}{v.location ? ` · ${v.location}` : ""}{v.duration_minutes > 0 ? ` · ${v.duration_minutes} min` : ""}</p>
+                        <p className="text-[11px] text-gray-400">{v.purpose}{formatLoc(v.location) ? ` · ${formatLoc(v.location)}` : ""}{v.duration_minutes > 0 ? ` · ${v.duration_minutes} min` : ""}</p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {r.doctor_mood && <span className="text-sm">{MOOD_ICON[r.doctor_mood]}</span>}
-                        {r.rx_commitment && <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100">Rx ✓</span>}
                         {r.samples_given > 0 && <span className="text-[9px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100">{r.samples_given} samp</span>}
                       </div>
                     </div>
@@ -213,7 +260,6 @@ export default function MRDCRPage() {
           moodCounts={moodCounts}
           productsToday={[...productsSet]}
           totalSamples={totalSamples}
-          rxCommits={rxCommits}
           followUps={followUps}
           competitors={competitors}
           generatedAt={generatedAt}
@@ -225,7 +271,7 @@ export default function MRDCRPage() {
 }
 
 // ── DCR Print Modal ──────────────────────────────────────────────────────────
-function DCRPrintModal({ date, displayDate, mrInfo, mrName, completed, moodCounts, productsToday, totalSamples, rxCommits, followUps, competitors, generatedAt, onClose }) {
+function DCRPrintModal({ date, displayDate, mrInfo, mrName, completed, moodCounts, productsToday, totalSamples, followUps, competitors, generatedAt, onClose }) {
 
   const handlePrint = () => {
     const printContents = document.getElementById("dcr-print-area").innerHTML;
@@ -409,14 +455,12 @@ function DCRPrintModal({ date, displayDate, mrInfo, mrName, completed, moodCount
                 </div>
               </div>
 
-              {/* ── Day Summary Stats ── */}
               <div style={{ marginBottom:"18px" }}>
                 <div style={{ fontSize:"11px", fontWeight:"800", color:"#374151", textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"10px", paddingBottom:"6px", borderBottom:"1px solid #e5e7eb" }}>Day Summary</div>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:"8px" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:"8px" }}>
                   {[
                     { label:"Total Visits",   value: totalVisits,      bg:"#fff7ed", border:"#fed7aa", color:"#ea580c" },
                     { label:"Samples Given",  value: totalSamples,     bg:"#eff6ff", border:"#bfdbfe", color:"#2563eb" },
-                    { label:"Rx Commitments", value: rxCommits,        bg:"#f0fdf4", border:"#bbf7d0", color:"#16a34a" },
                     { label:"Follow-ups Set", value: followUps,        bg:"#fff7ed", border:"#fed7aa", color:"#d97706" },
                     { label:"Competitor Info",value: competitors,      bg:"#fef2f2", border:"#fecaca", color:"#dc2626" },
                     { label:"Products Discussed", value: [...productsToday].length, bg:"#f5f3ff", border:"#ddd6fe", color:"#7c3aed" },
@@ -482,7 +526,7 @@ function DCRPrintModal({ date, displayDate, mrInfo, mrName, completed, moodCount
                           <div>
                             <div style={{ fontSize:"13px", fontWeight:"800", color:"#111827" }}>{v.doctor_name}</div>
                             <div style={{ fontSize:"10px", color:"#6b7280", marginTop:"1px" }}>
-                              {[v.location && `📍 ${v.location}`, v.completed_at && `🕐 ${formatISTTime(v.completed_at)}`, v.duration_minutes > 0 && `⏱️ ${v.duration_minutes} min`].filter(Boolean).join("  ·  ")}
+                              {[formatLoc(v.location) && `📍 ${formatLoc(v.location)}`, v.completed_at && `🕐 ${formatISTTime(v.completed_at)}`, v.duration_minutes > 0 && `⏱️ ${v.duration_minutes} min`].filter(Boolean).join("  ·  ")}
                             </div>
                           </div>
                         </div>
@@ -496,11 +540,10 @@ function DCRPrintModal({ date, displayDate, mrInfo, mrName, completed, moodCount
                       {/* Visit body */}
                       <div style={{ padding:"12px 14px" }}>
                         {/* Data grid */}
-                        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"8px", marginBottom:"10px" }}>
+                        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"8px", marginBottom:"10px" }}>
                           {[
                             { label:"Purpose",       value: v.purpose || "—",    style:{} },
                             { label:"Samples Given", value: r.samples_given ?? "—", style:{} },
-                            { label:"Rx Commitment", value: r.rx_commitment ? `Yes · ${r.expected_rx_per_month || "—"}/mo` : "No", style: r.rx_commitment ? { color:"#16a34a", background:"#f0fdf4", border:"1px solid #bbf7d0" } : {} },
                             { label:"Follow-up",     value: r.follow_up_date ? formatISTDate(r.follow_up_date + "T00:00:00") : "None", style: r.follow_up_date ? { color:"#d97706", background:"#fffbeb", border:"1px solid #fde68a" } : {} },
                           ].map((f) => (
                             <div key={f.label} style={{ background:"#f9fafb", border:"1px solid #e5e7eb", borderRadius:"6px", padding:"7px 9px", ...f.style }}>

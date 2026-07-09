@@ -1,10 +1,12 @@
-﻿"use client";
+"use client";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import DoctorNavbar from "@/components/doctor/DoctorNavbar";
 import { formatISTDate } from "@/lib/time";
 import { get, put } from "@/lib/api";
 import ChangePasswordSection from "@/components/ChangePasswordSection";
+
+const formatLoc = (loc) => loc && typeof loc === "object" ? loc.location_name || loc.temporary_location?.name || "" : loc || "";
 
 export default function DoctorProfile() {
   const queryClient = useQueryClient();
@@ -45,7 +47,7 @@ export default function DoctorProfile() {
       full_name:        profile?.full_name || "",
       phone:            profile?.phone || "",
       bio:              profile?.bio || "",
-      location:         profile?.location || "",
+      location:         formatLoc(profile?.location) || "",
       experience_years: profile?.experience_years || "",
       specialization:   profile?.specialization || "",
       hospital:         profile?.hospital || "",
@@ -89,7 +91,7 @@ export default function DoctorProfile() {
               <h2 className="text-xl font-bold text-gray-900">{profile?.full_name}</h2>
               <p className="text-indigo-600 font-semibold text-sm mt-1">{profile?.specialization || "Doctor"}</p>
               {profile?.hospital && <p className="text-gray-500 text-xs mt-1">{profile.hospital}</p>}
-              {profile?.location && <p className="text-gray-400 text-xs mt-1">{profile.location}</p>}
+              {formatLoc(profile?.location) && <p className="text-gray-400 text-xs mt-1">{formatLoc(profile.location)}</p>}
               {profile?.bio && <p className="text-gray-600 text-sm mt-3 leading-relaxed">{profile.bio}</p>}
               <button onClick={startEdit}
                 className="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl font-semibold text-sm transition-all">
@@ -110,7 +112,7 @@ export default function DoctorProfile() {
                   { label: "Hospital",       value: profile?.hospital || "—",              color: "pink" },
                   { label: "Experience",     value: profile?.experience_years ? `${profile.experience_years} years` : "—", color: "green" },
                   { label: "License",        value: profile?.license_number || "—",        color: "orange" },
-                  { label: "Location",       value: profile?.location || "—",              color: "teal" },
+                  { label: "Location",       value: formatLoc(profile?.location) || "—",              color: "teal" },
                   { label: "Member Since",   value: profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : "—", color: "gray" },
                 ].map((f) => (
                   <div key={f.label} className={`bg-${f.color}-50 border border-${f.color}-100 rounded-xl p-3`}>

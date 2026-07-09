@@ -1,7 +1,7 @@
 "use client";
 import { formatISTDate, formatISTTime } from "@/lib/time";
 
-function buildHTML({ mrInfo, mrName, date, displayDate, completed, moodCounts, productsToday, totalSamples, rxCommits, followUps, competitors, generatedAt }) {
+function buildHTML({ mrInfo, mrName, date, displayDate, completed, moodCounts, productsToday, totalSamples, followUps, competitors, generatedAt }) {
   const totalVisits = completed.length;
   const name        = mrInfo?.name || mrName || "—";
   const reportId    = `MEDREPAI-DCR-${date.replace(/-/g, "")}-${(name).replace(/\s+/g,"").toUpperCase().slice(0,5)}`;
@@ -39,7 +39,6 @@ function buildHTML({ mrInfo, mrName, date, displayDate, completed, moodCounts, p
         ${field("Purpose",       v.purpose || "—")}
         ${field("Samples Given", r.samples_given ?? "0")}
         ${field("Doctor Mood",   mood)}
-        ${field("Rx Commitment", r.rx_commitment ? `Yes — ${r.expected_rx_per_month||"—"} Rx/mo` : "No")}
       </tr><tr>
         ${field("Follow-up Date",followD)}
         ${field("Competitor",    r.competitor_info || "None")}
@@ -159,7 +158,6 @@ function buildHTML({ mrInfo, mrName, date, displayDate, completed, moodCounts, p
   <table style="width:100%;border-collapse:collapse;margin-bottom:6px;"><tr>
     ${field("Doctors Visited",     String(totalVisits))}
     ${field("Samples Distributed", String(totalSamples))}
-    ${field("Rx Commitments",      String(rxCommits))}
     ${field("Follow-ups Planned",  String(followUps))}
     ${field("Competitor Reports",  String(competitors))}
     ${field("Products Covered",    String(productsToday.length))}
@@ -248,12 +246,12 @@ function buildHTML({ mrInfo, mrName, date, displayDate, completed, moodCounts, p
 }
 
 // ── DCR Print Template Modal ─────────────────────────────────────────────────
-export default function DCRPrintTemplate({ mrInfo, mrName, date, displayDate, completed, moodCounts, productsToday, totalSamples, rxCommits, followUps, competitors, generatedAt, onClose }) {
+export default function DCRPrintTemplate({ mrInfo, mrName, date, displayDate, completed, moodCounts, productsToday, totalSamples, followUps, competitors, generatedAt, onClose }) {
   const name        = mrInfo?.name || mrName || "—";
   const totalVisits = completed.length;
 
   const handlePrint = () => {
-    const html = buildHTML({ mrInfo, mrName, date, displayDate, completed, moodCounts, productsToday, totalSamples, rxCommits, followUps, competitors, generatedAt });
+    const html = buildHTML({ mrInfo, mrName, date, displayDate, completed, moodCounts, productsToday, totalSamples, followUps, competitors, generatedAt });
     const win  = window.open("", "_blank", "width=960,height=780,scrollbars=yes");
     if (!win) { alert("Please allow pop-ups to print."); return; }
     win.document.write(html);
@@ -355,7 +353,6 @@ export default function DCRPrintTemplate({ mrInfo, mrName, date, displayDate, co
               {[
                 { l:"Doctors Visited",    v: totalVisits      },
                 { l:"Samples Given",      v: totalSamples     },
-                { l:"Rx Commitments",     v: rxCommits        },
                 { l:"Follow-ups",         v: followUps        },
                 { l:"Competitor Reports", v: competitors      },
                 { l:"Products Covered",   v: productsToday.length },
@@ -392,7 +389,6 @@ export default function DCRPrintTemplate({ mrInfo, mrName, date, displayDate, co
                         { l:"Purpose",       v: v.purpose||"—" },
                         { l:"Samples Given", v: r.samples_given ?? "0" },
                         { l:"Doctor Mood",   v: mood },
-                        { l:"Rx Commitment", v: r.rx_commitment ? `Yes — ${r.expected_rx_per_month||"—"}/mo` : "No" },
                         { l:"Follow-up", v: (() => { const raw = r.follow_up_date || v.follow_up_date; if (!raw) return "—"; try { const s = String(raw); return formatISTDate(s.includes("T") ? s : s + "T00:00:00"); } catch { return String(raw); } })() },
                         { l:"Competitor",    v: r.competitor_info||"None" },
                         { l:"Products Discussed", v: prods },
