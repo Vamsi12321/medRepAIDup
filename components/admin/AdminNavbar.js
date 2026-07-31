@@ -28,7 +28,7 @@ export default function AdminNavbar() {
               <span className="text-lg sm:text-xl">💊</span>
             </div>
             <div className="hidden sm:block">
-              <h1 className="text-lg sm:text-xl font-bold text-white">MedRepAI Admin</h1>
+              <h1 className="text-lg sm:text-xl font-bold text-white">MRX Admin</h1>
               <p className="text-xs text-blue-100">System Administration</p>
             </div>
           </Link>

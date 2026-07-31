@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -55,7 +55,7 @@ export default function DoctorNavbar() {
                 <span className="text-base">💊</span>
               </div>
               <div className="leading-tight hidden sm:block">
-                <span className="text-sm font-bold text-gray-900 block">MedRepAI</span>
+                <span className="text-sm font-bold text-gray-900 block">MRX</span>
                 <span className="text-xs text-indigo-500 -mt-0.5 block">Doctor Portal</span>
               </div>
             </Link>

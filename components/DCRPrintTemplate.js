@@ -4,7 +4,7 @@ import { formatISTDate, formatISTTime } from "@/lib/time";
 function buildHTML({ mrInfo, mrName, date, displayDate, completed, moodCounts, productsToday, totalSamples, followUps, competitors, generatedAt }) {
   const totalVisits = completed.length;
   const name        = mrInfo?.name || mrName || "—";
-  const reportId    = `MEDREPAI-DCR-${date.replace(/-/g, "")}-${(name).replace(/\s+/g,"").toUpperCase().slice(0,5)}`;
+  const reportId    = `MRX-DCR-${date.replace(/-/g, "")}-${(name).replace(/\s+/g,"").toUpperCase().slice(0,5)}`;
 
   const field = (label, value, bold = false) =>
     `<td style="padding:0 32px 14px 0;vertical-align:top;min-width:140px;">
@@ -100,8 +100,8 @@ function buildHTML({ mrInfo, mrName, date, displayDate, completed, moodCounts, p
     <tr>
       <!-- Logo / Brand -->
       <td style="vertical-align:middle;padding-bottom:16px;width:200px;">
-        <div style="font-size:24px;font-weight:900;color:#111827;letter-spacing:-1px;line-height:1;">MedRep<span style="color:#1d4ed8;">AI</span></div>
-        <div style="font-size:9px;color:#6b7280;margin-top:3px;letter-spacing:0.3px;">Pharma Field Force Management</div>
+        <div style="font-size:24px;font-weight:900;color:#111827;letter-spacing:-1px;line-height:1;">MR<span style="color:#7c3aed;">X</span></div>
+        <div style="font-size:9px;color:#6b7280;margin-top:3px;letter-spacing:0.3px;">Pharma Intelligence Platform</div>
       </td>
       <!-- Divider -->
       <td style="width:1px;padding:0 24px 16px;vertical-align:middle;">
@@ -119,7 +119,7 @@ function buildHTML({ mrInfo, mrName, date, displayDate, completed, moodCounts, p
         <div style="font-size:8px;color:#1d4ed8;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-top:8px;">GENERATED</div>
         <div style="font-size:14px;font-weight:800;color:#111827;margin-top:2px;">${displayDate.split(",").slice(1).join(",").trim()}</div>
         <div style="font-size:9px;color:#374151;margin-top:2px;">${generatedAt}</div>
-        <div style="font-size:9px;color:#6b7280;margin-top:2px;">medrepai.app</div>
+        <div style="font-size:9px;color:#6b7280;margin-top:2px;">mrx.app</div>
       </td>
     </tr>
   </table>
@@ -225,7 +225,7 @@ function buildHTML({ mrInfo, mrName, date, displayDate, completed, moodCounts, p
 
   <!-- Watermark -->
   <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:80px;font-weight:900;color:#111827;opacity:0.03;pointer-events:none;white-space:nowrap;z-index:0;">
-    MedRepAI
+    MRX
   </div>
 
 </div>
@@ -234,7 +234,7 @@ function buildHTML({ mrInfo, mrName, date, displayDate, completed, moodCounts, p
 <div style="position:fixed;bottom:0;left:0;right:0;background:#f9fafb;border-top:1.5px solid #1d4ed8;padding:7px 40px;">
   <table style="width:100%;border-collapse:collapse;">
     <tr>
-      <td style="font-size:8px;color:#6b7280;">MedRepAI · Pharma Field Force Management Platform</td>
+      <td style="font-size:8px;color:#6b7280;">MRX · Pharma Intelligence Platform</td>
       <td style="font-size:8px;color:#6b7280;text-align:center;">Daily Call Report &nbsp;·&nbsp; CONFIDENTIAL</td>
       <td style="font-size:8px;color:#6b7280;text-align:right;">${reportId}</td>
     </tr>
@@ -298,8 +298,8 @@ export default function DCRPrintTemplate({ mrInfo, mrName, date, displayDate, co
             <div className="flex items-start justify-between pb-4 mb-0">
               <div className="flex items-center gap-5">
                 <div>
-                  <div style={{ fontSize:"22px", fontWeight:"900", color:"#111827", letterSpacing:"-1px", lineHeight:1 }}>MedRep<span style={{ color:"#1d4ed8" }}>AI</span></div>
-                  <div style={{ fontSize:"9px", color:"#6b7280", marginTop:"3px" }}>Pharma Field Force Management</div>
+                  <div style={{ fontSize:"22px", fontWeight:"900", color:"#111827", letterSpacing:"-1px", lineHeight:1 }}>MR<span style={{ color:"#7c3aed" }}>X</span></div>
+                  <div style={{ fontSize:"9px", color:"#6b7280", marginTop:"3px" }}>Pharma Intelligence Platform</div>
                 </div>
                 <div style={{ width:"1px", height:"44px", background:"#d1d5db" }} />
                 <div>
@@ -312,7 +312,7 @@ export default function DCRPrintTemplate({ mrInfo, mrName, date, displayDate, co
                   Field Activity Report &nbsp;·&nbsp; <span style={{ color:"#1d4ed8" }}>CONFIDENTIAL</span>
                 </div>
                 <div style={{ fontSize:"9px", color:"#6b7280", marginTop:"2px" }}>
-                  {`MEDREPAI-DCR-${date.replace(/-/g,"")}`}
+                  {`MRX-DCR-${date.replace(/-/g,"")}`}
                 </div>
                 <div style={{ fontSize:"8px", color:"#1d4ed8", fontWeight:"700", textTransform:"uppercase", letterSpacing:"0.5px", marginTop:"8px" }}>GENERATED</div>
                 <div style={{ fontSize:"14px", fontWeight:"800", color:"#111827", marginTop:"2px" }}>{date}</div>
@@ -413,7 +413,7 @@ export default function DCRPrintTemplate({ mrInfo, mrName, date, displayDate, co
 
             {/* Footer bar */}
             <div style={{ marginTop:"24px", borderTop:"1.5px solid #1d4ed8", paddingTop:"8px", display:"flex", justifyContent:"space-between" }}>
-              <span style={{ fontSize:"8px", color:"#9ca3af" }}>MedRepAI · Pharma Field Force Management</span>
+              <span style={{ fontSize:"8px", color:"#9ca3af" }}>MRX · Pharma Intelligence Platform</span>
               <span style={{ fontSize:"8px", color:"#9ca3af" }}>Daily Call Report · CONFIDENTIAL</span>
               <span style={{ fontSize:"8px", color:"#9ca3af" }}>Generated: {generatedAt}</span>
             </div>

@@ -11,7 +11,7 @@ async function forward(req, { params }) {
   const path = segments.join("/");
   const { searchParams } = new URL(req.url);
   const query = searchParams.toString();
-  const url = `${BACKEND}/api/v1/${path}${query ? "?" + query : ""}`;
+  const url = `${BACKEND}/mrx/api/v1/${path}${query ? "?" + query : ""}`;
 
   const method = req.method;
   const auth = req.headers.get("authorization") || "";
@@ -20,7 +20,7 @@ async function forward(req, { params }) {
   const forwardHeaders = {
     Authorization: auth,
     "ngrok-skip-browser-warning": "true",
-    "User-Agent": "MedRepAI-Proxy/1.0",
+    "User-Agent": "MRX-Proxy/1.0",
   };
 
   let body;

@@ -1,469 +1,607 @@
-﻿"use client";
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import DoctorNavbar from "@/components/doctor/DoctorNavbar";
-import MRNavbar from "@/components/mr/MRNavbar";
-import Breadcrumb from "@/components/Breadcrumb";
+"use client";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import MRSidebar from "@/components/mr/MRSidebar";
+import CompanyNavbar from "@/components/company/CompanyNavbar";
+import NotificationBell from "@/components/NotificationBell";
 import { useParams } from "next/navigation";
-import { get } from "@/lib/api";
+import { get, put } from "@/lib/api";
+import Link from "next/link";
 
-const formatKey = (key) => key?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "";
-const getVal = (drug, key) => {
-  // Primary: field_values array (official GET /api/v1/drugs/{id} format)
-  if (Array.isArray(drug?.field_values)) {
-    const fv = drug.field_values.find((f) => f.key === key);
-    if (fv !== undefined) {
-      if (Array.isArray(fv.value)) return fv.value.join(", ");
-      return fv.value ?? "";
-    }
-  }
-  // Fallback: top-level field (list endpoint format)
-  if (drug?.[key] !== undefined && drug?.[key] !== null) {
-    const v = drug[key];
-    if (Array.isArray(v)) return v.join(", ");
-    return String(v);
-  }
-  return "";
-};
-
-// Helper — fetch with auth, get blob, trigger download using server-provided filename
-async function downloadBrochure(url, fallbackName) {
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "ngrok-skip-browser-warning": "true",
-    },
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.detail || "Download failed");
-  }
-  // Extract filename from Content-Disposition header
-  const disposition = res.headers.get("content-disposition") || "";
-  const match = disposition.match(/filename[^;=\n]*=["']?([^"'\n;]+)["']?/i);
-  const filename = match?.[1]?.trim() || fallbackName;
-  const blob = await res.blob();
-  const objUrl = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = objUrl;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(objUrl);
-}
-
-// Brochure download — uses fetch with auth token so the backend accepts the request
-function BrochureDownloadButton({ drugId }) {
-  const [downloading, setDownloading] = useState(false);
-  const [err, setErr] = useState("");
-
-  const handleDownload = async () => {
-    setDownloading(true);
-    setErr("");
-    try {
-      await downloadBrochure(
-        `/api/v1/drugs/${drugId}/brochure/download`,
-        `drug-${drugId}-brochure.pdf`
-      );
-    } catch (e) {
-      setErr(e.message || "Download failed");
-    }
-    setDownloading(false);
-  };
-
-  return (
-    <div>
-      <button onClick={handleDownload} disabled={downloading}
-        className="w-full flex items-center gap-3 bg-gray-50 rounded-xl p-3 border border-gray-200 hover:shadow-md hover:border-indigo-300 transition-all group disabled:opacity-50">
-        <div className="w-9 h-9 bg-gradient-to-br from-red-500 to-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
-          <span className="text-sm">📄</span>
-        </div>
-        <div className="flex-1 min-w-0 text-left">
-          <p className="font-semibold text-gray-800 text-xs group-hover:text-indigo-600 transition-colors">Drug Brochure</p>
-          <p className="text-xs text-gray-400">{downloading ? "Downloading..." : "PDF · Click to download"}</p>
-        </div>
-        <span className="text-xs text-indigo-600 font-bold flex-shrink-0">{downloading ? "..." : "↓"}</span>
-      </button>
-      {err && <p className="text-xs text-red-500 mt-1 px-1">{err}</p>}
-    </div>
-  );
-}
-
-// Style presets to cycle through for dynamic fields
-const FIELD_STYLES = [
-  { icon: "🩺", bg: "bg-blue-50",    border: "border-blue-200",    text: "text-blue-700"    },
-  { icon: "🤒", bg: "bg-orange-50",  border: "border-orange-200",  text: "text-orange-700"  },
-  { icon: "⚠️", bg: "bg-red-50",     border: "border-red-200",     text: "text-red-700"     },
-  { icon: "🔬", bg: "bg-purple-50",  border: "border-purple-200",  text: "text-purple-700"  },
-  { icon: "💊", bg: "bg-green-50",   border: "border-green-200",   text: "text-green-700"   },
-  { icon: "💉", bg: "bg-teal-50",    border: "border-teal-200",    text: "text-teal-700"    },
-  { icon: "🔄", bg: "bg-cyan-50",    border: "border-cyan-200",    text: "text-cyan-700"    },
-  { icon: "💰", bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700" },
-  { icon: "🏷️", bg: "bg-amber-50",   border: "border-amber-200",   text: "text-amber-700"   },
-  { icon: "📋", bg: "bg-indigo-50",  border: "border-indigo-200",  text: "text-indigo-700"  },
-  { icon: "🧪", bg: "bg-pink-50",    border: "border-pink-200",    text: "text-pink-700"    },
-  { icon: "📊", bg: "bg-slate-50",   border: "border-slate-200",   text: "text-slate-700"   },
-];
-
-// Keys to skip in the drug info section (shown elsewhere or internal)
-const SKIP_KEYS = ["drug_name", "brand_name", "drug_class", "manufacturer", "specialization",
-  "pack_type", "units_per_pack", "packs_per_box", "pack_price", "box_price", "mrp", "price_per_drug", "price"];
-
-// Pricing keys to render in dedicated Pricing section
-const PRICING_KEYS = ["pack_type", "units_per_pack", "packs_per_box", "pack_price", "box_price", "mrp", "price_per_drug", "price"];
-
+const fmt = (key) => key?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "";
+const arrStr = (v) => Array.isArray(v) ? v.join(", ") : v || "";
 
 export default function DrugDetails() {
-  const params = useParams();
-  const drugId = params.id;
-  const [userRole, setUserRole]       = useState("doctor");
-  const [question, setQuestion]       = useState("");
+  const { id: drugId } = useParams();
+  const queryClient = useQueryClient();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [showBrochure, setShowBrochure] = useState(false);
+  const [showAI, setShowAI] = useState(false);
+  const [question, setQuestion] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
-  const [isAsking, setIsAsking]       = useState(false);
+  const [isAsking, setIsAsking] = useState(false);
+  const userName = typeof window !== "undefined" ? localStorage.getItem("userName") || "User" : "User";
+  const userRole = typeof window !== "undefined" ? localStorage.getItem("userRole") || "mr" : "mr";
+  const isAdmin = userRole === "company" || userRole === "admin";
 
-  useEffect(() => {
-    const role = localStorage.getItem("userRole");
-    if (role) setUserRole(role);
-  }, []);
-
-  const { data: drug, isLoading: loading } = useQuery({
+  const { data: drug, isLoading } = useQuery({
     queryKey: ["drug", drugId],
-    queryFn:  () => get(`/api/v1/drugs/${drugId}`),
-    enabled:  !!drugId,
+    queryFn: () => get(`/api/v1/drugs/${drugId}`),
+    enabled: !!drugId,
     staleTime: 10 * 60 * 1000,
   });
 
-  const handleAsk = () => {
-    if (!question.trim() || !drug) return;
-    setChatHistory((p) => [...p, { type: "user", text: question }]);
+  if (isLoading) return <div className="min-h-screen bg-[#f8f9fc] flex items-center justify-center"><div className="animate-pulse text-gray-400 text-sm">Loading drug details...</div></div>;
+  if (!drug) return <div className="min-h-screen bg-[#f8f9fc] flex items-center justify-center"><p className="text-gray-500 text-sm">Drug not found.</p></div>;
+
+  const d = drug;
+  const name = d.drug_name || d.brand_name || "Drug";
+  const pkg = d.packaging;
+  const backLink = isAdmin ? "/company/drug-management" : "/mr/drug-search";
+  const backLabel = isAdmin ? "Drug Management" : "Drug Search";
+
+  // AI assistant handler (MR only)
+  const handleAskAI = () => {
+    if (!question.trim()) return;
+    setChatHistory(p => [...p, { type: "user", text: question }]);
     setIsAsking(true);
-    const q   = question.toLowerCase();
-    const ctx = (drug.field_values?.length > 0
-      ? drug.field_values
-      : Object.entries(drug)
-          .filter(([k, v]) => v && typeof v !== "object")
-          .map(([k, v]) => ({ key: k, value: v }))
-    ).map((fv) => `${formatKey(fv.key)}: ${fv.value}`).join(". ");
+    const q = question.toLowerCase();
+    const ctx = Object.entries(d).filter(([k,v]) => v && typeof v !== "object" && !["_id","template_id","search_text","created_at","updated_at"].includes(k)).map(([k,v]) => `${fmt(k)}: ${v}`).join(". ");
     setTimeout(() => {
-      const sideEffects = drug.side_effects     || getVal(drug, "side_effects");
-      const mechanism   = drug.mechanism_of_action || getVal(drug, "mechanism_of_action");
-      const dosage      = drug.dosage_strength  || getVal(drug, "dosage_strength") || drug.dosage || getVal(drug, "dosage");
-      const name        = drug.drug_name || getVal(drug, "drug_name") || drug.brand_name || getVal(drug, "brand_name") || "this drug";
       let answer = "";
-      if (q.includes("side effect"))                              answer = sideEffects ? `Side effects of ${name}: ${sideEffects}.` : "No side effects data available.";
-      else if (q.includes("mechanism") || q.includes("action"))  answer = mechanism ? `${name} works by: ${mechanism}.` : "Mechanism not available.";
-      else if (q.includes("dose") || q.includes("dosage"))       answer = dosage ? `Dosage for ${name}: ${dosage}.` : "Dosage not available.";
-      else answer = `Here is what I know about ${name}: ${ctx}`;
-      setChatHistory((p) => [...p, { type: "ai", text: answer }]);
-      setIsAsking(false);
-      setQuestion("");
-    }, 1200);
+      const se = arrStr(d.side_effects); const moa = d.mechanism_of_action || ""; const dos = d.strength || d.adult_dosage || "";
+      if (q.includes("side effect")) answer = se ? `Side effects: ${se}` : "No side effects data available.";
+      else if (q.includes("mechanism") || q.includes("action")) answer = moa ? `${name} works by: ${moa}` : "Mechanism not available.";
+      else if (q.includes("dose") || q.includes("dosage")) answer = dos ? `Dosage: ${dos}` : "Dosage info not available.";
+      else if (q.includes("indication")) answer = arrStr(d.indications) || "No indications data.";
+      else if (q.includes("contra")) answer = arrStr(d.contraindications) || "No contraindications data.";
+      else answer = `Here's what I know about ${name}: ${ctx.slice(0, 500)}`;
+      setChatHistory(p => [...p, { type: "ai", text: answer }]);
+      setIsAsking(false); setQuestion("");
+    }, 1000);
   };
 
-  if (loading) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p className="text-gray-400 text-sm">Loading...</p>
-    </div>
-  );
-  if (!drug) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p className="text-gray-500 text-sm">Drug not found.</p>
-    </div>
-  );
-
-  const drugName       = getVal(drug, "drug_name")     || drug.drug_name     || drug.name || "Drug";
-  const brandName      = getVal(drug, "brand_name")    || drug.brand_name;
-  const drugClass      = getVal(drug, "drug_class")    || drug.drug_class;
-  const manufacturer   = getVal(drug, "manufacturer")  || drug.manufacturer;
-  const specialization = getVal(drug, "specialization") || drug.specialization;
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      {userRole === "mr" ? <MRNavbar /> : <DoctorNavbar />}
+    <div className={`min-h-screen bg-[#f8f9fc] ${isAdmin ? "" : "flex"}`}>
+      {/* Admin: top navbar */}
+      {isAdmin && <CompanyNavbar />}
+      {/* MR: sidebar */}
+      {!isAdmin && <MRSidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />}
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <Breadcrumb customItems={[
-          { label: userRole === "mr" ? "MR Portal" : "Doctor", href: userRole === "mr" ? "/mr/dashboard" : "/doctor/home" },
-          { label: "Drug Search", href: userRole === "mr" ? "/mr/drug-search" : "/doctor/drug-search" },
-          { label: drugName, href: null },
-        ]} />
-
-        {/* Compact header */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 mb-5 overflow-hidden">
-          <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
-          <div className="px-5 py-4 flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow flex-shrink-0">
-              {drugName?.charAt(0)?.toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-bold text-gray-900 capitalize leading-tight">{drugName}</h1>
-              {brandName && drugName !== brandName && (
-                <p className="text-sm text-indigo-500 font-semibold capitalize">{brandName}</p>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-1.5 justify-end">
-              {drugClass      && <span className="bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-lg text-xs font-semibold">{drugClass}</span>}
-              {specialization && <span className="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-lg text-xs font-semibold">{specialization}</span>}
-              {manufacturer   && <span className="bg-gray-100 text-gray-600 px-2.5 py-1 rounded-lg text-xs font-semibold">{manufacturer}</span>}
+      <div className={isAdmin ? "max-w-7xl mx-auto" : `${sidebarCollapsed ? "md:ml-[60px]" : "md:ml-[220px]"} flex-1 min-h-screen transition-all duration-300`}>
+        {/* Top Bar — MR only */}
+        {!isAdmin && (
+        <header className="bg-white/80 backdrop-blur-md border-b border-gray-100/80 px-4 md:px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+          <button onClick={() => setMobileOpen(true)} className="md:hidden w-9 h-9 rounded-lg bg-gray-100 hover:bg-purple-50 flex items-center justify-center text-gray-600 hover:text-purple-600 transition-all mr-3">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+          </button>
+          <div className="flex items-center gap-1.5 text-sm text-gray-600">
+            <Link href={backLink} className="hover:text-purple-600 transition-colors">{backLabel}</Link>
+            <span className="text-gray-300">›</span>
+            <span className="font-semibold text-gray-800 capitalize">{name}</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <NotificationBell accentColor="indigo" />
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center text-white text-xs font-bold">{userName.charAt(0).toUpperCase()}</div>
+              <div className="hidden sm:block"><p className="text-sm font-bold text-gray-800 leading-none">{userName.split(" ")[0]}</p><p className="text-[10px] text-gray-400">MR</p></div>
             </div>
           </div>
-        </div>
+        </header>
+        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
-          {/* Drug info — 2/3 width — main highlight */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-sm border border-indigo-100 p-5" style={{ boxShadow: "0 0 0 2px rgba(99,102,241,0.08), 0 4px 24px 0 rgba(99,102,241,0.06)" }}>
-            <h2 className="text-base font-extrabold text-gray-900 mb-4 flex items-center gap-2 uppercase tracking-wide">
-              <span className="w-6 h-6 bg-indigo-500 rounded-lg flex items-center justify-center text-white text-xs">💊</span>
-              Drug Information
-            </h2>
-            <div className="space-y-3">
-              {(() => {
-                // Get all displayable fields dynamically from field_values or top-level keys
-                const fields = drug.field_values?.length > 0
-                  ? drug.field_values.filter((fv) => !SKIP_KEYS.includes(fv.key) && fv.value !== null && fv.value !== undefined && fv.value !== "" && !(Array.isArray(fv.value) && fv.value.length === 0))
-                  : Object.entries(drug)
-                      .filter(([k, v]) => !SKIP_KEYS.includes(k) && !k.startsWith("_") && !["id","template_id","field_values","created_at","updated_at","is_active","search_text","has_brochure"].includes(k) && v !== null && v !== undefined && v !== "")
-                      .map(([k, v]) => ({ key: k, value: v, type: Array.isArray(v) ? "array" : typeof v === "number" ? "number" : "text" }));
-
-                return fields.map((fv, idx) => {
-                  const style = FIELD_STYLES[idx % FIELD_STYLES.length];
-                  const rawVal = fv.value;
-                  const fieldType = fv.type || (Array.isArray(rawVal) ? "array" : "text");
-                  const label = formatKey(fv.key);
-
-                  return (
-                    <div key={fv.key || idx} className={`${style.bg} border ${style.border} rounded-xl p-3`}>
-                      <p className={`text-xs font-bold ${style.text} mb-1.5 flex items-center gap-1.5`}>
-                        <span>{style.icon}</span>{label}
-                      </p>
-                      {(fieldType === "array" || Array.isArray(rawVal)) ? (
-                        <div className="flex flex-wrap gap-1.5">
-                          {(Array.isArray(rawVal) ? rawVal : []).map((item, i) => (
-                            <span key={i} className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${style.bg} ${style.text} border ${style.border}`}>
-                              {item}
-                            </span>
-                          ))}
-                        </div>
-                      ) : fieldType === "textarea" ? (
-                        <p className="text-gray-800 text-xs leading-relaxed whitespace-pre-wrap">{String(rawVal)}</p>
-                      ) : fieldType === "number" ? (
-                        <p className="text-gray-900 text-sm font-bold">{String(rawVal)}</p>
-                      ) : fieldType === "date" ? (
-                        <p className="text-gray-800 text-xs font-semibold">{(() => { try { return new Date(rawVal).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); } catch { return String(rawVal); } })()}</p>
-                      ) : fieldType === "url" ? (
-                        <a href={String(rawVal)} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-700 text-xs font-medium underline break-all">{String(rawVal)}</a>
-                      ) : fieldType === "select" ? (
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-semibold ${style.bg} ${style.text} border ${style.border}`}>{String(rawVal)}</span>
-                      ) : (
-                        <p className="text-gray-800 text-xs leading-relaxed">{String(rawVal)}</p>
-                      )}
-                    </div>
-                  );
-                });
-              })()}
+        <main className="px-4 md:px-6 py-4 md:py-5">
+          {/* Admin breadcrumb */}
+          {isAdmin && (
+            <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-4">
+              <Link href={backLink} className="hover:text-purple-600 transition-colors font-medium">{backLabel}</Link>
+              <span className="text-gray-300">›</span>
+              <span className="font-semibold text-gray-800 capitalize">{name}</span>
             </div>
-            </div>
-          </div>
-
-          {/* Right column — docs + brochure */}
-          <div className="space-y-4">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
-              <h2 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2 uppercase tracking-wide">
-                <span className="w-5 h-5 bg-blue-100 rounded-lg flex items-center justify-center text-xs">📁</span>
-                Documents
-              </h2>
-              {drug.has_brochure ? (
-                <div className="space-y-2">
-                  <BrochureDownloadButton drugId={drugId} />
+          )}
+          {/* Hero Card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
+            <div className="h-2 w-full bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400" />
+            <div className="p-5 md:p-6 flex flex-col md:flex-row items-start md:items-center gap-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-purple-800 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-purple-200 flex-shrink-0">{name.charAt(0).toUpperCase()}</div>
+              <div className="flex-1 min-w-0">
+                <h1 className="text-2xl font-bold text-gray-900 capitalize">{name}</h1>
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  {d.brand_name && d.brand_name !== name && <span className="text-sm text-purple-600 font-semibold capitalize">{d.brand_name}</span>}
+                  {d.generic_name && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-[10px] font-semibold">{d.generic_name}</span>}
+                  {d.prescription_type && <span className="bg-green-50 text-green-600 px-2 py-0.5 rounded-full text-[10px] font-bold border border-green-100">{d.prescription_type}</span>}
+                  {d.is_active && <span className="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full text-[10px] font-bold border border-emerald-100">Active</span>}
                 </div>
-              ) : (
-                <div className="flex items-center gap-2 py-3 px-1">
-                  <span className="text-gray-300 text-lg">📄</span>
-                  <p className="text-gray-400 text-xs">No brochure available for this drug</p>
-                </div>
-              )}
-            </div>
-
-            {/* Quick facts */}
-            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100 p-4">
-              <p className="text-xs font-bold text-indigo-700 mb-2 uppercase tracking-wide">Quick Facts</p>
-              <div className="space-y-1.5 text-xs">
-                {(() => {
-                  // Build quick facts from all available fields
-                  const facts = [];
-                  if (drugName) facts.push({ label: "Drug Name", value: drugName });
-                  if (brandName) facts.push({ label: "Brand", value: brandName });
-                  if (drugClass) facts.push({ label: "Class", value: drugClass });
-                  if (manufacturer) facts.push({ label: "By", value: manufacturer });
-                  // Add pricing summary from drug.packaging
-                  const shownKeys = ["drug_name","brand_name","drug_class","manufacturer","specialization",
-                    "pack_type","units_per_pack","packs_per_box","pack_price","box_price","mrp","price_per_drug","price"];
-                  if (drug.field_values?.length > 0) {
-                    drug.field_values.forEach((fv) => {
-                      if (shownKeys.includes(fv.key)) return;
-                      if (fv.type === "array" || fv.type === "textarea" || fv.type === "url") return;
-                      if (Array.isArray(fv.value)) return;
-                      if (!fv.value || String(fv.value).length > 50) return;
-                      facts.push({ label: formatKey(fv.key), value: String(fv.value) });
-                    });
-                  }
-                  return facts.map((r) => (
-                    <div key={r.label} className="flex items-center justify-between gap-2">
-                      <span className="text-gray-400 font-medium flex-shrink-0">{r.label}</span>
-                      {String(r.value).startsWith("http") ? (
-                        <a href={r.value} target="_blank" rel="noreferrer" className="text-indigo-600 font-semibold text-right truncate hover:underline text-[11px]">
-                          {r.label === "Reference Url" ? "View Reference ↗" : r.value}
-                        </a>
-                      ) : (
-                        <span className="text-gray-700 font-semibold text-right truncate capitalize">{r.value}</span>
-                      )}
-                    </div>
-                  ));
-                })()}
+                {d.manufacturer && <p className="text-xs text-gray-400 mt-1">Marketed by <strong className="text-gray-600">{d.manufacturer}</strong></p>}
               </div>
-            </div>
-
-            {/* Pricing & Packaging — compact, below Quick Facts (MR only) */}
-            {userRole === "mr" && drug.packaging?.sales_unit && (() => {
-              const rawPkg = drug.packaging;
-              const pricing = rawPkg.pricing || {};
-              const boxPricing = pricing.box_pricing || {};
-              const pkg = {
-                ...rawPkg,
-                selling_price: rawPkg.selling_price ?? pricing.selling_price,
-                mrp: rawPkg.mrp ?? pricing.mrp,
-                max_discount_percent: rawPkg.max_discount_percent ?? pricing.max_discount_percent,
-                box_price: rawPkg.box_price ?? boxPricing.box_price,
-              };
-              return (
-                <div className="bg-white rounded-2xl border border-emerald-100 p-4">
-                  <p className="text-xs font-bold text-emerald-700 mb-3 uppercase tracking-wide flex items-center gap-1.5">
-                    <span>💰</span> Pricing & Packaging
-                  </p>
-                  {/* Hierarchy */}
-                  {(pkg.pack_quantity || pkg.sales_units_per_box) && (
-                    <div className="flex items-center gap-2 mb-3 flex-wrap">
-                      {pkg.pack_quantity && (
-                        <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-1.5 text-center">
-                          <p className="text-[8px] text-emerald-600 font-bold uppercase">1 {pkg.sales_unit}</p>
-                          <p className="text-[11px] font-bold text-gray-700">{pkg.pack_quantity} {pkg.measurement_unit || "units"}</p>
-                        </div>
-                      )}
-                      {pkg.pack_quantity && pkg.sales_units_per_box && <span className="text-gray-300 text-sm">→</span>}
-                      {pkg.sales_units_per_box && (
-                        <div className="bg-teal-50 border border-teal-100 rounded-lg px-2.5 py-1.5 text-center">
-                          <p className="text-[8px] text-teal-600 font-bold uppercase">1 Box</p>
-                          <p className="text-[11px] font-bold text-gray-700">{pkg.sales_units_per_box} {pkg.sales_unit}s</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {/* Prices */}
-                  <div className="grid grid-cols-2 gap-2">
-                    {pkg.selling_price != null && <div className="bg-emerald-50 rounded-lg p-2 text-center border border-emerald-100"><p className="text-[8px] text-emerald-600 font-bold uppercase">/{pkg.sales_unit}</p><p className="text-sm font-extrabold text-emerald-800">₹{pkg.selling_price}</p></div>}
-                    {pkg.box_price != null && <div className="bg-teal-50 rounded-lg p-2 text-center border border-teal-100"><p className="text-[8px] text-teal-600 font-bold uppercase">/Box</p><p className="text-sm font-extrabold text-teal-800">₹{pkg.box_price}</p></div>}
-                    {pkg.mrp != null && <div className="bg-amber-50 rounded-lg p-2 text-center border border-amber-100"><p className="text-[8px] text-amber-600 font-bold uppercase">MRP</p><p className="text-sm font-extrabold text-amber-800">₹{pkg.mrp}</p></div>}
-                    {pkg.max_discount_percent != null && <div className="bg-red-50 rounded-lg p-2 text-center border border-red-100"><p className="text-[8px] text-red-500 font-bold uppercase">Max Disc</p><p className="text-sm font-extrabold text-red-700">{pkg.max_discount_percent}%</p></div>}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-
-        {/* AI Chat — light premium */}
-        <div className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 rounded-2xl border border-indigo-100 p-5 relative overflow-hidden">
-          {/* Subtle background accents */}
-          <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-indigo-100/40 to-purple-100/40 rounded-full -mr-24 -mt-24 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-32 h-32 bg-indigo-100/30 rounded-full -ml-16 -mb-16 pointer-events-none" />
-
-          {/* Header */}
-          <div className="flex items-center gap-2.5 mb-4 relative">
-            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md shadow-indigo-200">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-gray-900 font-bold text-sm leading-tight">Ask AI About This Drug</p>
-              <p className="text-indigo-400 text-xs">Powered by AI · Instant answers</p>
-            </div>
-            <div className="ml-auto flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-green-600 text-xs font-medium">Online</span>
-            </div>
-          </div>
-
-          {/* Chat area */}
-          <div className="overflow-y-auto space-y-2.5 mb-4 max-h-48 relative">
-            {chatHistory.length === 0 && (
-              <div className="space-y-2">
-                <p className="text-gray-400 text-xs">Quick questions:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {["Side effects?","Mechanism of action?","Dosage?","Indications?"].map((q) => (
-                    <button key={q} onClick={() => setQuestion(q)}
-                      className="bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 hover:border-indigo-400 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm">
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {chatHistory.map((msg, i) => (
-              <div key={i} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"} items-end gap-2`}>
-                {msg.type === "ai" && (
-                  <div className="w-6 h-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
-                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                  </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {isAdmin && (
+                  <button onClick={() => setShowEdit(true)} className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-purple-50 hover:border-purple-200 hover:text-purple-700 transition-all flex items-center gap-1.5">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    Edit Drug
+                  </button>
                 )}
-                <div className={`max-w-sm px-3.5 py-2.5 rounded-xl text-xs leading-relaxed shadow-sm ${
-                  msg.type === "user"
-                    ? "bg-indigo-600 text-white rounded-br-sm"
-                    : "bg-white text-gray-800 border border-indigo-100 rounded-bl-sm"
-                }`}>
-                  {msg.text}
-                </div>
+                {isAdmin && (
+                  <button onClick={() => setShowBrochure(true)} className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-purple-50 hover:border-purple-200 hover:text-purple-700 transition-all flex items-center gap-1.5">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                    {d.has_brochure ? "Replace Brochure" : "Upload Brochure"}
+                  </button>
+                )}
+                {d.has_brochure && <BrochureDownloadBtn drugId={drugId} />}
+                {!isAdmin && (
+                  <button onClick={() => setShowAI(true)} className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-800 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-200 hover:shadow-lg transition-all flex items-center gap-1.5">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                    Ask AI
+                  </button>
+                )}
               </div>
-            ))}
-            {isAsking && (
-              <div className="flex justify-start items-end gap-2">
-                <div className="w-6 h-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
-                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
+            </div>
+          </div>
+
+          {/* Main Grid — 3 columns */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Col 1+2 — Drug Info */}
+            <div className="lg:col-span-2 space-y-5">
+              {/* Basic Info Grid */}
+              <Section title="Drug Information" icon="💊" color="purple">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <InfoField label="Drug Name" value={d.drug_name} />
+                  <InfoField label="Brand Name" value={d.brand_name} />
+                  <InfoField label="Generic Name" value={d.generic_name} />
+                  <InfoField label="Manufacturer" value={d.manufacturer} />
+                  <InfoField label="Drug Class" value={d.drug_class} />
+                  <InfoField label="Therapeutic Category" value={d.therapeutic_category} />
+                  <InfoField label="Dosage Form" value={d.dosage_form} />
+                  <InfoField label="Strength" value={d.strength} />
+                  <InfoField label="Route" value={d.route} />
+                  <InfoField label="Prescription Type" value={d.prescription_type} />
+                  <InfoField label="Storage" value={d.storage_conditions} />
+                  <InfoField label="Created" value={d.created_at ? new Date(d.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : null} />
                 </div>
-                <div className="bg-white border border-indigo-100 px-3.5 py-2.5 rounded-xl rounded-bl-sm shadow-sm">
-                  <div className="flex gap-1">
-                    {[0,1,2].map((i) => (
-                      <span key={i} className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: `${i*150}ms`}} />
+              </Section>
+
+              {/* Composition */}
+              {d.composition?.length > 0 && (
+                <Section title="Composition" icon="🧪" color="green">
+                  <div className="flex flex-wrap gap-2">
+                    {(Array.isArray(d.composition) ? d.composition : [d.composition]).map((c, i) => (
+                      <span key={i} className="bg-green-50 text-green-700 border border-green-100 px-3 py-1.5 rounded-lg text-xs font-medium">{c}</span>
                     ))}
                   </div>
+                </Section>
+              )}
+
+              {/* Indications & Symptoms */}
+              {(d.indications?.length > 0 || d.symptoms?.length > 0) && (
+                <Section title="Indications & Symptoms" icon="🎯" color="blue">
+                  {d.indications?.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Indications</p>
+                      <div className="flex flex-wrap gap-2">{(Array.isArray(d.indications) ? d.indications : [d.indications]).map((v, i) => <span key={i} className="bg-blue-50 text-blue-700 border border-blue-100 px-3 py-1.5 rounded-lg text-xs font-medium">{v}</span>)}</div>
+                    </div>
+                  )}
+                  {d.symptoms?.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Symptoms</p>
+                      <div className="flex flex-wrap gap-2">{(Array.isArray(d.symptoms) ? d.symptoms : [d.symptoms]).map((v, i) => <span key={i} className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-lg text-xs font-medium">{v}</span>)}</div>
+                    </div>
+                  )}
+                </Section>
+              )}
+
+              {/* Mechanism of Action */}
+              {d.mechanism_of_action && (
+                <Section title="Mechanism of Action" icon="⚙️" color="purple">
+                  <p className="text-sm text-gray-700 leading-relaxed">{d.mechanism_of_action}</p>
+                </Section>
+              )}
+
+              {/* Side Effects */}
+              {d.side_effects?.length > 0 && (
+                <Section title="Side Effects" icon="⚠️" color="red">
+                  <div className="flex flex-wrap gap-2">{(Array.isArray(d.side_effects) ? d.side_effects : [d.side_effects]).map((v, i) => <span key={i} className="bg-red-50 text-red-700 border border-red-100 px-3 py-1.5 rounded-lg text-xs font-medium">{v}</span>)}</div>
+                </Section>
+              )}
+
+              {/* Contraindications */}
+              {d.contraindications?.length > 0 && (
+                <Section title="Contraindications" icon="🚫" color="orange">
+                  <div className="flex flex-wrap gap-2">{(Array.isArray(d.contraindications) ? d.contraindications : [d.contraindications]).map((v, i) => <span key={i} className="bg-orange-50 text-orange-700 border border-orange-100 px-3 py-1.5 rounded-lg text-xs font-medium">{v}</span>)}</div>
+                </Section>
+              )}
+
+              {/* Warnings */}
+              {d.warnings_precautions?.length > 0 && (
+                <Section title="Warnings & Precautions" icon="🔔" color="amber">
+                  <div className="flex flex-wrap gap-2">{(Array.isArray(d.warnings_precautions) ? d.warnings_precautions : [d.warnings_precautions]).map((v, i) => <span key={i} className="bg-amber-50 text-amber-700 border border-amber-100 px-3 py-1.5 rounded-lg text-xs font-medium">{v}</span>)}</div>
+                </Section>
+              )}
+
+              {/* Drug Interactions */}
+              {d.drug_interactions?.length > 0 && (
+                <Section title="Drug Interactions" icon="🔄" color="cyan">
+                  <div className="flex flex-wrap gap-2">{(Array.isArray(d.drug_interactions) ? d.drug_interactions : [d.drug_interactions]).map((v, i) => <span key={i} className="bg-cyan-50 text-cyan-700 border border-cyan-100 px-3 py-1.5 rounded-lg text-xs font-medium">{v}</span>)}</div>
+                </Section>
+              )}
+
+              {/* Reference */}
+              {d.reference_url && (
+                <Section title="Reference" icon="🔗" color="slate">
+                  <a href={d.reference_url} target="_blank" rel="noreferrer" className="text-purple-600 hover:text-purple-800 text-sm font-medium underline break-all flex items-center gap-2">
+                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                    {d.reference_url}
+                  </a>
+                </Section>
+              )}
+
+              {/* Dynamic fields — show all remaining data not already rendered above */}
+              {(() => {
+                const SHOWN = new Set(["_id","template_id","field_values","search_text","packaging","packaging_type","created_at","updated_at","is_active","has_brochure",
+                  "drug_name","brand_name","generic_name","manufacturer","drug_class","therapeutic_category","dosage_form","strength","route","prescription_type","storage_conditions",
+                  "composition","indications","symptoms","mechanism_of_action","side_effects","contraindications","warnings_precautions","drug_interactions","reference_url"]);
+                const extra = Object.entries(d).filter(([k, v]) => !SHOWN.has(k) && v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0));
+                if (extra.length === 0) return null;
+                return (
+                  <Section title="Additional Information" icon="📋" color="slate">
+                    <div className="space-y-4">
+                      {extra.map(([key, value], idx) => {
+                        const label = fmt(key);
+                        const colors = [
+                          { bg: "bg-blue-50", border: "border-blue-100", label: "text-blue-600", icon: "💊" },
+                          { bg: "bg-purple-50", border: "border-purple-100", label: "text-purple-600", icon: "🔬" },
+                          { bg: "bg-emerald-50", border: "border-emerald-100", label: "text-emerald-600", icon: "🩺" },
+                          { bg: "bg-amber-50", border: "border-amber-100", label: "text-amber-600", icon: "⚠️" },
+                          { bg: "bg-cyan-50", border: "border-cyan-100", label: "text-cyan-600", icon: "📋" },
+                          { bg: "bg-pink-50", border: "border-pink-100", label: "text-pink-600", icon: "🔄" },
+                          { bg: "bg-indigo-50", border: "border-indigo-100", label: "text-indigo-600", icon: "📊" },
+                          { bg: "bg-orange-50", border: "border-orange-100", label: "text-orange-600", icon: "🏷️" },
+                        ];
+                        const c = colors[idx % colors.length];
+                        if (Array.isArray(value)) {
+                          return (
+                            <div key={key} className={`${c.bg} border ${c.border} rounded-xl p-4`}>
+                              <p className={`text-[10px] font-bold ${c.label} uppercase mb-2 flex items-center gap-1.5`}><span>{c.icon}</span>{label}</p>
+                              <div className="flex flex-wrap gap-2">{value.map((v, i) => <span key={i} className="bg-white text-gray-700 border border-gray-200 px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">{v}</span>)}</div>
+                            </div>
+                          );
+                        }
+                        if (typeof value === "object") return null;
+                        const strVal = String(value);
+                        if (strVal.length > 80) {
+                          return (
+                            <div key={key} className={`${c.bg} border ${c.border} rounded-xl p-4`}>
+                              <p className={`text-[10px] font-bold ${c.label} uppercase mb-2 flex items-center gap-1.5`}><span>{c.icon}</span>{label}</p>
+                              <p className="text-sm text-gray-700 leading-relaxed">{strVal}</p>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div key={key} className={`${c.bg} border ${c.border} rounded-xl px-4 py-3 flex items-center gap-3`}>
+                            <span className="text-base">{c.icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-[10px] font-bold ${c.label} uppercase`}>{label}</p>
+                              <p className="text-sm text-gray-800 font-medium mt-0.5">{strVal}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Section>
+                );
+              })()}
+            </div>
+
+            {/* Col 3 — Sidebar: Pricing + Quick Facts */}
+            <div className="space-y-5">
+              {/* Pricing & Packaging */}
+              {pkg && (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+                  <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2"><span className="w-7 h-7 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600 text-xs">💰</span>Pricing & Packaging</h3>
+                  {pkg.sales_unit && (
+                    <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-4 mb-3 border border-emerald-100">
+                      <div className="grid grid-cols-2 gap-2 text-center">
+                        {pkg.selling_price != null && <div className="bg-white rounded-lg p-2.5 border border-emerald-100"><p className="text-[9px] text-emerald-500 font-bold uppercase">Per {pkg.sales_unit}</p><p className="text-lg font-extrabold text-emerald-700">₹{pkg.selling_price}</p></div>}
+                        {pkg.mrp != null && <div className="bg-white rounded-lg p-2.5 border border-amber-100"><p className="text-[9px] text-amber-500 font-bold uppercase">MRP</p><p className="text-lg font-extrabold text-amber-700">₹{pkg.mrp}</p></div>}
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-2 text-xs">
+                    {pkg.sales_unit && <div className="flex justify-between"><span className="text-gray-400">Sales Unit</span><span className="font-semibold text-gray-700">{pkg.sales_unit}</span></div>}
+                    {pkg.pack_quantity && <div className="flex justify-between"><span className="text-gray-400">Pack Qty</span><span className="font-semibold text-gray-700">{pkg.pack_quantity} {pkg.measurement_unit || "units"}</span></div>}
+                    {pkg.sales_units_per_box && <div className="flex justify-between"><span className="text-gray-400">Per Box</span><span className="font-semibold text-gray-700">{pkg.sales_units_per_box} {pkg.sales_unit}s</span></div>}
+                    {pkg.box_price != null && <div className="flex justify-between"><span className="text-gray-400">Box Price</span><span className="font-semibold text-gray-700">₹{pkg.box_price}</span></div>}
+                    {pkg.max_discount_percent != null && <div className="flex justify-between"><span className="text-gray-400">Max Discount</span><span className="font-semibold text-red-600">{pkg.max_discount_percent}%</span></div>}
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Facts */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+                <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2"><span className="w-7 h-7 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600 text-xs">⚡</span>Quick Facts</h3>
+                <div className="space-y-0 text-xs">
+                  {d.drug_name && <div className="flex items-center justify-between py-2.5 border-b border-gray-100"><span className="text-gray-500 flex-shrink-0">Drug</span><span className="font-semibold text-gray-800 capitalize text-right ml-3">{d.drug_name}</span></div>}
+                  {d.brand_name && <div className="flex items-center justify-between py-2.5 border-b border-gray-100"><span className="text-gray-500 flex-shrink-0">Brand</span><span className="font-semibold text-gray-800 capitalize text-right ml-3">{d.brand_name}</span></div>}
+                  {d.drug_class && <div className="flex items-center justify-between py-2.5 border-b border-gray-100"><span className="text-gray-500 flex-shrink-0">Class</span><span className="font-semibold text-gray-800 text-right ml-3">{d.drug_class}</span></div>}
+                  {d.dosage_form && <div className="flex items-center justify-between py-2.5 border-b border-gray-100"><span className="text-gray-500 flex-shrink-0">Form</span><span className="font-semibold text-gray-800 text-right ml-3">{d.dosage_form}</span></div>}
+                  {d.strength && <div className="flex items-center justify-between py-2.5 border-b border-gray-100"><span className="text-gray-500 flex-shrink-0">Strength</span><span className="font-semibold text-gray-800 text-right ml-3">{d.strength}</span></div>}
+                  {d.route && <div className="flex items-center justify-between py-2.5 border-b border-gray-100"><span className="text-gray-500 flex-shrink-0">Route</span><span className="font-semibold text-gray-800 text-right ml-3">{d.route}</span></div>}
+                  {d.storage_conditions && (
+                    <div className="pt-2.5">
+                      <p className="text-gray-500 mb-1">Storage</p>
+                      <p className="font-medium text-gray-700 text-[11px] leading-relaxed">{d.storage_conditions}</p>
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Input */}
-          <div className="flex gap-2 relative">
-            <input type="text" value={question} onChange={(e) => setQuestion(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAsk()}
-              placeholder="Ask anything about this drug..."
-              className="flex-1 px-4 py-2.5 bg-white border border-indigo-200 rounded-xl text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all shadow-sm" />
-            <button onClick={handleAsk} disabled={isAsking || !question.trim()}
-              className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-40 shadow-md shadow-indigo-200 flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-              Ask
-            </button>
+              {/* Documents */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+                <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2"><span className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 text-xs">📁</span>Documents</h3>
+                {d.has_brochure ? <BrochureDownloadBtn drugId={drugId} /> : <p className="text-xs text-gray-400">No brochure uploaded yet.</p>}
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      {/* Modals */}
+      {isAdmin && showEdit && <EditDrugModal drug={d} drugId={drugId} onClose={() => setShowEdit(false)} onSaved={() => { queryClient.invalidateQueries({ queryKey: ["drug", drugId] }); setShowEdit(false); }} />}
+      {isAdmin && showBrochure && <BrochureUploadModal drugId={drugId} hasBrochure={d.has_brochure} onClose={() => setShowBrochure(false)} onUploaded={() => { queryClient.invalidateQueries({ queryKey: ["drug", drugId] }); setShowBrochure(false); }} />}
+
+      {/* AI Assistant Panel — MR only */}
+      {!isAdmin && showAI && (
+        <div className="fixed top-0 right-0 w-full sm:w-[380px] h-full bg-white border-l border-gray-200 shadow-2xl z-50 flex flex-col">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-purple-800 rounded-xl flex items-center justify-center"><svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg></div>
+              <div><p className="text-sm font-bold text-gray-800">MRX AI Assistant</p><p className="text-[10px] text-gray-400">Ask about {name}</p></div>
+            </div>
+            <button onClick={() => setShowAI(false)} className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+          </div>
+          <div className="px-5 py-3 border-b border-gray-50"><p className="text-sm text-gray-700">Hello {userName.split(" ")[0]}! 👋</p><p className="text-xs text-gray-400 mt-1">Ask me anything about {name}.</p></div>
+          {chatHistory.length === 0 && (
+            <div className="px-5 py-3"><p className="text-xs font-semibold text-purple-600 mb-2">Suggested Questions</p>
+              <div className="space-y-2">{[`Side effects of ${name}?`, `Dosage for ${name}?`, `Mechanism of action?`].map(q => <button key={q} onClick={() => setQuestion(q)} className="w-full text-left px-3 py-2.5 rounded-xl border border-purple-100 text-xs text-gray-600 hover:bg-purple-50 transition-all">{q}</button>)}</div>
+            </div>
+          )}
+          <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
+            {chatHistory.map((msg, i) => (
+              <div key={i} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[80%] px-3.5 py-2.5 rounded-xl text-xs leading-relaxed ${msg.type === "user" ? "bg-purple-600 text-white rounded-br-sm" : "bg-gray-100 text-gray-700 rounded-bl-sm"}`}>{msg.text}</div>
+              </div>
+            ))}
+            {isAsking && <div className="flex justify-start"><div className="bg-gray-100 px-3.5 py-2.5 rounded-xl rounded-bl-sm"><div className="flex gap-1">{[0,1,2].map(i => <span key={i} className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{animationDelay:`${i*150}ms`}} />)}</div></div></div>}
+          </div>
+          <div className="px-5 py-1"><p className="text-[9px] text-gray-400 text-center">AI responses are for informational purposes only.</p></div>
+          <div className="px-5 py-3 border-t border-gray-100 flex gap-2">
+            <input value={question} onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAskAI()} placeholder="Ask anything..." className="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:border-purple-300 focus:ring-1 focus:ring-purple-100" />
+            <button onClick={handleAskAI} disabled={isAsking || !question.trim()} className="w-9 h-9 bg-gradient-to-r from-purple-600 to-purple-800 text-white rounded-xl flex items-center justify-center disabled:opacity-40 shadow-md"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg></button>
           </div>
         </div>
-      </main>
+      )}
+    </div>
+  );
+}
+// ── Reusable Components ───────────────────────────────────────────────────────
+function Section({ title, icon, color, children }) {
+  const colors = { purple: "bg-purple-100 text-purple-600", green: "bg-green-100 text-green-600", blue: "bg-blue-100 text-blue-600", red: "bg-red-100 text-red-600", orange: "bg-orange-100 text-orange-600", amber: "bg-amber-100 text-amber-600", cyan: "bg-cyan-100 text-cyan-600", slate: "bg-slate-100 text-slate-600" };
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+      <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
+        <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs ${colors[color] || colors.purple}`}>{icon}</span>
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
+function InfoField({ label, value }) {
+  if (!value) return null;
+  const str = String(value);
+  const isLong = str.length > 40;
+  return (
+    <div className={isLong ? "col-span-2 md:col-span-3" : ""}>
+      <p className="text-[10px] text-gray-400 uppercase font-semibold mb-0.5">{label}</p>
+      <p className={`text-sm text-gray-800 font-medium ${isLong ? "" : "capitalize"}`}>{str}</p>
+    </div>
+  );
+}
+
+function BrochureDownloadBtn({ drugId }) {
+  const [downloading, setDownloading] = useState(false);
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const token = localStorage.getItem("access_token");
+      const res = await fetch(`/api/v1/drugs/${drugId}/brochure/download`, { headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" } });
+      if (!res.ok) throw new Error("Download failed");
+      const disposition = res.headers.get("content-disposition") || "";
+      const match = disposition.match(/filename[^;=\n]*=["']?([^"'\n;]+)/i);
+      const filename = match?.[1]?.trim() || `drug-brochure.pdf`;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    } catch (e) { alert(e.message || "Download failed"); }
+    setDownloading(false);
+  };
+  return (
+    <button onClick={handleDownload} disabled={downloading}
+      className="w-full flex items-center gap-3 bg-gray-50 hover:bg-purple-50 rounded-xl p-3 border border-gray-200 hover:border-purple-200 transition-all group disabled:opacity-50">
+      <div className="w-9 h-9 bg-gradient-to-br from-red-500 to-red-600 rounded-lg flex items-center justify-center flex-shrink-0"><span className="text-white text-[10px] font-bold">PDF</span></div>
+      <div className="flex-1 text-left"><p className="text-xs font-semibold text-gray-700 group-hover:text-purple-700">Drug Brochure</p><p className="text-[10px] text-gray-400">{downloading ? "Downloading..." : "Click to download"}</p></div>
+      <svg className="w-4 h-4 text-gray-400 group-hover:text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+    </button>
+  );
+}
+
+// ── Edit Drug Modal ───────────────────────────────────────────────────────────
+function EditDrugModal({ drug, drugId, onClose, onSaved }) {
+  // Build form from ALL top-level fields (skip internal ones)
+  const SKIP = new Set(["_id","template_id","field_values","search_text","packaging","packaging_type","created_at","updated_at","is_active","has_brochure"]);
+  const ARRAY_FIELDS = new Set(["composition","indications","symptoms","contraindications","warnings_precautions","side_effects","drug_interactions"]);
+
+  const initialForm = {};
+  Object.entries(drug).forEach(([k, v]) => {
+    if (SKIP.has(k)) return;
+    if (v === null || v === undefined) { initialForm[k] = ""; return; }
+    if (Array.isArray(v)) { initialForm[k] = v.join(", "); return; }
+    if (typeof v === "object") return;
+    initialForm[k] = String(v);
+  });
+
+  const [form, setForm] = useState(initialForm);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault(); setSaving(true); setError("");
+    try {
+      // Fetch current active template to get valid field_ids
+      const template = await get("/api/v1/drugs/templates");
+      const validFieldIds = new Set((template?.fields || []).filter(f => f.is_active !== false).map(f => f.field_id));
+
+      // Build a map: key -> field_id (from template, not from drug)
+      const templateKeyMap = {};
+      (template?.fields || []).forEach(f => { if (f.is_active !== false) templateKeyMap[f.key] = f.field_id; });
+
+      const fieldValues = [];
+      Object.entries(form).forEach(([key, val]) => {
+        // Only send fields that exist in the active template
+        const fieldId = templateKeyMap[key];
+        if (!fieldId) return;
+        let value = val;
+        if (ARRAY_FIELDS.has(key) && typeof val === "string") {
+          value = val.split(",").map(s => s.trim()).filter(Boolean);
+        }
+        if (value === "" || value === null || value === undefined) value = null;
+        if (Array.isArray(value) && value.length === 0) value = null;
+        fieldValues.push({ field_id: fieldId, key, value });
+      });
+
+      const payload = { field_values: fieldValues };
+      await put(`/api/v1/drugs/${drugId}`, payload);
+      onSaved();
+    } catch (err) { setError(err?.data?.detail || err.message || "Failed to update"); }
+    setSaving(false);
+  };
+
+  const update = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
+
+  // Split fields into "core" (shown in structured grid) and "extra" (shown dynamically below)
+  const CORE_KEYS = new Set(["drug_name","brand_name","generic_name","manufacturer","drug_class","therapeutic_category",
+    "dosage_form","strength","route","prescription_type","storage_conditions","reference_url",
+    "composition","indications","symptoms","mechanism_of_action","contraindications","warnings_precautions","side_effects","drug_interactions"]);
+  const extraKeys = Object.keys(form).filter(k => !CORE_KEYS.has(k) && form[k] !== "");
+
+  const F = (label, key, ph = "") => (
+    <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{label}</label>
+    <input value={form[key] || ""} onChange={(e) => update(key, e.target.value)} placeholder={ph}
+      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-100 focus:border-purple-300 transition-all" /></div>
+  );
+
+  const TA = (label, key, ph = "") => (
+    <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{label}</label>
+    <textarea value={form[key] || ""} onChange={(e) => update(key, e.target.value)} placeholder={ph} rows={2}
+      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-100 resize-none" /></div>
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-gradient-to-r from-purple-600 to-purple-800 px-6 py-4 rounded-t-2xl flex items-center justify-between sticky top-0 z-10">
+          <h2 className="text-white font-bold text-sm flex items-center gap-2"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>Edit Drug</h2>
+          <button onClick={onClose} className="text-white/70 hover:text-white text-xl">×</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-3">
+          {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-xs">{error}</div>}
+          {/* Core fields — structured */}
+          <div className="grid grid-cols-2 gap-3">{F("Drug Name","drug_name","Paracetamol")}{F("Brand Name","brand_name","Crocin")}</div>
+          <div className="grid grid-cols-2 gap-3">{F("Generic Name","generic_name")}{F("Manufacturer","manufacturer","GSK")}</div>
+          <div className="grid grid-cols-2 gap-3">{F("Drug Class","drug_class","Analgesic")}{F("Category","therapeutic_category","Pain Management")}</div>
+          <div className="grid grid-cols-3 gap-3">{F("Form","dosage_form","Tablet")}{F("Strength","strength","500mg")}{F("Route","route","Oral")}</div>
+          <div className="grid grid-cols-2 gap-3">{F("Prescription Type","prescription_type","OTC")}{F("Storage","storage_conditions","Below 25°C")}</div>
+          {TA("Composition (comma separated)","composition")}
+          {TA("Indications (comma separated)","indications")}
+          {TA("Symptoms (comma separated)","symptoms")}
+          {TA("Mechanism of Action","mechanism_of_action")}
+          {TA("Contraindications (comma separated)","contraindications")}
+          {TA("Side Effects (comma separated)","side_effects")}
+          {TA("Drug Interactions (comma separated)","drug_interactions")}
+          {TA("Warnings & Precautions (comma separated)","warnings_precautions")}
+          {F("Reference URL","reference_url","https://...")}
+
+          {/* Dynamic extra fields */}
+          {extraKeys.length > 0 && (
+            <>
+              <div className="border-t border-gray-100 pt-3 mt-3">
+                <p className="text-[10px] font-bold text-purple-600 uppercase mb-2">Additional Fields</p>
+              </div>
+              {extraKeys.map(key => {
+                const val = form[key] || "";
+                const label = fmt(key);
+                const isLong = val.length > 80;
+                return <div key={key}>{isLong ? TA(label, key) : F(label, key)}</div>;
+              })}
+            </>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-200">Cancel</button>
+            <button type="submit" disabled={saving} className="flex-1 bg-gradient-to-r from-purple-600 to-purple-800 text-white py-2.5 rounded-xl font-bold text-sm disabled:opacity-50 shadow-md">{saving ? "Saving..." : "Update Drug"}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Brochure Upload Modal ─────────────────────────────────────────────────────
+function BrochureUploadModal({ drugId, hasBrochure, onClose, onUploaded }) {
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const handleUpload = async () => {
+    if (!file) { setError("Select a file first"); return; }
+    setUploading(true); setError(""); setSuccess("");
+    try {
+      const token = localStorage.getItem("access_token");
+      const fd = new FormData(); fd.append("file", file);
+      const res = await fetch(`/api/v1/drugs/${drugId}/brochure`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" }, body: fd });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || "Upload failed"); }
+      setSuccess("Brochure uploaded!");
+      setTimeout(() => onUploaded(), 800);
+    } catch (e) { setError(e.message); }
+    setUploading(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-gradient-to-r from-purple-600 to-purple-800 px-6 py-4 rounded-t-2xl flex items-center justify-between">
+          <h2 className="text-white font-bold text-sm flex items-center gap-2"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>{hasBrochure ? "Replace" : "Upload"} Brochure</h2>
+          <button onClick={onClose} className="text-white/70 hover:text-white text-xl">×</button>
+        </div>
+        <div className="p-5 space-y-4">
+          {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-xs">{error}</div>}
+          {success && <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-xl text-xs">{success}</div>}
+          {hasBrochure && <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700 flex items-center gap-2"><span>⚠️</span>Existing brochure will be replaced.</div>}
+          <div className="border-2 border-dashed border-purple-200 rounded-xl p-8 text-center hover:border-purple-400 transition-all cursor-pointer" onClick={() => document.getElementById("br-file").click()}>
+            <input type="file" id="br-file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={(e) => setFile(e.target.files[0])} className="hidden" />
+            <div className="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-3"><svg className="w-7 h-7 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg></div>
+            <p className="text-sm font-semibold text-gray-700">{file ? file.name : "Click to select file"}</p>
+            <p className="text-[10px] text-gray-400 mt-1">PDF, DOC, PNG, JPG — max 10MB</p>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={onClose} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-200">Cancel</button>
+            <button onClick={handleUpload} disabled={uploading || !file} className="flex-1 bg-gradient-to-r from-purple-600 to-purple-800 text-white py-2.5 rounded-xl font-bold text-sm disabled:opacity-50 shadow-md">{uploading ? "Uploading..." : "Upload"}</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

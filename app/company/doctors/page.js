@@ -227,7 +227,15 @@ export default function CompanyDoctors() {
             <h1 className="text-2xl font-extrabold text-gray-900">Doctors</h1>
             <p className="text-gray-400 text-sm mt-0.5">Manage healthcare professionals · {total} total</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <a href="/company/drx-doctors"
+              className="bg-white text-gray-700 border border-gray-200 px-4 py-2.5 rounded-xl font-bold hover:border-indigo-300 hover:text-indigo-600 transition-all flex items-center gap-1.5 text-xs">
+              <span>🌐</span><span>DRX Doctors</span>
+            </a>
+            <a href="/company/drx-requests"
+              className="bg-white text-gray-700 border border-gray-200 px-4 py-2.5 rounded-xl font-bold hover:border-blue-300 hover:text-blue-600 transition-all flex items-center gap-1.5 text-xs">
+              <span>📨</span><span>DRX Requests</span>
+            </a>
             <button onClick={() => setShowRequests(true)}
               className="bg-white text-gray-700 border border-gray-200 px-4 py-2.5 rounded-xl font-bold hover:border-amber-300 hover:text-amber-600 transition-all flex items-center gap-1.5 text-xs">
               <span>📋</span><span>Requests</span>

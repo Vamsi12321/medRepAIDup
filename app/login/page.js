@@ -1,24 +1,10 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
-const ROLES = ["ADMIN", "DOCTOR", "MR"];
-
-const roleRedirectMap = {
-  ADMIN:  "/company/overview",
-  DOCTOR: "/doctor/home",
-  MR:     "/mr/dashboard",
-};
-
-const roleKeyMap = {
-  ADMIN:  "company",
-  DOCTOR: "doctor",
-  MR:     "mr",
-};
-
-export default function Login() {
+export default function MRLogin() {
   const router = useRouter();
-  const [role, setRole] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -30,18 +16,17 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
-    if (!role) { setError("Please select a role"); return; }
     if (!email || !password) { setError("Please enter both email and password"); return; }
     setIsLoggingIn(true);
     try {
       const res = await fetch("/api/v1/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, role }),
+        body: JSON.stringify({ email, password, role: "MR" }),
       });
       const data = await res.json();
       if (!res.ok) {
-        const raw = data.detail || data.message || "Invalid credentials. Did you select the correct role?";
+        const raw = data.detail || data.message || "Invalid credentials.";
         const msg = Array.isArray(raw)
           ? raw.map((d) => (typeof d === "string" ? d : d.msg || JSON.stringify(d))).join(", ")
           : String(raw);
@@ -51,8 +36,7 @@ export default function Login() {
       }
 
       localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("token_type",   data.token_type);
-      // Use JWT exp claim if available, otherwise fall back to expires_in
+      localStorage.setItem("token_type", data.token_type);
       let expiry;
       try {
         const payload = JSON.parse(atob(data.access_token.split(".")[1]));
@@ -61,28 +45,25 @@ export default function Login() {
         expiry = Date.now() + (data.expires_in || 3600) * 1000;
       }
       localStorage.setItem("token_expiry", expiry);
-      localStorage.setItem("userEmail",    data.user.email);
-      localStorage.setItem("userName",     data.user.name || data.user.full_name);
-      localStorage.setItem("userId",       data.user.id);
-      localStorage.setItem("apiRole",      data.user.role);
-
-      const appRole = roleKeyMap[data.user.role] || data.user.role.toLowerCase();
-      localStorage.setItem("userRole", appRole);
+      localStorage.setItem("userEmail", data.user.email);
+      localStorage.setItem("userName", data.user.name || data.user.full_name);
+      localStorage.setItem("userId", data.user.id);
+      localStorage.setItem("apiRole", data.user.role);
+      localStorage.setItem("userRole", "mr");
       localStorage.setItem("userDepartment", data.user.department || "");
       localStorage.setItem("companyName", data.user.company_name || data.company_name || "");
 
       document.cookie = `access_token=${data.access_token}; path=/; max-age=3600; SameSite=Lax`;
-      document.cookie = `userRole=${appRole}; path=/; max-age=3600; SameSite=Lax`;
+      document.cookie = `userRole=mr; path=/; max-age=3600; SameSite=Lax`;
 
       setLoggedInUser(data.user.name || data.user.full_name);
       setLoginSuccess(true);
       setIsLoggingIn(false);
 
-      // If must_change_password, redirect to change password page
       if (data.must_change_password) {
         setTimeout(() => router.push("/change-password"), 1800);
       } else {
-        setTimeout(() => router.push(roleRedirectMap[data.user.role] || "/"), 1800);
+        setTimeout(() => router.push("/mr/dashboard"), 1800);
       }
     } catch {
       setError("Unable to connect to server. Please try again.");
@@ -91,10 +72,10 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="h-screen w-screen overflow-hidden flex bg-[#1a0a3e] lg:flex-row flex-col">
       {/* Success overlay */}
       {loginSuccess && (
-        <div className="fixed inset-0 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 bg-gradient-to-br from-[#1a0a3e] via-[#2d1b69] to-[#4a1d96] z-50 flex items-center justify-center">
           <div className="text-center px-4">
             <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center shadow-2xl mb-6 mx-auto animate-bounce">
               <span className="text-5xl">💊</span>
@@ -105,128 +86,212 @@ export default function Login() {
               ))}
             </div>
             <h2 className="text-3xl font-bold text-white mb-2">Welcome back, {loggedInUser}!</h2>
-            <p className="text-indigo-100 text-lg">Taking you to your dashboard...</p>
+            <p className="text-purple-200 text-lg">Taking you to your dashboard...</p>
           </div>
         </div>
       )}
 
-      {/* Left panel — branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-indigo-600 via-purple-700 to-pink-600 flex-col justify-between p-8 xl:p-12 relative overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-24 -left-24 w-96 h-96 bg-white/5 rounded-full" />
-          <div className="absolute top-1/3 -right-20 w-72 h-72 bg-white/5 rounded-full" />
-          <div className="absolute -bottom-16 left-1/4 w-64 h-64 bg-white/5 rounded-full" />
+      {/* LEFT SIDE */}
+      <div className="hidden lg:block lg:w-[58%] relative overflow-hidden">
+        {/* Decorative particles */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-[8%] left-[25%] w-1 h-1 bg-purple-400/40 rounded-full" />
+          <div className="absolute top-[12%] left-[55%] w-1.5 h-1.5 bg-purple-300/30 rounded-full" />
+          <div className="absolute top-[25%] left-[75%] w-1 h-1 bg-purple-400/40 rounded-full" />
+          <div className="absolute top-[45%] left-[10%] w-1 h-1 bg-purple-300/30 rounded-full" />
+          <div className="absolute top-[60%] left-[65%] w-1.5 h-1.5 bg-purple-400/20 rounded-full" />
+          <div className="absolute top-[80%] left-[35%] w-1 h-1 bg-purple-300/30 rounded-full" />
+          <div className="absolute top-[5%] left-[45%] w-[2px] h-[2px] bg-white/20 rounded-full" />
+          <div className="absolute top-[35%] left-[85%] w-[2px] h-[2px] bg-white/20 rounded-full" />
         </div>
 
-        <div className="relative">
-          <div className="flex items-center space-x-3 mb-8 lg:mb-6 xl:mb-12">
-            <div className="w-10 h-10 lg:w-9 lg:h-9 xl:w-11 xl:h-11 bg-white rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-xl lg:text-lg xl:text-2xl">💊</span>
+        <div className="h-full flex flex-col px-8 xl:px-10 py-5 relative z-10">
+          {/* Logo */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-purple-700 rounded-xl flex items-center justify-center shadow-lg shadow-purple-900/40">
+              <span className="text-lg">💊</span>
             </div>
-            <span className="text-xl lg:text-lg xl:text-2xl font-bold text-white">MedRepAI</span>
+            <div>
+              <p className="text-white font-bold text-lg leading-none">MRX</p>
+              <p className="text-purple-300/80 text-[12px]">Pharma. Data. Performance.</p>
+            </div>
           </div>
-          <h1 className="text-3xl xl:text-4xl 2xl:text-5xl font-bold text-white leading-tight mb-4 lg:mb-3 xl:mb-6">
-            MedRepAI Hub: Awareness & Collaboration
-          </h1>
-          <p className="text-indigo-100 text-base lg:text-sm xl:text-lg leading-relaxed">
-            Stay ahead with real-time drug launches, CME events, and a connected network of medical representatives and doctors.
-          </p>
-        </div>
 
-        <div className="relative space-y-2 lg:space-y-2 xl:space-y-3">
-          {[
-            { icon: "💊", text: "Real-time drug launch updates" },
-            { icon: "📅", text: "CME events & medical conferences" },
-            { icon: "🤝", text: "Connected MR & doctor network" },
-            { icon: "🔒", text: "Role-based secure access" },
-          ].map((f) => (
-            <div key={f.text} className="flex items-center space-x-3 bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2 lg:py-2 xl:py-3">
-              <span className="text-base lg:text-sm xl:text-xl">{f.icon}</span>
-              <span className="text-white font-medium text-sm lg:text-xs xl:text-sm">{f.text}</span>
+          {/* Headline */}
+          <div className="mt-6 mb-1">
+            <p className="text-white font-bold text-[15px] leading-tight">MRX for</p>
+            <h1 className="text-white font-extrabold text-[1.5rem] xl:text-[1.75rem] leading-[1.15]">
+              Medical <span className="text-purple-300">Representatives</span>
+            </h1>
+          </div>
+
+          <p className="text-purple-200/60 text-[12px] mb-4 max-w-[280px] leading-relaxed">
+            Your complete field engagement and productivity platform — in your pocket.
+          </p>
+
+          {/* Features + Phone */}
+          <div className="flex flex-1 min-h-0 items-stretch">
+            {/* Features */}
+            <div className="space-y-2 w-[230px] xl:w-[260px] flex-shrink-0 self-center">
+              {[
+                { icon: "📅", title: "My Schedule & Visits", desc: "Plan your day, manage doctor visits and check-in on the move." },
+                { icon: "📊", title: "MCR & Reporting", desc: "Submit MCRs, activity reports and manage your commitments." },
+                { icon: "💊", title: "Product & Resources", desc: "Access latest product information, brochures, and digital aids." },
+                { icon: "📈", title: "Performance Dashboard", desc: "Track your achievements, targets, and performance in real-time." },
+                { icon: "🛡️", title: "Secure & Reliable", desc: "Enterprise-grade security to keep your data safe and your journey worry-free." },
+              ].map((f) => (
+                <div key={f.title} className="flex items-start gap-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl px-2.5 py-2">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <span className="text-lg">{f.icon}</span>
+                  </div>
+                  <div className="min-w-0 pt-0.5">
+                    <p className="text-white text-[11.5px] font-bold leading-tight">{f.title}</p>
+                    <p className="text-purple-200/50 text-[9.5px] leading-snug mt-0.5">{f.desc}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+
+            {/* Phone image with decorative elements */}
+            <div className="flex-1 flex items-center justify-end ml-2 -mr-6 overflow-visible relative">
+              {/* Location pins connected to phone with dotted lines */}
+              {/* Pin 1 - top left, connected to phone */}
+              <svg className="absolute top-[5%] left-[10%] w-5 h-7 z-20 opacity-70" viewBox="0 0 24 36" fill="none">
+                <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24c0-6.6-5.4-12-12-12z" fill="#a855f7"/>
+                <circle cx="12" cy="12" r="4" fill="#1a0a3e"/>
+              </svg>
+              {/* Dot trail from pin 1 to phone */}
+              <div className="absolute top-[9%] left-[18%] w-1 h-1 bg-purple-400/60 rounded-full z-20" />
+              <div className="absolute top-[10%] left-[25%] w-1 h-1 bg-purple-400/50 rounded-full z-20" />
+              <div className="absolute top-[11%] left-[32%] w-1 h-1 bg-purple-400/40 rounded-full z-20" />
+              <div className="absolute top-[12%] left-[39%] w-1 h-1 bg-purple-400/30 rounded-full z-20" />
+
+              {/* Pin 2 - middle left, connected to phone */}
+              <svg className="absolute top-[30%] left-[3%] w-4.5 h-6 z-20 opacity-55" viewBox="0 0 24 36" fill="none">
+                <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24c0-6.6-5.4-12-12-12z" fill="#c084fc"/>
+                <circle cx="12" cy="12" r="4" fill="#1a0a3e"/>
+              </svg>
+              {/* Dot trail from pin 2 to phone */}
+              <div className="absolute top-[33%] left-[12%] w-1 h-1 bg-purple-300/50 rounded-full z-20" />
+              <div className="absolute top-[33.5%] left-[20%] w-1 h-1 bg-purple-300/40 rounded-full z-20" />
+              <div className="absolute top-[34%] left-[28%] w-1 h-1 bg-purple-300/30 rounded-full z-20" />
+              <div className="absolute top-[34.5%] left-[36%] w-1 h-1 bg-purple-300/25 rounded-full z-20" />
+
+              {/* Pin 3 - lower left, connected to phone */}
+              <svg className="absolute top-[55%] left-[6%] w-4 h-5.5 z-20 opacity-45" viewBox="0 0 24 36" fill="none">
+                <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24c0-6.6-5.4-12-12-12z" fill="#9333ea"/>
+                <circle cx="12" cy="12" r="4" fill="#1a0a3e"/>
+              </svg>
+              {/* Dot trail from pin 3 to phone */}
+              <div className="absolute top-[57%] left-[14%] w-1 h-1 bg-purple-400/40 rounded-full z-20" />
+              <div className="absolute top-[56.5%] left-[22%] w-1 h-1 bg-purple-400/30 rounded-full z-20" />
+              <div className="absolute top-[56%] left-[30%] w-1 h-1 bg-purple-400/25 rounded-full z-20" />
+              <div className="absolute top-[55.5%] left-[38%] w-1 h-1 bg-purple-400/20 rounded-full z-20" />
+
+              <Image
+                src="/images/mr/phone.png"
+                alt="MRX App"
+                width={500}
+                height={950}
+                className="object-contain h-[140%] w-auto max-w-none drop-shadow-[0_25px_70px_rgba(120,60,220,0.4)] relative z-10"
+                priority
+              />
+            </div>
+          </div>
+
+          {/* Bottom tagline */}
+          <div className="border-l-[3px] border-purple-500 pl-3 mt-3">
+            <p className="text-purple-200/60 text-[12px]">
+              Empowering <span className="text-green-400 font-bold italic">every</span> MR. Driving <span className="text-green-400 font-bold italic">every</span> connection.
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Right panel — form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-8 lg:p-6 xl:p-12">
-        <div className="w-full max-w-md">
-          {/* Mobile logo */}
-          <div className="flex items-center space-x-3 mb-6 lg:hidden">
-            <div className="w-9 h-9 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow">
-              <span className="text-lg">💊</span>
+      {/* RIGHT SIDE - White background */}
+      <div className="w-full lg:w-[42%] flex flex-col items-center justify-center px-4 sm:px-6 py-6 relative overflow-y-auto bg-white">
+        {/* Mobile logo */}
+        <div className="flex items-center gap-2 mb-4 lg:hidden">
+          <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg flex items-center justify-center shadow-lg">
+            <span className="text-sm">💊</span>
+          </div>
+          <div>
+            <p className="text-white font-bold text-base leading-none">MRX</p>
+            <p className="text-purple-300/70 text-[10px]">Pharma. Data. Performance.</p>
+          </div>
+        </div>
+
+        {/* Login Card */}
+        <div className="w-full max-w-[380px] px-4 py-5">
+          {/* Shield + Title */}
+          <div className="text-center mb-3">
+            <div className="w-24 h-26 mx-auto mb-1.5">
+              <Image
+                src="/images/mr/shield.png"
+                alt="Secure Login"
+                width={68}
+                height={68}
+                className="object-contain w-full h-full"
+                priority
+              />
             </div>
-            <span className="text-lg font-bold text-gray-900">MedRepAI</span>
+            <h2 className="text-lg font-bold text-gray-900">MR Login</h2>
+            <p className="text-gray-400 text-[11px] mt-0.5">Welcome back! Please sign in to continue</p>
           </div>
 
-          <h2 className="text-2xl lg:text-2xl xl:text-3xl font-bold text-gray-900 mb-1">Sign in</h2>
-          <p className="text-gray-500 text-sm mb-5 lg:mb-4 xl:mb-8">Enter your credentials to access your portal</p>
-
           {error && (
-            <div className="mb-4 flex items-start space-x-3 bg-red-50 border border-red-200 text-red-700 px-3 py-2.5 rounded-xl">
-              <span className="text-base mt-0.5">⚠️</span>
-              <div>
-                <p className="text-xs font-medium">{error}</p>
-                {role && <p className="text-xs text-red-500 mt-1">💡 Make sure you selected the correct role: <span className="font-bold">{role}</span></p>}
-              </div>
+            <div className="mb-3 flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg">
+              <span className="text-xs mt-0.5">⚠️</span>
+              <p className="text-[11px] font-medium">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-3 lg:space-y-3 xl:space-y-5">
-            {/* Role selector */}
+          <form onSubmit={handleLogin} className="space-y-3">
+            {/* Employee ID */}
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5">Role</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full px-3 py-2 lg:py-2 xl:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm bg-white transition-all outline-none text-gray-700"
-              >
-                <option value="" disabled>Select your role</option>
-                {ROLES.map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5">Email address</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                autoComplete="email"
-                className="w-full px-3 py-2 lg:py-2 xl:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm bg-white transition-all outline-none"
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-gray-700">Password</label>
-                <a href="/forgot-password" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">Forgot password?</a>
-              </div>
+              <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Employee ID</label>
               <div className="relative">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your Employee ID"
+                  autoComplete="email"
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-[13px] bg-white focus:ring-2 focus:ring-purple-400 focus:border-purple-400 outline-none placeholder:text-gray-400 transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Password</label>
+              <div className="relative">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
                   autoComplete="current-password"
-                  className="w-full px-3 py-2 lg:py-2 xl:py-3 pr-12 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm bg-white transition-all outline-none"
+                  className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg text-[13px] bg-white focus:ring-2 focus:ring-purple-400 focus:border-purple-400 outline-none placeholder:text-gray-400 transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   {showPassword ? (
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d={"M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7" +
-                          "a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243" +
-                          "M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29" +
-                          "M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7" +
-                          "a10.025 10.025 0 01-4.132 4.411m0 0L21 21"} />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 4.411m0 0L21 21" />
                     </svg>
                   ) : (
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -236,12 +301,16 @@ export default function Login() {
                   )}
                 </button>
               </div>
+              <div className="flex justify-end mt-1.5">
+                <a href="/forgot-password" className="text-[11px] text-purple-600 font-semibold hover:text-purple-700">Forgot Password?</a>
+              </div>
             </div>
 
+            {/* Sign In */}
             <button
               type="submit"
               disabled={isLoggingIn}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 lg:py-2.5 xl:py-3.5 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
+              className="w-full bg-gradient-to-r from-purple-600 to-purple-800 text-white py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 text-[13px] shadow-lg shadow-purple-500/20 hover:from-purple-700 hover:to-purple-900 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isLoggingIn ? (
                 <>
@@ -252,16 +321,58 @@ export default function Login() {
                   <span>Signing in...</span>
                 </>
               ) : (
-                <span>Sign in to your account</span>
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  <span>Sign in to your account</span>
+                </>
               )}
             </button>
           </form>
 
-          <p className="mt-4 lg:mt-4 xl:mt-8 text-center text-xs text-gray-500">
-            Access is role-based and verified by the server.{" "}
-            <span className="text-gray-400">Your portal is determined by your credentials.</span>
-          </p>
+          {/* Divider */}
+          <div className="flex items-center gap-3 my-3">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-[11px] text-gray-400">or</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+
+          {/* Company Login */}
+          <a
+            href="/admin/login"
+            className="w-full flex items-center justify-between px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-[13px] font-bold text-gray-900">Company Login</p>
+                <p className="text-[10px] text-gray-400">For Admin / Management access</p>
+              </div>
+            </div>
+            <svg className="w-4 h-4 text-gray-400 group-hover:text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </a>
+
+          {/* Footer */}
+          <div className="mt-3 text-center">
+            <div className="flex items-center justify-center gap-1.5 text-[9px] text-gray-400">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <span>Secure access for authorized medical representatives only.</span>
+            </div>
+            <p className="text-[10px] text-gray-300 mt-0.5">All activities are monitored and protected.</p>
+          </div>
         </div>
+
+        {/* Copyright below card */}
+        <p className="mt-4 text-[10px] text-gray-400">© 2025 MRX Pharma. All rights reserved.</p>
       </div>
     </div>
   );

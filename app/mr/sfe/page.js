@@ -1,10 +1,11 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import MRNavbar from "@/components/mr/MRNavbar";
-import Breadcrumb from "@/components/Breadcrumb";
+import MRSidebar from "@/components/mr/MRSidebar";
+import NotificationBell from "@/components/NotificationBell";
 import { get, post, put } from "@/lib/api";
 import { formatISTDate, formatISTTime } from "@/lib/time";
+import MCRPrintTemplate from "@/components/MCRPrintTemplate";
 
 const now = new Date();
 const CURRENT_MONTH = now.getMonth() + 1;
@@ -42,93 +43,218 @@ export default function SFEPage() {
   });
   const mrInfo = (mrList || []).find((m) => m.id === userId) || null;
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [showMCRPrint, setShowMCRPrint] = useState(false);
+  const userName = typeof window !== "undefined" ? localStorage.getItem("userName") || "MR" : "MR";
+
+  // MCR data for print — fetched at parent level
+  const { data: mcrData } = useQuery({
+    queryKey: ["sfe-mcr-print", month, year],
+    queryFn: () => get("/api/v1/sfe/mcr", { month, year }),
+    staleTime: 2 * 60 * 1000,
+  });
+
   return (
-    <div className="min-h-screen bg-[#fafbfd]">
-      <MRNavbar />
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        <Breadcrumb />
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-extrabold text-gray-900 mb-0.5">SFE Analytics</h1>
-          <p className="text-sm text-gray-400">Track your performance, coverage & commitments</p>
+    <div className="min-h-screen bg-[#f8f9fc] flex">
+      <MRSidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
+      <div className={`${sidebarCollapsed ? "md:ml-[60px]" : "md:ml-[220px]"} flex-1 min-h-screen transition-all duration-300`}>
+        {/* Top Bar */}
+                <header className="bg-white/80 backdrop-blur-md border-b border-gray-100/80 px-4 md:px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+          {/* Mobile hamburger */}
+          <button onClick={() => setMobileOpen(true)} className="md:hidden w-9 h-9 rounded-lg bg-gray-100 hover:bg-purple-50 flex items-center justify-center text-gray-600 hover:text-purple-600 transition-all mr-3">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-sm text-gray-600">
+              <svg className="w-4 h-4 text-indigo-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/></svg>
+              <span className="font-medium">{mrInfo?.territory || "Visakhapatnam, AP"}</span>
+              <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <NotificationBell accentColor="indigo" />
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center text-white text-xs font-bold">{userName.charAt(0).toUpperCase()}</div>
+              <div className="hidden sm:block">
+                <p className="text-sm font-bold text-gray-800 leading-none">{userName.split(" ")[0]} {userName.split(" ")[1]?.charAt(0) || ""}.</p>
+                <p className="text-[10px] text-gray-400">MR - Field Executive</p>
+              </div>
+            </div>
+          </div>
+        </header>
+
+      <main className="px-4 md:px-6 py-4 md:py-5">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-1.5 text-[11px] text-gray-400 mb-3">
+          <span>🏠 SFE</span><span>›</span><span className="text-gray-600 font-medium">SFE Analytics</span>
         </div>
 
-        {/* MR Profile Card */}
-        {mrInfo && (
-          <div className="mb-6 bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 text-sm font-bold">
-                  {mrInfo.name?.charAt(0) || "M"}
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-gray-900">{mrInfo.name}</p>
-                  <p className="text-xs text-gray-400 flex items-center gap-1">
-                    <svg className="w-3 h-3 text-orange-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/></svg>
-                    {mrInfo.territory} · {mrInfo.zone} · {mrInfo.state}
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <span className="text-[11px] bg-gray-50 text-gray-600 px-2.5 py-1 rounded-full border border-gray-100 font-medium">{mrInfo.email}</span>
-                {mrInfo.phone && <span className="text-[11px] bg-gray-50 text-gray-600 px-2.5 py-1 rounded-full border border-gray-100 font-medium">{mrInfo.phone}</span>}
-              </div>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <div className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium">
-                <span>🩺</span>
-                {(mrInfo.assigned_doctors || []).map((d) => (
-                  <span key={d.id} className="bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full border border-orange-100">{d.name}</span>
-                ))}
-                {(mrInfo.assigned_doctors || []).length === 0 && <span className="text-gray-400">No doctors</span>}
-              </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium">
-                <span>💊</span>
-                {(mrInfo.assigned_drugs || []).map((d) => (
-                  <span key={d.id} className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-100">{d.name}</span>
-                ))}
-                {(mrInfo.assigned_drugs || []).length === 0 && <span className="text-gray-400">No drugs</span>}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Controls Row: Month/Year + Tabs */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-          <div className="flex gap-1 bg-white rounded-xl p-1 border border-gray-100 shadow-sm overflow-x-auto scrollbar-sfe">
-            {TABS.map((t) => (
-              <button key={t.id} onClick={() => setActiveTab(t.id)}
-                className={"flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap " + (
-                  activeTab === t.id ? "bg-orange-500 text-white shadow" : "text-gray-500 hover:bg-gray-50"
-                )}>
-                <span>{t.icon}</span> {t.label}
-              </button>
-            ))}
+        {/* Header + Month/Year */}
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h1 className="text-xl font-extrabold text-gray-900 mb-0.5">SFE Analytics</h1>
+            <p className="text-xs text-gray-400">Track your performance, coverage & commitments</p>
           </div>
           <div className="flex items-center gap-2">
-            <select value={month} onChange={(e) => setMonth(+e.target.value)}
-              className="text-xs border border-gray-200 rounded-lg px-3 py-2 bg-white font-medium text-gray-700 focus:ring-2 focus:ring-orange-200 outline-none">
-              {Array.from({ length: 12 }, (_, i) => (
-                <option key={i + 1} value={i + 1}>{new Date(2026, i).toLocaleString("default", { month: "long" })}</option>
-              ))}
-            </select>
-            <select value={year} onChange={(e) => setYear(+e.target.value)}
-              className="text-xs border border-gray-200 rounded-lg px-3 py-2 bg-white font-medium text-gray-700 focus:ring-2 focus:ring-orange-200 outline-none">
+            <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-3 py-2">
+              <span className="text-xs">📅</span>
+              <select value={month} onChange={(e) => setMonth(+e.target.value)} className="text-xs font-medium text-gray-700 outline-none bg-transparent">
+                {Array.from({ length: 12 }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>{new Date(2026, i).toLocaleString("default", { month: "long" })}</option>
+                ))}
+              </select>
+            </div>
+            <select value={year} onChange={(e) => setYear(+e.target.value)} className="text-xs border border-gray-200 rounded-lg px-3 py-2 bg-white font-medium text-gray-700 outline-none">
               {[2024, 2025, 2026, 2027].map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
         </div>
 
-        {activeTab === "mcr"  && <MCRSection month={month} year={year} />}
+        {/* Stats Cards Row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+          <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center"><span className="text-lg">🩺</span></div>
+            <div>
+              <p className="text-xl font-extrabold text-gray-900">{mrInfo?.assigned_doctors?.length || 0}</p>
+              <p className="text-[10px] text-gray-400">Total Doctors</p>
+              <p className="text-[9px] text-gray-300">👤 Assigned to you</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">
+            <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center"><span className="text-lg">✅</span></div>
+            <div>
+              <p className="text-xl font-extrabold text-gray-900">0</p>
+              <p className="text-[10px] text-gray-400">Visited</p>
+              <p className="text-[9px] text-green-500">✅ 0% of total</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-orange-200 flex items-center gap-3">
+            <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center"><span className="text-lg">⏳</span></div>
+            <div>
+              <p className="text-xl font-extrabold text-gray-900">0</p>
+              <p className="text-[10px] text-gray-400">In Progress</p>
+              <p className="text-[9px] text-orange-400">⏳ 0% of total</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-red-200 flex items-center gap-3">
+            <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center"><span className="text-lg">❌</span></div>
+            <div>
+              <p className="text-xl font-extrabold text-gray-900">{mrInfo?.assigned_doctors?.length || 0}</p>
+              <p className="text-[10px] text-gray-400">Not Visited</p>
+              <p className="text-[9px] text-red-400">❌ 100% of total</p>
+            </div>
+          </div>
+        </div>
+
+        {/* MR Profile + Activity Calendar */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-6">
+          {/* MR Profile Card */}
+          <div className="lg:col-span-5 bg-white rounded-xl border border-gray-200 p-5">
+            {mrInfo ? (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 text-base font-bold">
+                    {mrInfo.name?.charAt(0) || "M"}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{mrInfo.name}</p>
+                    <p className="text-[11px] text-gray-400">{mrInfo.territory} · {mrInfo.zone} · {mrInfo.state}</p>
+                  </div>
+                </div>
+                <div className="space-y-2.5 mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-indigo-500">✉️</span>
+                    <span className="text-[11px] text-gray-600">{mrInfo.email}</span>
+                  </div>
+                  {mrInfo.phone && (
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-indigo-500">📞</span>
+                      <span className="text-[11px] text-gray-600">{mrInfo.phone}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="pt-3 border-t border-gray-100">
+                  <p className="text-[10px] text-gray-400 mb-1">Coverage Area</p>
+                  <span className="text-[11px] bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full border border-indigo-100 font-medium">{mrInfo.territory} ({mrInfo.zone})</span>
+                </div>
+                <div className="pt-3 mt-3 border-t border-gray-100 flex items-center justify-between">
+                  <p className="text-[10px] text-gray-400">Doctors Assigned</p>
+                  <p className="text-lg font-extrabold text-gray-900">{mrInfo.assigned_doctors?.length || 0}</p>
+                </div>
+              </>
+            ) : (
+              <div className="animate-pulse space-y-3">
+                <div className="h-12 bg-gray-100 rounded-full w-12" />
+                <div className="h-4 bg-gray-100 rounded w-3/4" />
+                <div className="h-3 bg-gray-50 rounded w-1/2" />
+              </div>
+            )}
+          </div>
+
+          {/* Activity Calendar */}
+          <div className="lg:col-span-7 bg-white rounded-xl border border-gray-200 p-5">
+            <h3 className="text-sm font-bold text-gray-900 mb-4">{new Date(year, month - 1).toLocaleString("default", { month: "long" })} {year} — Activity Calendar</h3>
+            <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-gray-400 font-semibold mb-2">
+              {["SUN","MON","TUE","WED","THU","FRI","SAT"].map(d => <div key={d}>{d}</div>)}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {(() => {
+                const firstDay = new Date(year, month - 1, 1).getDay();
+                const daysInMonth = new Date(year, month, 0).getDate();
+                const todayDate = new Date().getDate();
+                const todayMonth = new Date().getMonth() + 1;
+                const todayYear = new Date().getFullYear();
+                const cells = [];
+                for (let i = 0; i < firstDay; i++) cells.push(<div key={`empty-${i}`} />);
+                for (let d = 1; d <= daysInMonth; d++) {
+                  const isToday = d === todayDate && month === todayMonth && year === todayYear;
+                  cells.push(
+                    <div key={d} className={`w-8 h-8 mx-auto rounded-lg flex items-center justify-center text-[11px] font-medium ${isToday ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}>
+                      {d}
+                    </div>
+                  );
+                }
+                return cells;
+              })()}
+            </div>
+            <div className="flex items-center gap-4 mt-3 text-[9px] text-gray-400 font-medium">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-600" /> Selected</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> Visited</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400" /> In Progress</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400" /> Not Visited</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+          <div className="flex gap-1 bg-white rounded-xl p-1 border border-gray-200 overflow-x-auto scrollbar-sfe">
+            {TABS.map((t) => (
+              <button key={t.id} onClick={() => setActiveTab(t.id)}
+                className={"flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap " + (
+                  activeTab === t.id ? "bg-indigo-600 text-white shadow" : "text-gray-500 hover:bg-gray-50"
+                )}>
+                <span>{t.icon}</span> {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {activeTab === "mcr"  && <MCRSection month={month} year={year} mrInfo={mrInfo} onPrint={() => setShowMCRPrint(true)} />}
         {activeTab === "mvc"  && <MVCSection month={month} year={year} />}
         {activeTab === "rcpa" && <RCPASection month={month} year={year} preSelectVisitId={urlVisitId} />}
       </main>
+    </div>
+
+    {/* MCR Print Modal */}
+    {showMCRPrint && <MCRPrintTemplate mrInfo={mrInfo} month={month} year={year} data={mcrData} onClose={() => setShowMCRPrint(false)} />}
     </div>
   );
 }
 
 // ── Shared UI Components ──────────────────────────────────────────────────────
-function StatCard({ icon, label, value, sub, color = "from-orange-500 to-red-500" }) {
+function StatCard({ icon, label, value, sub, color = "from-indigo-600 to-purple-600" }) {
   return (
     <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:shadow-md transition-all">
       <div className={"w-10 h-10 bg-gradient-to-br " + color + " rounded-xl flex items-center justify-center mb-3 shadow-sm"}>
@@ -141,7 +267,7 @@ function StatCard({ icon, label, value, sub, color = "from-orange-500 to-red-500
   );
 }
 
-function ProgressBar({ value, max = 100, color = "bg-orange-500" }) {
+function ProgressBar({ value, max = 100, color = "bg-indigo-500" }) {
   const pct = Math.min(100, Math.max(0, (value / max) * 100));
   return (
     <div className="w-full bg-gray-100 rounded-full h-2.5">
@@ -170,7 +296,7 @@ function ErrorBox({ message }) {
 }
 
 // ── MCR Section ───────────────────────────────────────────────────────────────
-function MCRSection({ month, year }) {
+function MCRSection({ month, year, mrInfo, onPrint }) {
   const [filterTab, setFilterTab] = useState("all");
   const { data, isLoading, error } = useQuery({
     queryKey: ["sfe-mcr", month, year],
@@ -182,7 +308,7 @@ function MCRSection({ month, year }) {
 
   const s = data || {};
   const pct = s.mcr_percentage || 0;
-  const pctColor = pct >= 90 ? "text-emerald-600" : pct >= 75 ? "text-orange-600" : "text-red-600";
+  const pctColor = pct >= 90 ? "text-emerald-600" : pct >= 75 ? "text-indigo-600" : "text-red-600";
   const pctBg = pct >= 90 ? "bg-emerald-500" : pct >= 75 ? "bg-orange-400" : "bg-red-500";
   const pctLabel = pct >= 90 ? "Excellent" : pct >= 75 ? "Good" : pct >= 60 ? "Needs Improvement" : "Critical";
 
@@ -198,22 +324,27 @@ function MCRSection({ month, year }) {
 
       {/* Left: Doctor Details */}
       <div className="lg:col-span-2 space-y-4">
-        {/* Filter Tabs */}
-        <div className="flex gap-2 bg-white rounded-xl p-1.5 shadow-sm border border-gray-100 w-fit sticky top-20 z-10">
-          {[
-            { id: "all", label: `📋 All (${visited.length + notVisited.length})` },
-            { id: "visited", label: `✅ Visited (${visited.length})` },
-            { id: "not-visited", label: `❌ Not Visited (${notVisited.length})` },
-          ].map((tab) => (
-            <button key={tab.id} onClick={() => setFilterTab(tab.id)}
-              className={`px-4 py-2 rounded-lg font-semibold text-xs transition-all whitespace-nowrap ${
-                filterTab === tab.id 
-                  ? "bg-orange-500 text-white shadow" 
-                  : "text-gray-600 hover:bg-gray-50"
-              }`}>
-              {tab.label}
+        {/* Filter Tabs + Print */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex gap-2 bg-white rounded-xl p-1.5 shadow-sm border border-gray-100 w-fit">
+            {[
+              { id: "all", label: `📋 All (${visited.length + notVisited.length})` },
+              { id: "visited", label: `✅ Visited (${visited.length})` },
+              { id: "not-visited", label: `❌ Not Visited (${notVisited.length})` },
+            ].map((tab) => (
+              <button key={tab.id} onClick={() => setFilterTab(tab.id)}
+                className={`px-4 py-2 rounded-lg font-semibold text-xs transition-all whitespace-nowrap ${
+                  filterTab === tab.id 
+                    ? "bg-gradient-to-r from-purple-600 to-purple-800 text-white shadow" 
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}>
+                {tab.label}
             </button>
           ))}
+          </div>
+          <button onClick={onPrint} className="flex items-center gap-1.5 bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all">
+            📄 Download MCR
+          </button>
         </div>
 
         {/* Doctor cards */}
@@ -261,7 +392,7 @@ function MCRSection({ month, year }) {
                 <span className="text-[9px] text-gray-400 font-medium">MCR</span>
               </div>
             </div>
-            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${pct >= 90 ? "bg-emerald-50 text-emerald-700" : pct >= 75 ? "bg-orange-50 text-orange-700" : "bg-red-50 text-red-700"}`}>{pctLabel}</span>
+            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${pct >= 90 ? "bg-emerald-50 text-emerald-700" : pct >= 75 ? "bg-indigo-50 text-indigo-700" : "bg-red-50 text-red-700"}`}>{pctLabel}</span>
           </div>
 
           {/* Stats Grid */}
@@ -318,7 +449,7 @@ function DoctorVisitCard({ doctor }) {
       {/* Doctor Header */}
       <button onClick={() => setExpanded(!expanded)} className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center text-orange-600 text-sm font-bold border border-orange-100 flex-shrink-0">
+          <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 text-sm font-bold border border-indigo-100 flex-shrink-0">
             {d.doctor_name?.charAt(0)?.toUpperCase()}
           </div>
           <div className="text-left">
@@ -328,7 +459,7 @@ function DoctorVisitCard({ doctor }) {
         </div>
         <div className="flex items-center gap-2">
           <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black border flex-shrink-0 ${d.classification === "A" ? "bg-red-50 text-red-600 border-red-200" : d.classification === "B" ? "bg-amber-50 text-amber-600 border-amber-200" : "bg-gray-50 text-gray-500 border-gray-200"}`}>{d.classification}</span>
-          <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-transform duration-200 ${expanded ? "bg-orange-100 rotate-180" : "bg-gray-100"}`}>
+          <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-transform duration-200 ${expanded ? "bg-indigo-100 rotate-180" : "bg-gray-100"}`}>
             <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
           </div>
         </div>
@@ -341,7 +472,7 @@ function DoctorVisitCard({ doctor }) {
           <div className="px-5 pt-3 flex gap-1.5 overflow-x-auto scrollbar-sfe">
             {visits.map((v, vi) => (
               <button key={vi} onClick={() => setActiveVisit(vi)}
-                className={`px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all ${activeVisit === vi ? "bg-orange-500 text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+                className={`px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all ${activeVisit === vi ? "bg-indigo-600 text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
                 Visit {vi + 1}
               </button>
             ))}
@@ -463,7 +594,7 @@ function MVCSection({ month, year }) {
 
   const s = data || {};
   const pct = s.mvc_percentage || 0;
-  const pctColor = pct >= 85 ? "text-emerald-600" : pct >= 70 ? "text-orange-600" : "text-red-600";
+  const pctColor = pct >= 85 ? "text-emerald-600" : pct >= 70 ? "text-indigo-600" : "text-red-600";
   const pctBg = pct >= 85 ? "bg-emerald-500" : pct >= 70 ? "bg-orange-400" : "bg-red-500";
   const pctLabel = pct >= 85 ? "Excellent" : pct >= 70 ? "Good" : pct >= 55 ? "Needs Improvement" : "Critical";
 
@@ -493,14 +624,14 @@ function MVCSection({ month, year }) {
                   {s.doctors.map((d, i) => {
                     const statusStyles = {
                       covered: "bg-emerald-50 text-emerald-700 border-emerald-100",
-                      under:   "bg-orange-50 text-orange-700 border-orange-100",
+                      under:   "bg-indigo-50 text-indigo-700 border-indigo-100",
                       missed:  "bg-red-50 text-red-600 border-red-100",
                     };
                     return (
                       <tr key={i} className="hover:bg-gray-50/50 transition-colors">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
-                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${d.status === "covered" ? "bg-emerald-100 text-emerald-600" : d.status === "missed" ? "bg-red-100 text-red-500" : "bg-orange-100 text-orange-600"}`}>{d.doctor_name?.charAt(0)}</div>
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${d.status === "covered" ? "bg-emerald-100 text-emerald-600" : d.status === "missed" ? "bg-red-100 text-red-500" : "bg-indigo-100 text-indigo-600"}`}>{d.doctor_name?.charAt(0)}</div>
                             <span className="font-semibold text-gray-800">{d.doctor_name}</span>
                           </div>
                         </td>
@@ -537,7 +668,7 @@ function MVCSection({ month, year }) {
                 <span className="text-[9px] text-gray-400 font-medium">MVC</span>
               </div>
             </div>
-            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${pct >= 85 ? "bg-emerald-50 text-emerald-700" : pct >= 70 ? "bg-orange-50 text-orange-700" : "bg-red-50 text-red-700"}`}>{pctLabel}</span>
+            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${pct >= 85 ? "bg-emerald-50 text-emerald-700" : pct >= 70 ? "bg-indigo-50 text-indigo-700" : "bg-red-50 text-red-700"}`}>{pctLabel}</span>
           </div>
 
           {/* Stats */}
@@ -546,9 +677,9 @@ function MVCSection({ month, year }) {
               <p className="text-base font-extrabold text-emerald-700">{s.fully_covered || 0}</p>
               <p className="text-[8px] text-emerald-600 font-medium uppercase">Covered</p>
             </div>
-            <div className="bg-orange-50 rounded-xl p-2.5 text-center border border-orange-100">
-              <p className="text-base font-extrabold text-orange-700">{s.under_covered || 0}</p>
-              <p className="text-[8px] text-orange-600 font-medium uppercase">Under</p>
+            <div className="bg-indigo-50 rounded-xl p-2.5 text-center border border-indigo-100">
+              <p className="text-base font-extrabold text-indigo-700">{s.under_covered || 0}</p>
+              <p className="text-[8px] text-indigo-600 font-medium uppercase">Under</p>
             </div>
             <div className="bg-red-50 rounded-xl p-2.5 text-center border border-red-100">
               <p className="text-base font-extrabold text-red-600">{s.not_visited || 0}</p>
@@ -691,7 +822,7 @@ function RCPASection({ month, year, preSelectVisitId }) {
     <div className="space-y-5">
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard icon="💊" label="Total Commitments" value={total} color="from-orange-500 to-red-500" />
+        <StatCard icon="💊" label="Total Commitments" value={total} color="from-indigo-600 to-purple-600" />
         <StatCard icon="⏳" label="Pending Approval" value={commitments.filter((c) => c.approval_status === "PENDING").length} color="from-amber-500 to-orange-500" />
         <StatCard icon="✅" label="Approved" value={commitments.filter((c) => c.approval_status === "APPROVED").length} color="from-green-500 to-emerald-500" />
         <StatCard icon="📈" label="Total Rx/Month" value={commitments.reduce((a, c) => a + (c.rx_per_month || 0), 0)} color="from-blue-500 to-cyan-500" />
@@ -700,17 +831,17 @@ function RCPASection({ month, year, preSelectVisitId }) {
       {/* New Commitment Button */}
       <div className="flex justify-end">
         <button onClick={() => setShowForm(!showForm)}
-          className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all">
+          className="bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all">
           {showForm ? "✕ Cancel" : "+ New Commitment"}
         </button>
       </div>
 
       {/* Create Form */}
       {showForm && (
-        <form onSubmit={handleCreate} className="bg-white rounded-2xl shadow-sm border border-orange-100 overflow-hidden">
-          <div className="px-5 py-3 bg-orange-50 border-b border-orange-100">
-            <p className="text-sm font-bold text-orange-800">📋 Log RCPA Commitment</p>
-            <p className="text-[11px] text-orange-500 mt-0.5">Select a completed visit, then the drug the doctor committed to prescribe</p>
+        <form onSubmit={handleCreate} className="bg-white rounded-2xl shadow-sm border border-indigo-100 overflow-hidden">
+          <div className="px-5 py-3 bg-indigo-50 border-b border-indigo-100">
+            <p className="text-sm font-bold text-indigo-800">📋 Log RCPA Commitment</p>
+            <p className="text-[11px] text-indigo-500 mt-0.5">Select a completed visit, then the drug the doctor committed to prescribe</p>
           </div>
           <div className="p-5 space-y-4">
             {createMutation.error && (
@@ -870,7 +1001,7 @@ function RCPASection({ month, year, preSelectVisitId }) {
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setShowForm(false)} className="text-xs text-gray-500 px-4 py-2 rounded-lg hover:bg-gray-100">Cancel</button>
               <button type="submit" disabled={createMutation.isPending || (discountPct > maxDiscount && maxDiscount > 0)}
-                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-50">
+                className="bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-50">
                 {createMutation.isPending ? "Saving..." : "Save Commitment"}
               </button>
             </div>
@@ -896,7 +1027,7 @@ function RCPASection({ month, year, preSelectVisitId }) {
                   <div className="space-y-3 bg-indigo-50/50 rounded-xl p-4 border border-indigo-100">
                     {/* Context header */}
                     <div className="flex items-center gap-3 pb-2 border-b border-indigo-100">
-                      <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                      <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                         {c.doctor_name?.charAt(0) || "D"}
                       </div>
                       <div className="min-w-0 flex-1">
@@ -1027,7 +1158,7 @@ function RCPASection({ month, year, preSelectVisitId }) {
                 ) : (
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0 flex-1">
-                      <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5">
+                      <div className="w-9 h-9 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5">
                         {c.doctor_name?.charAt(0) || "D"}
                       </div>
                       <div className="min-w-0">
@@ -1059,7 +1190,7 @@ function RCPASection({ month, year, preSelectVisitId }) {
                       </span>
                       {c.approval_status !== "APPROVED" && (
                       <button onClick={() => { setEditingId(c.id); setEditForm({ rx_per_month: c.rx_per_month, committed_quantity: c.committed_quantity, drug_id: "", requested_discount: "" }); }}
-                        className="text-[11px] text-orange-500 hover:text-orange-600 font-semibold px-2 py-0.5 rounded hover:bg-orange-50">
+                        className="text-[11px] text-indigo-500 hover:text-indigo-600 font-semibold px-2 py-0.5 rounded hover:bg-indigo-50">
                         Edit
                       </button>
                       )}

@@ -101,7 +101,7 @@ function buildMCRHTML({ mrInfo, month, year, data, generatedAt }) {
   <table style="width:100%;border-collapse:collapse;background:#111827;padding:0;" cellpadding="0" cellspacing="0">
     <tr>
       <td style="padding:20px 28px 16px;">
-        <div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:2px;margin-bottom:3px;">MedRepAI · MCR Report</div>
+        <div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:2px;margin-bottom:3px;">MRX · MCR Report</div>
         <div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-0.5px;">Monthly Call Report</div>
         <div style="font-size:11px;color:#9ca3af;margin-top:2px;">${monthName} ${year}</div>
       </td>
@@ -219,7 +219,7 @@ function buildMCRHTML({ mrInfo, month, year, data, generatedAt }) {
   <!-- FOOTER -->
   <div style="background:linear-gradient(135deg,#1e3a5f,#1d4ed8);padding:10px 24px;display:flex;justify-content:space-between;align-items:center;">
     <span style="font-size:8px;color:rgba(255,255,255,0.55);">Generated: ${generatedAt}</span>
-    <span style="font-size:8px;color:rgba(255,255,255,0.55);">MedRepAI · Monthly Call Report · CONFIDENTIAL</span>
+    <span style="font-size:8px;color:rgba(255,255,255,0.55);">MRX · Monthly Call Report · CONFIDENTIAL</span>
     <span style="font-size:8px;color:rgba(255,255,255,0.55);">${reportId}</span>
   </div>
 
@@ -279,8 +279,8 @@ export default function MCRPrintTemplate({ mrInfo, month, year, data, onClose })
             <div className="flex items-start justify-between pb-4 mb-0">
               <div className="flex items-center gap-5">
                 <div>
-                  <div style={{ fontSize:"20px", fontWeight:"900", color:"#111827", letterSpacing:"-1px", lineHeight:1 }}>MedRep<span style={{ color:"#1d4ed8" }}>AI</span></div>
-                  <div style={{ fontSize:"9px", color:"#6b7280", marginTop:"3px" }}>Pharma Field Force Management</div>
+                  <div style={{ fontSize:"20px", fontWeight:"900", color:"#111827", letterSpacing:"-1px", lineHeight:1 }}>MR<span style={{ color:"#7c3aed" }}>X</span></div>
+                  <div style={{ fontSize:"9px", color:"#6b7280", marginTop:"3px" }}>Pharma Intelligence Platform</div>
                 </div>
                 <div style={{ width:"1px", height:"44px", background:"#d1d5db" }} />
                 <div>
@@ -396,7 +396,7 @@ export default function MCRPrintTemplate({ mrInfo, month, year, data, onClose })
 
             {/* Footer */}
             <div style={{ marginTop:"20px", borderTop:"1.5px solid #1d4ed8", paddingTop:"8px", display:"flex", justifyContent:"space-between" }}>
-              <span style={{ fontSize:"8px", color:"#9ca3af" }}>MedRepAI · Monthly Call Report</span>
+              <span style={{ fontSize:"8px", color:"#9ca3af" }}>MRX · Monthly Call Report</span>
               <span style={{ fontSize:"8px", color:"#9ca3af" }}>CONFIDENTIAL</span>
               <span style={{ fontSize:"8px", color:"#9ca3af" }}>Generated: {generatedAt}</span>
             </div>

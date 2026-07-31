@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
-import MRNavbar from "@/components/mr/MRNavbar";
-import Breadcrumb from "@/components/Breadcrumb";
+import { useRouter, useSearchParams } from "next/navigation";
+import MRSidebar from "@/components/mr/MRSidebar";
+import NotificationBell from "@/components/NotificationBell";
 import { get, post, put } from "@/lib/api";
 import { formatISTDate } from "@/lib/time";
 import LocationMapPicker from "@/components/LocationMapPicker";
@@ -44,6 +44,7 @@ const getGPS = () => new Promise((resolve, reject) => {
 export default function MRVisits() {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState("upcoming");
   const [historyFilter, setHistoryFilter] = useState("all");
   const [showScheduleForm, setShowScheduleForm] = useState(false);
@@ -56,6 +57,15 @@ export default function MRVisits() {
   const [actionLoading, setActionLoading] = useState(null);
   const [commitmentPrompt, setCommitmentPrompt] = useState(null); // visit object after report submitted
   const [navigatingToRCPA, setNavigatingToRCPA] = useState(false);
+
+  // Auto-open schedule modal if navigated with ?action=schedule
+  useEffect(() => {
+    if (searchParams.get("action") === "schedule") {
+      setShowScheduleForm(true);
+      // Clean up the URL
+      router.replace("/mr/visits", { scroll: false });
+    }
+  }, [searchParams, router]);
 
   const mrId = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
 
@@ -232,19 +242,47 @@ export default function MRVisits() {
 
   const canCheckIn = !activeVisit && pendingReports < 2;
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const userName = typeof window !== "undefined" ? localStorage.getItem("userName") || "MR" : "MR";
+
   return (
-    <div className="min-h-screen bg-[#fafbfd]">
-      <MRNavbar />
-      <main className="max-w-6xl mx-auto px-3 sm:px-5 lg:px-8 py-5 sm:py-7">
-        <Breadcrumb />
+    <div className="min-h-screen bg-[#f8f9fc] flex">
+      <MRSidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
+      <div className={`${sidebarCollapsed ? "md:ml-[60px]" : "md:ml-[220px]"} flex-1 min-h-screen transition-all duration-300`}>
+        {/* Top Bar */}
+                <header className="bg-white/80 backdrop-blur-md border-b border-gray-100/80 px-4 md:px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+          {/* Mobile hamburger */}
+          <button onClick={() => setMobileOpen(true)} className="md:hidden w-9 h-9 rounded-lg bg-gray-100 hover:bg-purple-50 flex items-center justify-center text-gray-600 hover:text-purple-600 transition-all mr-3">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-sm text-gray-600">
+              <svg className="w-4 h-4 text-indigo-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/></svg>
+              <span className="font-medium">Visakhapatnam, AP</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <NotificationBell accentColor="indigo" />
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center text-white text-xs font-bold">{userName.charAt(0).toUpperCase()}</div>
+              <div className="hidden sm:block">
+                <p className="text-sm font-bold text-gray-800 leading-none">{userName.split(" ")[0]} {userName.split(" ")[1]?.charAt(0) || ""}.</p>
+                <p className="text-[10px] text-gray-400">MR - Field Executive</p>
+              </div>
+            </div>
+          </div>
+        </header>
+
+      <main className="px-4 md:px-6 py-4 md:py-5">
 {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div>
-            <h1 className="text-2xl font-extrabold text-gray-900 mb-0.5">Visits</h1>
-            <p className="text-gray-400 text-sm">Schedule, track, and report your doctor visits</p>
+            <h1 className="text-xl font-extrabold text-gray-900 mb-0.5">Visits</h1>
+            <p className="text-gray-400 text-xs">Track and manage all your doctor visits</p>
           </div>
           <button onClick={() => setShowScheduleForm(true)}
-            className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white px-5 py-3 rounded-xl font-bold shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 text-sm">
+            className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white px-4 py-2 rounded-lg font-bold shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 text-xs">
             <span>➕</span><span>Schedule Visit</span>
           </button>
         </div>
@@ -306,7 +344,7 @@ export default function MRVisits() {
           <div className="flex-1 min-w-[140px]">
             <label className="block text-[10px] font-semibold text-gray-400 mb-1">Doctor</label>
             <select value={filterDoctor} onChange={(e) => setFilterDoctor(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-orange-300 bg-white">
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
               <option value="">All</option>
               {assignedDoctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
@@ -314,12 +352,12 @@ export default function MRVisits() {
           <div className="flex-1 min-w-[120px]">
             <label className="block text-[10px] font-semibold text-gray-400 mb-1">From</label>
             <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-orange-300" />
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-300" />
           </div>
           <div className="flex-1 min-w-[120px]">
             <label className="block text-[10px] font-semibold text-gray-400 mb-1">To</label>
             <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-orange-300" />
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-300" />
           </div>
           {(filterDoctor || filterDateFrom || filterDateTo) && (
             <button onClick={() => { setFilterDoctor(""); setFilterDateFrom(""); setFilterDateTo(""); }}
@@ -332,7 +370,7 @@ export default function MRVisits() {
           <div className="flex space-x-2 bg-white rounded-xl p-1.5 shadow-sm border border-gray-100 w-fit">
             {[{ id: "upcoming", label: "📅 Active & Upcoming" }, { id: "history", label: "🕐 History" }].map((t) => (
               <button key={t.id} onClick={() => setActiveTab(t.id)}
-                className={`px-4 py-2 rounded-lg font-semibold text-xs transition-all ${activeTab === t.id ? "bg-orange-500 text-white shadow" : "text-gray-600 hover:bg-gray-50"}`}>
+                className={`px-4 py-2 rounded-lg font-semibold text-xs transition-all ${activeTab === t.id ? "bg-indigo-600 text-white shadow" : "text-gray-600 hover:bg-gray-50"}`}>
                 {t.label}
               </button>
             ))}
@@ -391,7 +429,7 @@ export default function MRVisits() {
             {targets.length > 0 && (
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sticky top-20">
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="w-7 h-7 bg-orange-50 rounded-lg flex items-center justify-center"><span className="text-xs">🎯</span></div>
+                  <div className="w-7 h-7 bg-indigo-50 rounded-lg flex items-center justify-center"><span className="text-xs">🎯</span></div>
                   <div>
                     <p className="text-xs font-bold text-gray-900">Monthly Targets</p>
                     <p className="text-[10px] text-gray-400">{targets.filter((t) => t.completed >= t.required).length}/{targets.length} achieved</p>
@@ -420,13 +458,13 @@ export default function MRVisits() {
                       <div key={t.doctor_id}>
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-1.5">
-                            <span className={`w-1.5 h-1.5 rounded-full ${met ? "bg-emerald-400" : "bg-orange-400"}`} />
+                            <span className={`w-1.5 h-1.5 rounded-full ${met ? "bg-emerald-400" : "bg-indigo-400"}`} />
                             <span className="text-[11px] font-semibold text-gray-700 truncate max-w-[100px]">{t.doctor_name}</span>
                           </div>
                           <span className={`text-[10px] font-bold ${met ? "text-emerald-600" : "text-gray-400"}`}>{t.completed}/{t.required}</span>
                         </div>
                         <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full transition-all duration-500 ${met ? "bg-emerald-400" : "bg-orange-400"}`} style={{ width: `${pct}%` }} />
+                          <div className={`h-full rounded-full transition-all duration-500 ${met ? "bg-emerald-400" : "bg-indigo-400"}`} style={{ width: `${pct}%` }} />
                         </div>
                       </div>
                     );
@@ -481,7 +519,7 @@ export default function MRVisits() {
                     router.push(`/mr/sfe?tab=rcpa&visitId=${visitId}`);
                   }, 1200);
                 }}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold text-sm hover:shadow-lg transition-all">
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-purple-800 text-white font-bold text-sm hover:shadow-lg transition-all">
                   Yes, log commitment
                 </button>
               </div>
@@ -492,7 +530,7 @@ export default function MRVisits() {
 
       {/* Navigating animation */}
       {navigatingToRCPA && (
-        <div className="fixed inset-0 bg-gradient-to-br from-orange-500 to-red-500 z-50 flex flex-col items-center justify-center gap-5">
+        <div className="fixed inset-0 bg-gradient-to-br from-indigo-600 to-red-500 z-50 flex flex-col items-center justify-center gap-5">
           <div className="relative">
             <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center">
               <span className="text-4xl animate-bounce">💊</span>
@@ -501,7 +539,7 @@ export default function MRVisits() {
           </div>
           <div className="text-center">
             <p className="text-white font-extrabold text-xl">Opening RCPA</p>
-            <p className="text-orange-100 text-sm mt-1">Taking you to log commitment...</p>
+            <p className="text-indigo-100 text-sm mt-1">Taking you to log commitment...</p>
           </div>
           <div className="flex gap-1.5">
             {[0,1,2].map((i) => (
@@ -510,6 +548,7 @@ export default function MRVisits() {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }
@@ -528,7 +567,7 @@ function VisitCard({ visit, canCheckIn, actionLoading, onCheckIn, onCheckOut, on
   const isCancelled = visit.status === "cancelled";
 
   // Score color based on mood/outcome
-  const moodColor = report.doctor_mood === "positive" ? "bg-orange-100 text-orange-600" :
+  const moodColor = report.doctor_mood === "positive" ? "bg-indigo-100 text-indigo-700" :
                     report.doctor_mood === "negative" ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-500";
 
   return (
@@ -623,7 +662,7 @@ function VisitCard({ visit, canCheckIn, actionLoading, onCheckIn, onCheckOut, on
             </>
           )}
           {visit.status === "checked_out" && (
-            <button onClick={onReport} className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-bold text-[11px] shadow-sm transition-all whitespace-nowrap">📋 Submit Report</button>
+            <button onClick={onReport} className="bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white px-4 py-2 rounded-xl font-bold text-[11px] shadow-sm transition-all whitespace-nowrap">📋 Submit Report</button>
           )}
           {(isCompleted || isCancelled) && (
             <button onClick={() => setExpanded(!expanded)} className="bg-gray-50 hover:bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg font-bold text-[10px] border border-gray-200 transition-all text-center">
@@ -916,7 +955,7 @@ function ScheduleForm({ assignedDoctors, onClose, onSubmit, serverError }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div className="bg-gradient-to-r from-orange-500 to-red-500 p-5 rounded-t-2xl flex items-center justify-between">
+        <div className="bg-gradient-to-r from-indigo-600 to-red-500 p-5 rounded-t-2xl flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">📅 Schedule Visit</h2>
           <button onClick={onClose} className="text-white/70 hover:text-white text-xl">×</button>
         </div>
@@ -927,7 +966,7 @@ function ScheduleForm({ assignedDoctors, onClose, onSubmit, serverError }) {
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">Doctor *</label>
             <select value={doctorId} onChange={(e) => setDoctorId(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-300 bg-white">
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
               <option value="">Select doctor</option>
               {assignedDoctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
@@ -938,7 +977,7 @@ function ScheduleForm({ assignedDoctors, onClose, onSubmit, serverError }) {
             <label className="block text-xs font-bold text-gray-700 mb-1">Visit Title *</label>
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Amlodipine 5mg Presentation"
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-300" />
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-300" />
           </div>
 
           {/* Date + Time */}
@@ -947,12 +986,12 @@ function ScheduleForm({ assignedDoctors, onClose, onSubmit, serverError }) {
               <label className="block text-xs font-bold text-gray-700 mb-1">Date *</label>
               <input type="date" value={scheduledDate} min={new Date().toISOString().split("T")[0]}
                 onChange={(e) => { setScheduledDate(e.target.value); setError(""); }}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-300" />
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-300" />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1">Time *</label>
               <input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-300" />
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-300" />
             </div>
           </div>
 
@@ -960,7 +999,7 @@ function ScheduleForm({ assignedDoctors, onClose, onSubmit, serverError }) {
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">Purpose *</label>
             <select value={purpose} onChange={(e) => setPurpose(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-300 bg-white">
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
               <option value="">Select purpose</option>
               {PURPOSE_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
@@ -974,7 +1013,7 @@ function ScheduleForm({ assignedDoctors, onClose, onSubmit, serverError }) {
                 onClick={() => setLocationType("permanent")}
                 className={`flex-1 py-2 rounded-xl text-xs font-bold border-2 transition-all ${
                   locationType === "permanent"
-                    ? "border-orange-400 bg-orange-50 text-orange-700"
+                    ? "border-indigo-400 bg-indigo-50 text-indigo-700"
                     : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"
                 }`}>
                 🏥 Clinic Location
@@ -1007,7 +1046,7 @@ function ScheduleForm({ assignedDoctors, onClose, onSubmit, serverError }) {
                       setLocationId(e.target.value);
                       setLocationName(sel ? sel.name || sel.location_name || "" : "");
                     }}
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-300 bg-white">
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
                     <option value="">Select clinic location</option>
                     {clinicLocations.map((l) => (
                       <option key={l.id} value={l.id}>{l.name || l.location_name}</option>
@@ -1065,12 +1104,12 @@ function ScheduleForm({ assignedDoctors, onClose, onSubmit, serverError }) {
             <label className="block text-xs font-bold text-gray-700 mb-1">Notes</label>
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)}
               placeholder="Preparation notes..." rows={2}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-300 resize-none" />
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-300 resize-none" />
           </div>
 
           <div className="flex gap-3">
             <button type="button" onClick={onClose} className="flex-1 bg-gray-100 text-gray-600 py-2.5 rounded-xl font-bold text-sm">Cancel</button>
-            <button type="submit" className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white py-2.5 rounded-xl font-bold text-sm">Schedule</button>
+            <button type="submit" className="flex-1 bg-gradient-to-r from-indigo-600 to-red-500 text-white py-2.5 rounded-xl font-bold text-sm">Schedule</button>
           </div>
         </form>
       </div>
@@ -1123,7 +1162,7 @@ function ReportForm({ visit, assignedDrugs, onClose, onSubmit }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div className="bg-gradient-to-r from-orange-500 to-red-500 p-5 rounded-t-2xl flex items-center justify-between">
+        <div className="bg-gradient-to-r from-indigo-600 to-red-500 p-5 rounded-t-2xl flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-white">📋 Visit Report</h2>
             <p className="text-purple-200 text-xs">{visit.doctor_name} · {visit.scheduled_date}</p>
@@ -1209,7 +1248,7 @@ function ReportForm({ visit, assignedDrugs, onClose, onSubmit }) {
 
           <div className="flex gap-3">
             <button type="button" onClick={onClose} className="flex-1 bg-gray-100 text-gray-600 py-2.5 rounded-xl font-bold text-sm">Cancel</button>
-            <button type="submit" className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white py-2.5 rounded-xl font-bold text-sm">Submit Report</button>
+            <button type="submit" className="flex-1 bg-gradient-to-r from-indigo-600 to-red-500 text-white py-2.5 rounded-xl font-bold text-sm">Submit Report</button>
           </div>
         </form>
       </div>

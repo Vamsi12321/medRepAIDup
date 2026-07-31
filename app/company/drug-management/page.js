@@ -343,11 +343,10 @@ export default function CompanyDrugManagement() {
                       <div className="px-4 pb-4 pt-1 space-y-2">
                         {/* Active toggle */}
                         <DrugActiveToggle drug={drug} onToggled={invalidateDrugs} />
-                        <button onClick={() => { setEditDrug(drug); setShowDrugModal(true); }}
-                          disabled={!drug.is_active}
-                          className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-2 rounded-xl font-bold text-xs hover:shadow-lg transition-all group-hover:from-indigo-700 group-hover:to-purple-700 disabled:opacity-40 disabled:cursor-not-allowed">
-                          ✏️ Edit Drug
-                        </button>
+                        <a href={`/drug-details/${drug._id}`}
+                          className="w-full block bg-gradient-to-r from-purple-600 to-purple-800 text-white py-2 rounded-xl font-bold text-xs hover:shadow-lg transition-all text-center flex items-center justify-center gap-1">
+                          👁️ View Details
+                        </a>
                         <BrochureUploadButton drug={drug} onUploaded={invalidateDrugs} />
                       </div>
                     </div>
