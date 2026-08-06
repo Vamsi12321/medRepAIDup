@@ -29,11 +29,11 @@ export default function AnalyticsLayout({ children }) {
     const timer = setTimeout(() => {
       const m = CM, y = CY;
       // Only prefetch tabs that aren't the current one
-      if (!pathname.includes("/drugs"))       queryClient.prefetchQuery({ queryKey: ["analytics-drugs", m, y], queryFn: () => get(`/api/v1/analytics/drugs?month=${m}&year=${y}`), staleTime: 3 * 60 * 1000 });
-      if (!pathname.includes("/mrs"))         queryClient.prefetchQuery({ queryKey: ["analytics-mrs", m, y], queryFn: () => get(`/api/v1/analytics/mrs?month=${m}&year=${y}`), staleTime: 3 * 60 * 1000 });
-      if (!pathname.includes("/doctors"))     queryClient.prefetchQuery({ queryKey: ["analytics-doctors", m, y], queryFn: () => get(`/api/v1/analytics/doctors?month=${m}&year=${y}`), staleTime: 3 * 60 * 1000 });
-      if (!pathname.includes("/regions"))     queryClient.prefetchQuery({ queryKey: ["analytics-regions", "state", {}, m, y], queryFn: () => get(`/api/v1/analytics/regions?level=state&month=${m}&year=${y}`), staleTime: 3 * 60 * 1000 });
-      if (!pathname.includes("/commitments")) queryClient.prefetchQuery({ queryKey: ["rcpa-pending"], queryFn: () => get("/api/v1/sfe/rcpa/pending-approvals"), staleTime: 2 * 60 * 1000 });
+      if (!pathname.includes("/drugs"))       queryClient.prefetchQuery({ queryKey: ["analytics-drugs", m, y], queryFn: () => get(`/api/v1/analytics/drugs?month=${m}&year=${y}`), staleTime: 7 * 60 * 1000 });
+      if (!pathname.includes("/mrs"))         queryClient.prefetchQuery({ queryKey: ["analytics-mrs", m, y], queryFn: () => get(`/api/v1/analytics/mrs?month=${m}&year=${y}`), staleTime: 7 * 60 * 1000 });
+      if (!pathname.includes("/doctors"))     queryClient.prefetchQuery({ queryKey: ["analytics-doctors", m, y], queryFn: () => get(`/api/v1/analytics/doctors?month=${m}&year=${y}`), staleTime: 7 * 60 * 1000 });
+      if (!pathname.includes("/regions"))     queryClient.prefetchQuery({ queryKey: ["analytics-regions", "state", {}, m, y], queryFn: () => get(`/api/v1/analytics/regions?level=state&month=${m}&year=${y}`), staleTime: 7 * 60 * 1000 });
+      if (!pathname.includes("/commitments")) queryClient.prefetchQuery({ queryKey: ["rcpa-pending"], queryFn: () => get("/api/v1/sfe/rcpa/pending-approvals"), staleTime: 7 * 60 * 1000 });
     }, 2000); // Wait 2s after page load, then prefetch others in background
     return () => clearTimeout(timer);
   }, [queryClient, pathname]);

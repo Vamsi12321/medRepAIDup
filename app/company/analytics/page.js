@@ -31,12 +31,12 @@ export default function AnalyticsOverview() {
   const { data: dashboard, isLoading } = useQuery({
     queryKey: ["analytics-dashboard", month, year],
     queryFn: () => get(`/api/v1/analytics/dashboard?month=${month}&year=${year}`),
-    staleTime: 3 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
   const { data: trends } = useQuery({
     queryKey: ["analytics-trends"],
     queryFn: () => get("/api/v1/analytics/trends?months=6"),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const d = dashboard || {};

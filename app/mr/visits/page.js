@@ -1130,7 +1130,7 @@ function ReportForm({ visit, assignedDrugs, onClose, onSubmit }) {
     queryKey: ["drugs-for-report"],
     queryFn: () => get("/api/v1/drugs?limit=200").then((d) => d.drugs || []),
     enabled: !assignedDrugs || assignedDrugs.length === 0,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const drugsList = (assignedDrugs && assignedDrugs.length > 0)

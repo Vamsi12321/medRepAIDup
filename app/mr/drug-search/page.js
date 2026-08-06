@@ -22,7 +22,7 @@ export default function MRDrugSearch() {
   const { data, isLoading } = useQuery({
     queryKey: ["drugs-public"],
     queryFn: () => get("/api/v1/drugs?limit=200").then((d) => d.drugs || []),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const drugs = data || [];

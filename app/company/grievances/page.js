@@ -39,19 +39,19 @@ export default function AdminGrievances() {
   const { data: statsData } = useQuery({
     queryKey: ["grievance-stats", adminDept],
     queryFn: () => get("/api/v1/grievances/admin/stats/dashboard" + (adminDept ? "?department=" + adminDept : "")),
-    staleTime: 30000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-grievances", deptFilter],
     queryFn: () => get("/api/v1/grievances/admin/list?limit=50" + (deptFilter ? "&department=" + deptFilter : "")),
-    staleTime: 30000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const { data: deptData } = useQuery({
     queryKey: ["departments"],
     queryFn: () => get("/api/v1/departments").then((d) => Array.isArray(d) ? d : d.departments || d.data || []),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
     enabled: !adminDept,
   });
 

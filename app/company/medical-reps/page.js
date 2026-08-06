@@ -251,7 +251,7 @@ export default function CompanyMedicalReps() {
       return [];
     }),
     gcTime: 30 * 60 * 1000,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
     placeholderData: (prev) => prev,
     retry: 2,
   });

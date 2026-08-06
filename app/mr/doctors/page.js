@@ -39,14 +39,14 @@ export default function MRDoctors() {
     queryKey: ["all-doctors"],
     queryFn: () => get("/api/v1/doctors?page_size=1000").then((d) => d.doctors || []),
     enabled: !!id,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const { data: requestsData, isLoading: loadingRequests } = useQuery({
     queryKey: ["doctor-requests"],
     queryFn: () => get("/api/v1/doctors/requests").then((d) => d.requests || []),
     enabled: !!id,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const assignedDoctorsList = mrData?.assigned_doctors || [];

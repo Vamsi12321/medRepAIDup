@@ -37,7 +37,7 @@ export default function CommunicationCenter() {
       if (filterPriority) params.append("priority", filterPriority);
       return get("/api/v1/communications?" + params);
     },
-    staleTime: 30000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const communications = data?.communications || [];
@@ -296,7 +296,7 @@ function CommDetailDrawer({ commId, onClose }) {
   const { data: comm, isLoading } = useQuery({
     queryKey: ["comm-mr-detail", commId],
     queryFn: () => get("/api/v1/communications/" + commId),
-    staleTime: 30000,
+    staleTime: 7 * 60 * 1000,
   });
   const t = TYPE_STYLES[comm?.type] || TYPE_STYLES.announcement;
   const p = PRIORITY_STYLES[comm?.priority] || PRIORITY_STYLES.medium;

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
@@ -68,13 +68,13 @@ export default function ActivityLogsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["activity-logs", page, actionType, targetType, severity, dateFrom, dateTo],
     queryFn: () => get(`/api/v1/admin/activity-logs?${buildParams()}`),
-    staleTime: 30000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const { data: stats } = useQuery({
     queryKey: ["activity-stats"],
     queryFn: () => get("/api/v1/admin/activity-logs/stats"),
-    staleTime: 60000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const logs       = data?.logs        || [];

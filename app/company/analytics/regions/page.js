@@ -20,7 +20,7 @@ export default function RegionsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["analytics-regions", level, filter, month, year, locationType],
     queryFn: () => get(query),
-    staleTime: 3 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
   const regionList = data?.regions || data || [];
   const totalRevenue = regionList.reduce((a, r) => a + (r.committed_revenue || 0), 0);
@@ -32,7 +32,7 @@ export default function RegionsPage() {
     queryKey: ["analytics-regions-doctors", selectedLocation, month, year],
     queryFn: () => get(`/api/v1/analytics/location-doctors?location=${encodeURIComponent(selectedLocation)}&month=${month}&year=${year}`),
     enabled: !!selectedLocation,
-    staleTime: 3 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
   const doctors = Array.isArray(doctorsData) ? doctorsData : (doctorsData?.doctors || []);
 

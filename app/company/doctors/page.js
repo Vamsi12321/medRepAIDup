@@ -620,7 +620,7 @@ function DoctorRequestsPanel({ onClose, onApproved }) {
     queryKey: ["doctors"],
     queryFn: () => get("/api/v1/doctors?page_size=1000").then((d) => d.doctors || []),
     enabled: filter === "approved",
-    staleTime: 2 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const approvedDoctors = (doctorsData || []).filter(

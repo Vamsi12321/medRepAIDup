@@ -25,7 +25,7 @@ export default function MRDashboard() {
   const { data, isLoading } = useQuery({
     queryKey: ["mr-dashboard"],
     queryFn: () => get("/api/v1/dashboard"),
-    staleTime: 2 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     placeholderData: (prev) => prev,
   });

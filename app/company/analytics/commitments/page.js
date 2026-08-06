@@ -25,13 +25,13 @@ export default function CommitmentsPage() {
   const { data: pendingData, isLoading: lp, refetch } = useQuery({
     queryKey: ["rcpa-pending"],
     queryFn: () => get("/api/v1/sfe/rcpa/pending-approvals"),
-    staleTime: 2 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
   const { data: allData, isLoading: la } = useQuery({
     queryKey: ["rcpa-all", month, year],
     queryFn: () => get(`/api/v1/sfe/rcpa?month=${month}&year=${year}`),
     enabled: tab === "all",
-    staleTime: 2 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const approveMut = useMutation({

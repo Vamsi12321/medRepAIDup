@@ -767,7 +767,7 @@ function MCRSection({ month, year }) {
   const { data: mrs } = useQuery({
     queryKey: ["company-mrs"],
     queryFn: () => get("/api/v1/mrs").then((r) => r.mrs || []),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const { data, isLoading, error } = useQuery({
@@ -990,7 +990,7 @@ function MVCSection({ month, year }) {
   const { data: mrs } = useQuery({
     queryKey: ["company-mrs"],
     queryFn: () => get("/api/v1/mrs").then((r) => r.mrs || []),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const { data, isLoading, error } = useQuery({
@@ -1414,7 +1414,7 @@ function RCPASection({ month, year }) {
   const trendQueries = trendMonths.map((m) => useQuery({
     queryKey: ["sfe-rcpa-summary", m.month, m.year],
     queryFn:  () => get("/api/v1/sfe/rcpa/summary", { month: m.month, year: m.year }),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   }));
 
   if (isLoading) return <LoadingSkeleton />;
@@ -2245,7 +2245,7 @@ function AdminDCRSection() {
   const { data: mrs } = useQuery({
     queryKey: ["company-mrs"],
     queryFn: () => get("/api/v1/mrs").then((r) => r.mrs || []),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const { data: visitsResponse, isLoading, error } = useQuery({
@@ -2266,7 +2266,7 @@ function AdminDCRSection() {
     queryKey: ["admin-dcr-month", mrId, monthKey],
     queryFn: () => get(`/api/v1/visits?mr_id=${mrId}&date_from=${monthStart}&date_to=${monthEnd}`),
     enabled: !!mrId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const selectedMr  = (mrs || []).find((m) => (m.id || m._id) === mrId) || null;
@@ -2596,13 +2596,13 @@ function VisitTargets() {
   const { data: settings, isLoading } = useQuery({
     queryKey: ["sfe-settings"],
     queryFn: () => get("/api/v1/sfe/settings"),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const { data: doctorsData } = useQuery({
     queryKey: ["doctors"],
     queryFn: () => get("/api/v1/doctors?page_size=1000").then((d) => Array.isArray(d) ? d : (d?.doctors || [])),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const doctors = Array.isArray(doctorsData) ? doctorsData : [];

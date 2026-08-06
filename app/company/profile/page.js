@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
@@ -18,14 +18,14 @@ export default function CompanyProfile() {
   const { data: me, isLoading: meLoading } = useQuery({
     queryKey: ["admin-me"],
     queryFn: () => get("/api/v1/profile/me"),
-    staleTime: 60000,
+    staleTime: 7 * 60 * 1000,
   });
 
   // Company profile (GET /profile/company)
   const { data: company, isLoading: companyLoading } = useQuery({
     queryKey: ["company-profile"],
     queryFn: () => get("/api/v1/profile/company"),
-    staleTime: 60000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const role = me?.role; // "ADMIN" or "MANAGER"

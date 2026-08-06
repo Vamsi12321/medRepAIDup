@@ -48,7 +48,7 @@ export default function MRDCRPage() {
     queryKey: ["mr-dcr-month", monthKey],
     queryFn: () => get(`/api/v1/visits?date_from=${monthStart}&date_to=${monthEnd}`),
     enabled: !!mrId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const allVisits   = visitsResponse?.visits || [];

@@ -10,7 +10,7 @@ export default function UserProfileModal({ userId, onClose }) {
   const { data: profile, isLoading } = useQuery({
     queryKey: ["user-profile", userId],
     queryFn: () => get(`/api/v1/profile/${userId}`),
-    staleTime: 60000,
+    staleTime: 7 * 60 * 1000,
     enabled: !!userId,
   });
 

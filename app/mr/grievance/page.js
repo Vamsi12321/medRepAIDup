@@ -36,14 +36,14 @@ export default function GrievancePage() {
   const { data: deptData } = useQuery({
     queryKey: ["departments"],
     queryFn: () => get("/api/v1/departments").then((d) => Array.isArray(d) ? d : d.departments || d.data || []),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
   const departments = Array.isArray(deptData) ? deptData : (deptData?.departments || []);
 
   const { data, isLoading } = useQuery({
     queryKey: ["grievances", activeFilter],
     queryFn: () => get("/api/v1/grievances?limit=50" + (activeFilter !== "all" && !["open","in_progress","resolved","rejected"].includes(activeFilter) ? "&department=" + activeFilter : "")),
-    staleTime: 30000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const allTickets = data?.grievances || [];

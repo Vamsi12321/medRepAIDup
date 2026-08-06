@@ -41,9 +41,12 @@ export default function AdminLogin() {
       let expiry;
       try {
         const payload = JSON.parse(atob(data.access_token.split(".")[1]));
-        expiry = payload.exp ? payload.exp * 1000 : Date.now() + (data.expires_in || 3600) * 1000;
+        const backendExpiry = payload.exp ? payload.exp * 1000 : Date.now() + (data.expires_in || 3600) * 1000;
+        // Enforce minimum 30 minutes
+        const minExpiry = Date.now() + (30 * 60 * 1000);
+        expiry = Math.max(backendExpiry, minExpiry);
       } catch {
-        expiry = Date.now() + (data.expires_in || 3600) * 1000;
+        expiry = Date.now() + Math.max((data.expires_in || 3600), 30 * 60) * 1000;
       }
       localStorage.setItem("token_expiry", expiry);
       localStorage.setItem("userEmail", data.user.email);

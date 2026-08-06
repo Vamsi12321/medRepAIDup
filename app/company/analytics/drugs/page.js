@@ -17,7 +17,7 @@ export default function DrugsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["analytics-drugs", month, year],
     queryFn: () => get(`/api/v1/analytics/drugs?month=${month}&year=${year}`),
-    staleTime: 3 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
   const raw = data?.drugs || data || [];
 

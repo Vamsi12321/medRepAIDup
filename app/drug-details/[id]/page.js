@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import MRSidebar from "@/components/mr/MRSidebar";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
@@ -453,8 +453,34 @@ function EditDrugModal({ drug, drugId, onClose, onSaved }) {
   });
 
   const [form, setForm] = useState(initialForm);
+  const [packaging, setPackaging] = useState({
+    sales_unit: drug.packaging?.sales_unit || "",
+    pack_quantity: drug.packaging?.pack_quantity || "",
+    measurement_unit: drug.packaging?.measurement_unit || "",
+    selling_price: drug.packaging?.selling_price || "",
+    mrp: drug.packaging?.mrp || "",
+    sales_units_per_box: drug.packaging?.sales_units_per_box || "",
+    box_pricing_mode: drug.packaging?.box_pricing_mode || "auto",
+    box_discount_percent: drug.packaging?.box_discount_percent || "",
+    box_price: drug.packaging?.box_price || "",
+    max_discount_percent: drug.packaging?.max_discount_percent || ""
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // Auto-populate measurement_unit based on dosage_form
+  useEffect(() => {
+    const MEASUREMENT_MAP = {
+      "Tablet": "Tablets", "Capsule": "Capsules", "Syrup": "ml", "Injection": "ml",
+      "Drops": "ml", "Cream": "gm", "Ointment": "gm", "Gel": "gm",
+      "Powder": "gm", "Lotion": "ml", "Inhaler": "doses", "Suspension": "ml",
+      "Solution": "ml", "Suppository": "units", "Patch": "patches"
+    };
+    const dosageForm = form.dosage_form || drug.dosage_form;
+    if (dosageForm && MEASUREMENT_MAP[dosageForm]) {
+      setPackaging(prev => ({ ...prev, measurement_unit: MEASUREMENT_MAP[dosageForm] }));
+    }
+  }, [form.dosage_form]);
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setSaving(true); setError("");
@@ -482,6 +508,16 @@ function EditDrugModal({ drug, drugId, onClose, onSaved }) {
       });
 
       const payload = { field_values: fieldValues };
+      
+      // Add packaging if any fields are filled
+      const pkgClean = {};
+      Object.entries(packaging).forEach(([k, v]) => {
+        if (v === "" || v === null || v === undefined) return;
+        const num = ["selling_price","mrp","pack_quantity","sales_units_per_box","box_price","max_discount_percent","box_discount_percent"].includes(k);
+        pkgClean[k] = num ? Number(v) : v;
+      });
+      if (Object.keys(pkgClean).length > 0) payload.packaging = pkgClean;
+
       await put(`/api/v1/drugs/${drugId}`, payload);
       onSaved();
     } catch (err) { setError(err?.data?.detail || err.message || "Failed to update"); }
@@ -547,6 +583,33 @@ function EditDrugModal({ drug, drugId, onClose, onSaved }) {
               })}
             </>
           )}
+
+          {/* Packaging & Pricing */}
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+            <p className="text-xs font-bold text-emerald-700 uppercase mb-3 flex items-center gap-2">📦 Packaging & Pricing</p>
+            
+            {/* Sales Unit — button selector */}
+            <div className="mb-3">
+              <label className="block text-xs font-bold text-gray-700 mb-2">Sales Unit <span className="text-red-500">*</span> <span className="text-gray-400 font-normal text-[10px]">— how you sell a single unit</span></label>
+              <div className="flex gap-2 flex-wrap">
+                {["Strip", "Bottle", "Blister Pack", "Vial", "Tube", "Sachet"].map(unit => (
+                  <button key={unit} type="button" onClick={() => setPackaging({...packaging, sales_unit: unit})} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${packaging.sales_unit === unit ? "bg-emerald-600 text-white shadow-md" : "bg-white text-gray-600 border border-gray-200 hover:border-emerald-300"}`}>{unit}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="block text-xs font-bold text-gray-700 mb-1">Pack Quantity <span className="text-red-500">*</span></label><input type="number" value={packaging.pack_quantity} onChange={(e) => setPackaging({...packaging, pack_quantity: e.target.value})} placeholder="How many Tablets per Strip" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400" /></div>
+              <div><label className="block text-xs font-bold text-gray-700 mb-1">Measurement Unit <span className="text-red-500">*</span></label><input value={packaging.measurement_unit} readOnly className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none bg-gray-50 text-gray-600" /></div>
+              <div><label className="block text-xs font-bold text-gray-700 mb-1">Selling Price (per {packaging.sales_unit || "Unit"}) <span className="text-red-500">*</span></label><div className="relative"><span className="absolute left-3 top-2.5 text-gray-400">₹</span><input type="number" step="0.01" value={packaging.selling_price} onChange={(e) => setPackaging({...packaging, selling_price: e.target.value})} placeholder="0.00" className="w-full pl-7 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400" /></div></div>
+              <div><label className="block text-xs font-bold text-gray-700 mb-1">MRP (optional)</label><div className="relative"><span className="absolute left-3 top-2.5 text-gray-400">₹</span><input type="number" step="0.01" value={packaging.mrp} onChange={(e) => setPackaging({...packaging, mrp: e.target.value})} placeholder="0.00" className="w-full pl-7 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400" /></div></div>
+              <div><label className="block text-xs font-bold text-gray-700 mb-1">Max Discount %</label><input type="number" step="0.1" value={packaging.max_discount_percent} onChange={(e) => setPackaging({...packaging, max_discount_percent: e.target.value})} placeholder="10" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400" /></div>
+              <div><label className="block text-xs font-bold text-gray-700 mb-1">Box Pricing Mode</label><select value={packaging.box_pricing_mode} onChange={(e) => setPackaging({...packaging, box_pricing_mode: e.target.value})} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400 bg-white"><option value="auto">Auto</option><option value="manual">Manual</option></select></div>
+              {packaging.box_pricing_mode === "auto" && <div><label className="block text-xs font-bold text-gray-700 mb-1">Box Discount %</label><input type="number" step="0.1" value={packaging.box_discount_percent} onChange={(e) => setPackaging({...packaging, box_discount_percent: e.target.value})} placeholder="5" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400" /></div>}
+              <div><label className="block text-xs font-bold text-gray-700 mb-1">Units per Box</label><input type="number" value={packaging.sales_units_per_box} onChange={(e) => setPackaging({...packaging, sales_units_per_box: e.target.value})} placeholder="10" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400" /></div>
+              {packaging.box_pricing_mode === "manual" && <div><label className="block text-xs font-bold text-gray-700 mb-1">Box Price (₹)</label><div className="relative"><span className="absolute left-3 top-2.5 text-gray-400">₹</span><input type="number" step="0.01" value={packaging.box_price} onChange={(e) => setPackaging({...packaging, box_price: e.target.value})} placeholder="0.00" className="w-full pl-7 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400" /></div></div>}
+            </div>
+          </div>
 
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-200">Cancel</button>

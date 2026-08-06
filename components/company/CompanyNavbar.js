@@ -34,26 +34,51 @@ export default function CompanyNavbar() {
     const now = new Date();
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
+    const STALE = 7 * 60 * 1000;  // 7 minutes
     if (path === "/company/overview") {
-      queryClient.prefetchQuery({ queryKey: ["company-overview"], queryFn: () => get("/api/v1/admin/dashboard"), staleTime: 5 * 60 * 1000 });
+      queryClient.prefetchQuery({ queryKey: ["company-overview"], queryFn: () => get("/api/v1/admin/dashboard"), staleTime: STALE });
     } else if (path === "/company/medical-reps") {
-      queryClient.prefetchQuery({ queryKey: ["mrs"], queryFn: () => get("/api/v1/mrs?page_size=1000").then((d) => d.mrs || []), staleTime: 5 * 60 * 1000 });
+      queryClient.prefetchQuery({ queryKey: ["mrs"], queryFn: () => get("/api/v1/mrs?page_size=1000").then(d => d.mrs || []), staleTime: STALE });
     } else if (path === "/company/sfe") {
-      queryClient.prefetchQuery({ queryKey: ["sfe-dashboard", month, year], queryFn: () => get("/api/v1/sfe/dashboard", { month, year }), staleTime: 5 * 60 * 1000 });
+      queryClient.prefetchQuery({ queryKey: ["sfe-dashboard", month, year], queryFn: () => get("/api/v1/sfe/dashboard", { month, year }), staleTime: STALE });
     } else if (path === "/company/doctors") {
-      queryClient.prefetchQuery({ queryKey: ["doctors"], queryFn: () => get("/api/v1/doctors?page_size=1000").then((d) => Array.isArray(d) ? d : (d?.doctors || [])), staleTime: 5 * 60 * 1000 });
+      queryClient.prefetchQuery({ queryKey: ["doctors"], queryFn: () => get("/api/v1/doctors?page_size=1000").then(d => Array.isArray(d) ? d : (d?.doctors || [])), staleTime: STALE });
     } else if (path === "/company/drug-management") {
-      queryClient.prefetchQuery({ queryKey: ["drugs"], queryFn: () => get("/api/v1/drugs?limit=500"), staleTime: 5 * 60 * 1000 });
+      queryClient.prefetchQuery({ queryKey: ["drugs"], queryFn: () => get("/api/v1/drugs?limit=100"), staleTime: STALE });
+      queryClient.prefetchQuery({ queryKey: ["drug-template"], queryFn: () => get("/api/v1/drugs/templates"), staleTime: 10 * 60 * 1000 });
+    } else if (path === "/company/cme-events") {
+      queryClient.prefetchQuery({ queryKey: ["cme", "all"], queryFn: () => get("/api/v1/cme?limit=100").then(d => d.events || []), staleTime: STALE });
+    } else if (path === "/company/communications") {
+      queryClient.prefetchQuery({ queryKey: ["admin-communications", ""], queryFn: () => get("/api/v1/communications/admin?limit=50"), staleTime: STALE });
+    } else if (path === "/company/grievances") {
+      queryClient.prefetchQuery({ queryKey: ["company-grievances"], queryFn: () => get("/api/v1/grievances/admin?limit=50"), staleTime: STALE });
     }
   };
 
   useEffect(() => {
     setCompanyName(localStorage.getItem("companyName") || "My Company");
     const dept = localStorage.getItem("userDepartment");
-    // general admin has no department — treat empty, null, "null", "undefined", "general" as no dept
     const hasNoDept = !dept || dept === "null" || dept === "undefined" || dept === "general" || dept.trim() === "";
     setIsGeneralAdmin(hasNoDept);
-  }, []);
+
+    // Eagerly prefetch the most-visited pages right after navbar mounts
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+    const STALE = 7 * 60 * 1000;  // 7 minutes // 5 minutes
+
+    // Prefetch concurrently without blocking render
+    const tasks = [
+      queryClient.prefetchQuery({ queryKey: ["company-overview"], queryFn: () => get("/api/v1/admin/dashboard"), staleTime: STALE }),
+      queryClient.prefetchQuery({ queryKey: ["mrs"], queryFn: () => get("/api/v1/mrs?page_size=1000").then(d => d.mrs || []), staleTime: STALE }),
+      queryClient.prefetchQuery({ queryKey: ["doctors"], queryFn: () => get("/api/v1/doctors?page_size=1000").then(d => Array.isArray(d) ? d : (d?.doctors || [])), staleTime: STALE }),
+      queryClient.prefetchQuery({ queryKey: ["drugs"], queryFn: () => get("/api/v1/drugs?limit=100"), staleTime: STALE }),
+      queryClient.prefetchQuery({ queryKey: ["sfe-dashboard", month, year], queryFn: () => get("/api/v1/sfe/dashboard", { month, year }), staleTime: STALE }),
+      queryClient.prefetchQuery({ queryKey: ["cme", "all"], queryFn: () => get("/api/v1/cme?limit=100").then(d => d.events || []), staleTime: STALE }),
+    ];
+    // Fire and forget — don't await
+    Promise.allSettled(tasks);
+  }, [queryClient]);
 
   const navItems = [
     { name: "Overview",   path: "/company/overview",        icon: "🏠" },

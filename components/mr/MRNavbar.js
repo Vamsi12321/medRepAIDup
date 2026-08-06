@@ -32,15 +32,15 @@ export default function MRNavbar() {
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
     if (path === "/mr/dashboard") {
-      queryClient.prefetchQuery({ queryKey: ["mr-dashboard"], queryFn: () => get("/api/v1/dashboard"), staleTime: 2 * 60 * 1000 });
+      queryClient.prefetchQuery({ queryKey: ["mr-dashboard"], queryFn: () => get("/api/v1/dashboard"), staleTime: 7 * 60 * 1000 });
     } else if (path === "/mr/doctors") {
-      queryClient.prefetchQuery({ queryKey: ["mr-doctors"], queryFn: () => get("/api/v1/doctors"), staleTime: 5 * 60 * 1000 });
+      queryClient.prefetchQuery({ queryKey: ["mr-doctors"], queryFn: () => get("/api/v1/doctors"), staleTime: 7 * 60 * 1000 });
     } else if (path === "/mr/visits") {
       queryClient.prefetchQuery({ queryKey: ["visits", mrId, "", "", ""], queryFn: () => get("/api/v1/visits"), staleTime: 0 });
     } else if (path === "/mr/sfe") {
-      queryClient.prefetchQuery({ queryKey: ["sfe-mcr", month, year], queryFn: () => get("/api/v1/sfe/mcr", { month, year }), staleTime: 5 * 60 * 1000 });
+      queryClient.prefetchQuery({ queryKey: ["sfe-mcr", month, year], queryFn: () => get("/api/v1/sfe/mcr", { month, year }), staleTime: 7 * 60 * 1000 });
     } else if (path === "/mr/announcements") {
-      queryClient.prefetchQuery({ queryKey: ["communications"], queryFn: () => get("/api/v1/communications"), staleTime: 2 * 60 * 1000 });
+      queryClient.prefetchQuery({ queryKey: ["communications"], queryFn: () => get("/api/v1/communications"), staleTime: 7 * 60 * 1000 });
     }
   };
 
@@ -66,7 +66,7 @@ export default function MRNavbar() {
     queryKey: ["comms-unread-count"],
     queryFn: () => get("/api/v1/communications/unread/count"),
     refetchInterval: 60000,
-    staleTime: 30000,
+    staleTime: 7 * 60 * 1000,
   });
   const unreadCount = unreadData?.unread_count || 0;
 

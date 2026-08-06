@@ -37,7 +37,7 @@ export default function AdminMRVisits() {
     queryKey: ["mr-detail", mrId],
     queryFn: () => get(`/api/v1/mrs/${mrId}`),
     enabled: !!mrId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const { data: visitsResponse, isLoading } = useQuery({

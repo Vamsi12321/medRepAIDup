@@ -36,7 +36,7 @@ export default function DoctorsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["analytics-doctors", month, year],
     queryFn: () => get(`/api/v1/analytics/doctors?month=${month}&year=${year}`),
-    staleTime: 3 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
   const raw = data?.doctors || data || [];
 

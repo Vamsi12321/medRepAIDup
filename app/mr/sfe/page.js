@@ -52,7 +52,7 @@ export default function SFEPage() {
   const { data: mcrData } = useQuery({
     queryKey: ["sfe-mcr-print", month, year],
     queryFn: () => get("/api/v1/sfe/mcr", { month, year }),
-    staleTime: 2 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   return (
@@ -723,7 +723,7 @@ function RCPASection({ month, year, preSelectVisitId }) {
   const { data: visitsData } = useQuery({
     queryKey: ["rcpa-eligible-visits"],
     queryFn: () => get("/api/v1/sfe/rcpa/eligible-visits"),
-    staleTime: 2 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
   const eligibleVisits = visitsData?.visits || [];
 
@@ -733,7 +733,7 @@ function RCPASection({ month, year, preSelectVisitId }) {
     queryKey: ["mr-profile-rcpa", mrId],
     queryFn: () => get(`/api/v1/mrs/${mrId}`),
     enabled: !!mrId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
   const assignedDrugIds = (mrData?.assigned_drugs || []).map((d) => d.id || d._id);
 
@@ -742,7 +742,7 @@ function RCPASection({ month, year, preSelectVisitId }) {
     queryKey: ["drugs-with-packaging"],
     queryFn: () => get("/api/v1/drugs?limit=500").then((d) => (d.drugs || []).filter((dr) => assignedDrugIds.includes(dr._id || dr.id))),
     enabled: assignedDrugIds.length > 0,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
   const allDrugs = drugsData || [];
 
@@ -846,7 +846,8 @@ function RCPASection({ month, year, preSelectVisitId }) {
           <div className="p-5 space-y-4">
             {createMutation.error && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded-lg text-xs">
-                {createMutation.error.message || "Failed to save commitment"}
+                <p className="font-bold mb-1">❌ Error saving commitment:</p>
+                <p>{createMutation.error?.data?.detail || createMutation.error.message || "Failed to save commitment"}</p>
               </div>
             )}
 
@@ -871,11 +872,11 @@ function RCPASection({ month, year, preSelectVisitId }) {
               <label className="text-xs font-bold text-gray-700 mb-1 block">Drug <span className="text-red-500">*</span></label>
               <select value={form.drug_id} onChange={(e) => setForm({ ...form, drug_id: e.target.value, committed_quantity: "", requested_discount: "", boxes: "", extra_strips: "" })} required className={inp + " bg-white"}>
                 <option value="">Select drug</option>
-                {allDrugs.filter((d) => (d.packaging?.selling_price ?? d.packaging?.pricing?.selling_price)).map((d) => {
-                  const sp = d.packaging.selling_price ?? d.packaging.pricing?.selling_price;
+                {allDrugs.map((d) => {
+                  const sp = d.packaging?.selling_price ?? d.packaging?.pricing?.selling_price;
                   return (
                   <option key={d._id || d.id} value={d._id || d.id}>
-                    {d.drug_name || d.brand_name || d.name} — ₹{sp}/{d.packaging.sales_unit}
+                    {d.drug_name || d.brand_name || d.name}{sp ? ` — ₹${sp}/${d.packaging.sales_unit}` : ""}
                   </option>
                   );
                 })}
@@ -1045,11 +1046,11 @@ function RCPASection({ month, year, preSelectVisitId }) {
                       <select value={editForm.drug_id || ""} onChange={(e) => setEditForm({ ...editForm, drug_id: e.target.value })}
                         className={inp + " bg-white"}>
                         <option value="">Keep current: {c.drug_name}</option>
-                        {allDrugs.filter((d) => (d.packaging?.selling_price ?? d.packaging?.pricing?.selling_price) && (d._id || d.id) !== c.drug_id).map((d) => {
-                          const sp = d.packaging.selling_price ?? d.packaging.pricing?.selling_price;
+                        {allDrugs.filter((d) => (d._id || d.id) !== c.drug_id).map((d) => {
+                          const sp = d.packaging?.selling_price ?? d.packaging?.pricing?.selling_price;
                           return (
                           <option key={d._id || d.id} value={d._id || d.id}>
-                            {d.drug_name || d.brand_name} — ₹{sp}/{d.packaging.sales_unit}
+                            {d.drug_name || d.brand_name}{sp ? ` — ₹${sp}/${d.packaging.sales_unit}` : ""}
                           </option>
                           );
                         })}

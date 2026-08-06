@@ -40,9 +40,12 @@ export default function MRLogin() {
       let expiry;
       try {
         const payload = JSON.parse(atob(data.access_token.split(".")[1]));
-        expiry = payload.exp ? payload.exp * 1000 : Date.now() + (data.expires_in || 3600) * 1000;
+        const backendExpiry = payload.exp ? payload.exp * 1000 : Date.now() + (data.expires_in || 3600) * 1000;
+        // Enforce minimum 30 minutes
+        const minExpiry = Date.now() + (30 * 60 * 1000);
+        expiry = Math.max(backendExpiry, minExpiry);
       } catch {
-        expiry = Date.now() + (data.expires_in || 3600) * 1000;
+        expiry = Date.now() + Math.max((data.expires_in || 3600), 30 * 60) * 1000;
       }
       localStorage.setItem("token_expiry", expiry);
       localStorage.setItem("userEmail", data.user.email);
@@ -153,47 +156,47 @@ export default function MRLogin() {
             </div>
 
             {/* Phone image with decorative elements */}
-            <div className="flex-1 flex items-center justify-end ml-2 -mr-6 overflow-visible relative">
+            <div className="flex-1 flex items-center justify-end relative overflow-visible">
               {/* Location pins connected to phone with dotted lines */}
               {/* Pin 1 - top left, connected to phone */}
-              <svg className="absolute top-[5%] left-[10%] w-5 h-7 z-20 opacity-70" viewBox="0 0 24 36" fill="none">
+              <svg className="absolute top-[5%] left-[28%] w-5 h-7 z-20 opacity-70" viewBox="0 0 24 36" fill="none">
                 <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24c0-6.6-5.4-12-12-12z" fill="#a855f7"/>
                 <circle cx="12" cy="12" r="4" fill="#1a0a3e"/>
               </svg>
               {/* Dot trail from pin 1 to phone */}
-              <div className="absolute top-[9%] left-[18%] w-1 h-1 bg-purple-400/60 rounded-full z-20" />
-              <div className="absolute top-[10%] left-[25%] w-1 h-1 bg-purple-400/50 rounded-full z-20" />
-              <div className="absolute top-[11%] left-[32%] w-1 h-1 bg-purple-400/40 rounded-full z-20" />
-              <div className="absolute top-[12%] left-[39%] w-1 h-1 bg-purple-400/30 rounded-full z-20" />
+              <div className="absolute top-[9%] left-[36%] w-1 h-1 bg-purple-400/60 rounded-full z-20" />
+              <div className="absolute top-[10%] left-[43%] w-1 h-1 bg-purple-400/50 rounded-full z-20" />
+              <div className="absolute top-[11%] left-[50%] w-1 h-1 bg-purple-400/40 rounded-full z-20" />
+              <div className="absolute top-[12%] left-[57%] w-1 h-1 bg-purple-400/30 rounded-full z-20" />
 
               {/* Pin 2 - middle left, connected to phone */}
-              <svg className="absolute top-[30%] left-[3%] w-4.5 h-6 z-20 opacity-55" viewBox="0 0 24 36" fill="none">
+              <svg className="absolute top-[30%] left-[21%] w-4.5 h-6 z-20 opacity-55" viewBox="0 0 24 36" fill="none">
                 <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24c0-6.6-5.4-12-12-12z" fill="#c084fc"/>
                 <circle cx="12" cy="12" r="4" fill="#1a0a3e"/>
               </svg>
               {/* Dot trail from pin 2 to phone */}
-              <div className="absolute top-[33%] left-[12%] w-1 h-1 bg-purple-300/50 rounded-full z-20" />
-              <div className="absolute top-[33.5%] left-[20%] w-1 h-1 bg-purple-300/40 rounded-full z-20" />
-              <div className="absolute top-[34%] left-[28%] w-1 h-1 bg-purple-300/30 rounded-full z-20" />
-              <div className="absolute top-[34.5%] left-[36%] w-1 h-1 bg-purple-300/25 rounded-full z-20" />
+              <div className="absolute top-[33%] left-[30%] w-1 h-1 bg-purple-300/50 rounded-full z-20" />
+              <div className="absolute top-[33.5%] left-[38%] w-1 h-1 bg-purple-300/40 rounded-full z-20" />
+              <div className="absolute top-[34%] left-[46%] w-1 h-1 bg-purple-300/30 rounded-full z-20" />
+              <div className="absolute top-[34.5%] left-[54%] w-1 h-1 bg-purple-300/25 rounded-full z-20" />
 
               {/* Pin 3 - lower left, connected to phone */}
-              <svg className="absolute top-[55%] left-[6%] w-4 h-5.5 z-20 opacity-45" viewBox="0 0 24 36" fill="none">
+              <svg className="absolute top-[55%] left-[24%] w-4 h-5.5 z-20 opacity-45" viewBox="0 0 24 36" fill="none">
                 <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24c0-6.6-5.4-12-12-12z" fill="#9333ea"/>
                 <circle cx="12" cy="12" r="4" fill="#1a0a3e"/>
               </svg>
               {/* Dot trail from pin 3 to phone */}
-              <div className="absolute top-[57%] left-[14%] w-1 h-1 bg-purple-400/40 rounded-full z-20" />
-              <div className="absolute top-[56.5%] left-[22%] w-1 h-1 bg-purple-400/30 rounded-full z-20" />
-              <div className="absolute top-[56%] left-[30%] w-1 h-1 bg-purple-400/25 rounded-full z-20" />
-              <div className="absolute top-[55.5%] left-[38%] w-1 h-1 bg-purple-400/20 rounded-full z-20" />
+              <div className="absolute top-[57%] left-[32%] w-1 h-1 bg-purple-400/40 rounded-full z-20" />
+              <div className="absolute top-[56.5%] left-[40%] w-1 h-1 bg-purple-400/30 rounded-full z-20" />
+              <div className="absolute top-[56%] left-[48%] w-1 h-1 bg-purple-400/25 rounded-full z-20" />
+              <div className="absolute top-[55.5%] left-[56%] w-1 h-1 bg-purple-400/20 rounded-full z-20" />
 
               <Image
                 src="/images/mr/phone.png"
                 alt="MRX App"
                 width={500}
                 height={950}
-                className="object-contain h-[140%] w-auto max-w-none drop-shadow-[0_25px_70px_rgba(120,60,220,0.4)] relative z-10"
+                className="object-contain h-[120%] w-auto max-w-[120%] drop-shadow-[0_25px_70px_rgba(120,60,220,0.4)] relative z-10 translate-x-28"
                 priority
               />
             </div>

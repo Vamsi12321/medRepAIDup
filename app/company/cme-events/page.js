@@ -445,14 +445,14 @@ function RegistrationsModal({ event, onClose }) {
   const { data: statsData, isLoading: statsLoading } = useQuery({
     queryKey: ["cme-stats", event._id],
     queryFn: () => get(`/api/v1/cme/${event._id}/statistics`),
-    staleTime: 30000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const { data: regsData, isLoading: regsLoading } = useQuery({
     queryKey: ["cme-registrations", event._id],
     queryFn: () => get(`/api/v1/cme/${event._id}/registrations?limit=100`),
     enabled: tab !== "stats",
-    staleTime: 30000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const stats = statsData || {};
