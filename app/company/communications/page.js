@@ -23,7 +23,7 @@ export default function AdminCommunications() {
       if (filterType) params.append("type", filterType);
       return get("/api/v1/communications/admin?" + params);
     },
-    staleTime: 30000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const communications = data?.communications || [];
@@ -466,7 +466,7 @@ function EditCommModal({ comm, onClose, onSaved }) {
   const { data: fullComm } = useQuery({
     queryKey: ["comm-detail", comm.id || comm._id],
     queryFn: () => get("/api/v1/communications/" + (comm.id || comm._id) + "/admin"),
-    staleTime: 30000,
+    staleTime: 7 * 60 * 1000,
   });
 
   // Update form when full data loads
@@ -603,7 +603,7 @@ function AdminCommDetailDrawer({ commId, onClose }) {
   const { data: comm, isLoading } = useQuery({
     queryKey: ["comm-admin-detail", commId],
     queryFn: () => get("/api/v1/communications/" + commId + "/admin"),
-    staleTime: 30000,
+    staleTime: 7 * 60 * 1000,
   });
 
   // Fetch MR list to resolve IDs to names
@@ -762,7 +762,7 @@ function MRSelector({ zone, state, territory, selected, onChange }) {
       if (territory) params.append("territory", territory);
       return get("/api/v1/mrs/filter?" + params);
     },
-    staleTime: 30000,
+    staleTime: 7 * 60 * 1000,
     enabled: showList,
   });
 

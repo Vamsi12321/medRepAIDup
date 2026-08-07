@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, AreaChart, Area, Cell,
@@ -9,24 +9,24 @@ import CompanyNavbar from "@/components/company/CompanyNavbar";
 import Breadcrumb from "@/components/Breadcrumb";
 import DCRPrintTemplate from "@/components/DCRPrintTemplate";
 import MCRPrintTemplate from "@/components/MCRPrintTemplate";
-import { get, put } from "@/lib/api";
+import { get, put, post } from "@/lib/api";
 import { formatISTDate, formatISTTime } from "@/lib/time";
+
+const formatLoc = (loc) => loc && typeof loc === "object" ? loc.location_name || loc.temporary_location?.name || "" : loc || "";
 
 const now = new Date();
 const CURRENT_MONTH = now.getMonth() + 1;
 const CURRENT_YEAR = now.getFullYear();
 
 const TABS = [
-  { id: "dashboard", label: "Dashboard",                      icon: "📊" },
   { id: "targets",   label: "Visit Targets",                  icon: "🎯" },
   { id: "mcr",       label: "MCR (Call Report)",              icon: "📞" },
   { id: "mvc",       label: "MVC (Visit Coverage)",           icon: "🔄" },
-  { id: "rcpa",      label: "RCPA (Demand Forecast)",         icon: "💊" },
   { id: "dcr",       label: "DCR (Daily Reports)",            icon: "📋" },
 ];
 
 export default function SFEPage() {
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState("targets");
   const [month, setMonth] = useState(CURRENT_MONTH);
   const [year, setYear] = useState(CURRENT_YEAR);
 
@@ -44,7 +44,7 @@ export default function SFEPage() {
 
         {/* Controls Row: Tabs + Month/Year */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-          <div className="flex gap-1 bg-white rounded-xl p-1 border border-gray-100 shadow-sm overflow-x-auto">
+          <div className="flex gap-1 bg-white rounded-xl p-1 border border-gray-100 shadow-sm overflow-x-auto scrollbar-sfe">
             {TABS.map((t) => (
               <button key={t.id} onClick={() => setActiveTab(t.id)}
                 className={"flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap " + (
@@ -68,11 +68,9 @@ export default function SFEPage() {
           </div>
         </div>
 
-        {activeTab === "dashboard" && <DashboardSection month={month} year={year} />}
         {activeTab === "targets"   && <VisitTargets />}
         {activeTab === "mcr"       && <MCRSection month={month} year={year} />}
         {activeTab === "mvc"       && <MVCSection month={month} year={year} />}
-        {activeTab === "rcpa"      && <RCPASection month={month} year={year} />}
         {activeTab === "dcr"       && <AdminDCRSection />}
       </main>
     </div>
@@ -769,7 +767,7 @@ function MCRSection({ month, year }) {
   const { data: mrs } = useQuery({
     queryKey: ["company-mrs"],
     queryFn: () => get("/api/v1/mrs").then((r) => r.mrs || []),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const { data, isLoading, error } = useQuery({
@@ -992,7 +990,7 @@ function MVCSection({ month, year }) {
   const { data: mrs } = useQuery({
     queryKey: ["company-mrs"],
     queryFn: () => get("/api/v1/mrs").then((r) => r.mrs || []),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const { data, isLoading, error } = useQuery({
@@ -1200,7 +1198,7 @@ function MVCDetail({ data }) {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto scrollbar-sfe">
           {filtered.length === 0 ? (
             <div className="text-center py-10">
               <p className="text-gray-400 text-sm font-medium">No doctors match this filter</p>
@@ -1297,7 +1295,7 @@ function AdminDoctorVisitCard({ doctor }) {
       {expanded && visits.length > 0 && (
         <div className="border-t border-gray-100">
           {/* Visit Tabs */}
-          <div className="px-5 pt-3 flex gap-1.5 overflow-x-auto">
+          <div className="px-5 pt-3 flex gap-1.5 overflow-x-auto scrollbar-sfe">
             {visits.map((v, vi) => (
               <button key={vi} onClick={() => setActiveVisit(vi)}
                 className={`px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all ${activeVisit === vi ? "bg-purple-600 text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
@@ -1327,9 +1325,9 @@ function AdminDoctorVisitCard({ doctor }) {
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
                     {v.purpose && <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100"><p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider">Purpose</p><p className="text-xs font-bold text-gray-800 mt-0.5">{v.purpose}</p></div>}
-                    {v.location && <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100"><p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider">Location</p><p className="text-xs font-bold text-gray-800 mt-0.5">{v.location}</p></div>}
+                    {formatLoc(v.location) && <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100"><p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider">Location</p><p className="text-xs font-bold text-gray-800 mt-0.5">{formatLoc(v.location)}</p></div>}
                     {v.samples_given != null && <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100"><p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider">Samples</p><p className="text-xs font-bold text-gray-800 mt-0.5">{v.samples_given}</p></div>}
-                    {v.rx_commitment != null && <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100"><p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider">Rx Commitment</p><p className={"text-xs font-bold mt-0.5 " + (v.rx_commitment ? "text-emerald-700" : "text-gray-500")}>{v.rx_commitment ? `Yes (${v.expected_rx_per_month || "—"}/month)` : "No"}</p></div>}
+
                     {v.follow_up_date && <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100"><p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider">Follow-up</p><p className="text-xs font-bold text-purple-700 mt-0.5">{formatISTDate(v.follow_up_date)}</p></div>}
                     {v.competitor_info && <div className="bg-red-50 rounded-xl px-3 py-2.5 border border-red-100"><p className="text-[9px] text-red-400 font-medium uppercase tracking-wider">Competitor</p><p className="text-xs font-bold text-red-700 mt-0.5">{v.competitor_info}</p></div>}
                   </div>
@@ -1416,7 +1414,7 @@ function RCPASection({ month, year }) {
   const trendQueries = trendMonths.map((m) => useQuery({
     queryKey: ["sfe-rcpa-summary", m.month, m.year],
     queryFn:  () => get("/api/v1/sfe/rcpa/summary", { month: m.month, year: m.year }),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   }));
 
   if (isLoading) return <LoadingSkeleton />;
@@ -1680,6 +1678,7 @@ function RCPASection({ month, year }) {
           { id: "overview",    label: "📊 Overview",    sub: "Trends & summary"    },
           { id: "products",    label: "💊 Products",    sub: "Drug demand analysis" },
           { id: "territories", label: "🗺️ Territories", sub: "Region performance"  },
+          { id: "approvals",   label: "✅ Approvals",   sub: "Discount requests"   },
         ].map((v) => (
           <button key={v.id} onClick={() => setActiveView(v.id)}
             className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold transition-all text-center ${activeView === v.id ? "bg-purple-600 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"}`}>
@@ -1978,10 +1977,257 @@ function RCPASection({ month, year }) {
         </div>
       )}
 
+      {/* ── APPROVALS tab ──────────────────────────────────────────────── */}
+      {activeView === "approvals" && <PendingApprovalsView />}
+
     </div>
   );
 }
 
+
+// ── Pending Approvals View (RCPA Discount Approvals) ──────────────────────────
+function PendingApprovalsView() {
+  const queryClient = useQueryClient();
+  const [approveDiscount, setApproveDiscount] = useState({});
+  const [viewTab, setViewTab] = useState("pending"); // "pending" | "all"
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ["sfe-rcpa-pending"],
+    queryFn: () => get("/api/v1/sfe/rcpa/pending-approvals"),
+  });
+
+  const { data: allData, isLoading: loadingAll } = useQuery({
+    queryKey: ["sfe-rcpa-all"],
+    queryFn: () => get("/api/v1/sfe/rcpa"),
+    enabled: viewTab === "all",
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: ({ id, approved_discount }) => post(`/api/v1/sfe/rcpa/${id}/approve`, { approved_discount }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["sfe-rcpa-pending"] }); queryClient.invalidateQueries({ queryKey: ["sfe-rcpa-all"] }); },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: ({ id }) => post(`/api/v1/sfe/rcpa/${id}/reject`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["sfe-rcpa-pending"] }); queryClient.invalidateQueries({ queryKey: ["sfe-rcpa-all"] }); },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, body }) => put(`/api/v1/sfe/rcpa/${id}`, body),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["sfe-rcpa-all"] }); queryClient.invalidateQueries({ queryKey: ["sfe-rcpa-pending"] }); setEditingId(null); },
+  });
+
+  const handleAdminUpdate = (id) => {
+    const body = {};
+    if (editForm.committed_quantity) body.committed_quantity = parseInt(editForm.committed_quantity);
+    if (editForm.rx_per_month) body.rx_per_month = parseInt(editForm.rx_per_month);
+    if (editForm.requested_discount !== undefined && editForm.requested_discount !== "") body.requested_discount = parseFloat(editForm.requested_discount);
+    updateMutation.mutate({ id, body });
+  };
+
+  if (isLoading) return <LoadingSkeleton />;
+  if (error) return <ErrorBox message={error.message} />;
+
+  const pendingCommitments = data?.commitments || [];
+  const allCommitments = allData?.commitments || [];
+  const total = data?.total || 0;
+
+  const APPROVAL_COLORS = {
+    PENDING: "bg-amber-100 text-amber-700 border-amber-200",
+    APPROVED: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    REJECTED: "bg-red-100 text-red-700 border-red-200",
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        <StatCard icon="⏳" label="Pending Approvals" value={total} color="from-amber-500 to-orange-500" />
+        <StatCard icon="💰" label="Total Qty Requested" value={pendingCommitments.reduce((a, c) => a + (c.committed_quantity || 0), 0)} color="from-indigo-500 to-purple-500" />
+        <StatCard icon="📊" label="Avg Discount Req" value={pendingCommitments.length > 0 ? (pendingCommitments.reduce((a, c) => a + (c.requested_discount || 0), 0) / pendingCommitments.length).toFixed(1) + "%" : "0%"} color="from-emerald-500 to-teal-500" />
+      </div>
+
+      {/* Tab toggle */}
+      <div className="flex gap-2 bg-white rounded-xl p-1 border border-gray-100 shadow-sm w-fit">
+        {[
+          { id: "pending", label: `⏳ Pending (${total})` },
+          { id: "all", label: "📋 All Commitments" },
+        ].map((t) => (
+          <button key={t.id} onClick={() => setViewTab(t.id)}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${viewTab === t.id ? "bg-purple-600 text-white shadow" : "text-gray-500 hover:bg-gray-50"}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Pending view */}
+      {viewTab === "pending" && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <p className="text-sm font-bold text-gray-800">Pending Discount Requests</p>
+            <button onClick={() => refetch()} className="text-xs text-purple-600 font-semibold hover:underline">🔄 Refresh</button>
+          </div>
+          {pendingCommitments.length === 0 ? (
+            <div className="text-center py-12">
+              <span className="text-4xl block mb-3">✅</span>
+              <p className="text-sm text-gray-500 font-medium">No pending approvals</p>
+              <p className="text-xs text-gray-400 mt-1">All discount requests have been processed</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {pendingCommitments.map((c) => (
+                <div key={c.id} className="p-4 hover:bg-gray-50/50 transition-colors">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                        {c.doctor_name?.charAt(0) || "D"}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-gray-900">{c.doctor_name}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          <span className="font-semibold text-indigo-600">{c.drug_name}</span>
+                          {" · "}{c.committed_quantity} {c.quantity_unit || "units"}
+                          {" · "}{c.rx_per_month} Rx/mo
+                          {c.committed_revenue && ` · ₹${c.committed_revenue.toLocaleString()}`}
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">
+                          MR: {c.mr_name || "—"}
+                          {c.doctor_location && ` · 📍 ${c.doctor_location.name}`}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 text-center">
+                        <p className="text-[9px] text-amber-600 font-bold uppercase">Requested</p>
+                        <p className="text-base font-extrabold text-amber-700">{c.requested_discount || 0}%</p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <input type="number" min="0" max="100" step="0.5" placeholder="%"
+                          value={approveDiscount[c.id] ?? c.requested_discount ?? ""}
+                          onChange={(e) => setApproveDiscount((p) => ({ ...p, [c.id]: e.target.value }))}
+                          className="w-16 text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-center focus:ring-2 focus:ring-emerald-200 outline-none" />
+                        <button onClick={() => approveMutation.mutate({ id: c.id, approved_discount: parseFloat(approveDiscount[c.id] ?? c.requested_discount ?? 0) })}
+                          disabled={approveMutation.isPending}
+                          className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50">✓</button>
+                        <button onClick={() => rejectMutation.mutate({ id: c.id })}
+                          disabled={rejectMutation.isPending}
+                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50">✕</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* All commitments view */}
+      {viewTab === "all" && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100">
+            <p className="text-sm font-bold text-gray-800">All RCPA Commitments ({allCommitments.length})</p>
+          </div>
+          {loadingAll ? (
+            <div className="p-8 text-center text-xs text-gray-400">Loading...</div>
+          ) : allCommitments.length === 0 ? (
+            <div className="text-center py-12">
+              <span className="text-3xl block mb-2">💊</span>
+              <p className="text-sm text-gray-500">No commitments found</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {allCommitments.map((c) => (
+                <div key={c.id} className="p-4 hover:bg-gray-50/50">
+                  {editingId === c.id ? (
+                    <div className="space-y-3 bg-indigo-50/50 rounded-xl p-3 border border-indigo-100">
+                      <div className="flex items-center gap-2 pb-2 border-b border-indigo-100">
+                        <p className="text-xs font-bold text-gray-900">{c.doctor_name}</p>
+                        <span className="text-[10px] text-indigo-600 font-medium">· {c.drug_name}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-[10px] text-gray-500 block mb-1">Qty ({c.quantity_unit})</label>
+                          <input type="number" min="1" value={editForm.committed_quantity || ""} onChange={(e) => setEditForm({ ...editForm, committed_quantity: e.target.value })}
+                            className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:ring-2 focus:ring-indigo-200" placeholder={String(c.committed_quantity)} />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-gray-500 block mb-1">Rx/Month</label>
+                          <input type="number" min="1" value={editForm.rx_per_month || ""} onChange={(e) => setEditForm({ ...editForm, rx_per_month: e.target.value })}
+                            className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:ring-2 focus:ring-indigo-200" placeholder={String(c.rx_per_month)} />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-gray-500 block mb-1">Discount %</label>
+                          <input type="number" min="0" max="100" step="0.5" value={editForm.requested_discount ?? ""} onChange={(e) => setEditForm({ ...editForm, requested_discount: e.target.value })}
+                            className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:ring-2 focus:ring-indigo-200" placeholder={String(c.requested_discount || 0)} />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => setEditingId(null)} className="text-xs text-gray-500 px-3 py-1.5 rounded-lg hover:bg-gray-100 border border-gray-200">Cancel</button>
+                        <button onClick={() => handleAdminUpdate(c.id)} disabled={updateMutation.isPending}
+                          className="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50">
+                          {updateMutation.isPending ? "..." : "Save"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                        {c.doctor_name?.charAt(0) || "D"}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-gray-900 truncate">{c.doctor_name}</p>
+                        <p className="text-xs text-gray-500">
+                          <span className="font-semibold text-indigo-600">{c.drug_name}</span>
+                          {" · "}{c.committed_quantity} {c.quantity_unit || "units"}
+                          {" · "}{c.rx_per_month} Rx/mo
+                        </p>
+                        <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-400 flex-wrap">
+                          <span>MR: {c.mr_name || "—"}</span>
+                          {c.selling_price && <span>₹{c.selling_price}/{c.quantity_unit}</span>}
+                          {c.committed_revenue && <span>Gross: ₹{c.committed_revenue.toLocaleString()}</span>}
+                          {c.net_revenue != null && <span className="text-emerald-600 font-semibold">Net: ₹{c.net_revenue.toLocaleString()}</span>}
+                          {c.approved_discount != null && <span>Approved: {c.approved_discount}%</span>}
+                          {c.doctor_location && <span>📍 {c.doctor_location.name}</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button onClick={() => { setEditingId(c.id); setEditForm({ committed_quantity: c.committed_quantity, rx_per_month: c.rx_per_month, requested_discount: "" }); }}
+                        className="text-[10px] text-purple-600 hover:text-purple-700 font-semibold px-2 py-1 rounded hover:bg-purple-50">
+                        Edit
+                      </button>
+                      {c.approval_status === "PENDING" && (
+                        <div className="flex items-center gap-1">
+                          <input type="number" min="0" max="100" step="0.5" placeholder="%"
+                            value={approveDiscount[c.id] ?? c.requested_discount ?? ""}
+                            onChange={(e) => setApproveDiscount((p) => ({ ...p, [c.id]: e.target.value }))}
+                            className="w-14 text-[10px] border border-gray-200 rounded-md px-1.5 py-1 text-center outline-none focus:ring-1 focus:ring-emerald-200" />
+                          <button onClick={() => approveMutation.mutate({ id: c.id, approved_discount: parseFloat(approveDiscount[c.id] ?? c.requested_discount ?? 0) })}
+                            disabled={approveMutation.isPending}
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white w-6 h-6 rounded-md text-xs font-bold disabled:opacity-50 flex items-center justify-center">✓</button>
+                          <button onClick={() => rejectMutation.mutate({ id: c.id })}
+                            disabled={rejectMutation.isPending}
+                            className="bg-red-500 hover:bg-red-600 text-white w-6 h-6 rounded-md text-xs font-bold disabled:opacity-50 flex items-center justify-center">✕</button>
+                        </div>
+                      )}
+                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${APPROVAL_COLORS[c.approval_status] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                        {c.approval_status}
+                      </span>
+                    </div>
+                  </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Admin DCR Section ─────────────────────────────────────────────────────────
 const MOOD_STYLES_ADMIN = {
@@ -1999,7 +2245,7 @@ function AdminDCRSection() {
   const { data: mrs } = useQuery({
     queryKey: ["company-mrs"],
     queryFn: () => get("/api/v1/mrs").then((r) => r.mrs || []),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const { data: visitsResponse, isLoading, error } = useQuery({
@@ -2020,7 +2266,7 @@ function AdminDCRSection() {
     queryKey: ["admin-dcr-month", mrId, monthKey],
     queryFn: () => get(`/api/v1/visits?mr_id=${mrId}&date_from=${monthStart}&date_to=${monthEnd}`),
     enabled: !!mrId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const selectedMr  = (mrs || []).find((m) => (m.id || m._id) === mrId) || null;
@@ -2031,7 +2277,6 @@ function AdminDCRSection() {
   // Stats
   const totalVisits    = completed.length;
   const totalSamples   = completed.reduce((a, v) => a + (v.report?.samples_given || 0), 0);
-  const rxCommitments  = completed.filter((v) => v.report?.rx_commitment).length;
   const followUps      = completed.filter((v) => v.report?.follow_up_date).length;
   const competitorsMet = completed.filter((v) => v.report?.competitor_info).length;
   const moodCounts = { positive: 0, neutral: 0, negative: 0 };
@@ -2102,36 +2347,78 @@ function AdminDCRSection() {
         <>
           {/* ── MR Info + Calendar ───────────────────────────────────────── */}
           {selectedMr && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-xl flex items-center justify-center text-white font-bold text-sm">
-                  {selectedMr.name?.charAt(0)}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                
+                {/* Left Side: MR Info */}
+                <div className="md:col-span-5 space-y-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-2xl flex items-center justify-center text-white font-black text-base shadow-sm shadow-purple-200">
+                      {selectedMr.name?.charAt(0)}
+                    </div>
+                    <div>
+                      <h3 className="text-base font-extrabold text-gray-900 leading-tight">{selectedMr.name}</h3>
+                      <p className="text-xs text-gray-400 font-medium mt-0.5">{selectedMr.territory} · {selectedMr.zone} · {selectedMr.state}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-2.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400 font-medium">Email</span>
+                      <span className="font-semibold text-gray-700">{selectedMr.email || "—"}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400 font-medium">Phone</span>
+                      <span className="font-semibold text-gray-700">{selectedMr.phone || "—"}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400 font-medium">Target Territory</span>
+                      <span className="font-semibold text-gray-700">{selectedMr.territory || "—"}</span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-bold text-gray-900">{selectedMr.name}</p>
-                  <p className="text-xs text-gray-400">{selectedMr.territory} · {selectedMr.zone} · {selectedMr.state}</p>
+
+                {/* Vertical Divider for larger screens */}
+                <div className="hidden md:block md:col-span-1 self-stretch border-r border-gray-100 my-1" />
+
+                {/* Right Side: Calendar */}
+                <div className="md:col-span-6 flex flex-col">
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                    {new Date(yr, mo-1).toLocaleString("default", { month: "long", year: "numeric" })} — Visit Activity
+                  </p>
+                  <div className="grid grid-cols-7 gap-1.5 bg-gray-50/60 p-3 rounded-2xl border border-gray-100/80">
+                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+                      <div key={d} className="text-center text-[9px] font-bold text-gray-400 uppercase tracking-wider py-1">{d}</div>
+                    ))}
+                    {Array.from({ length: new Date(yr, mo - 1, 1).getDay() }).map((_, idx) => (
+                      <div key={`spacer-${idx}`} className="w-8 h-8" />
+                    ))}
+                    {calDays.map(({ date, day, count }) => {
+                      const isSelected = date === selectedDate;
+                      const isFuture   = date > todayStr();
+                      return (
+                        <button key={date} onClick={() => !isFuture && setSelectedDate(date)} disabled={isFuture}
+                          className={`w-8 h-8 rounded-lg flex flex-col items-center justify-center text-xs font-bold transition-all border relative ${
+                            isSelected  ? "bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-200/60 scale-105"
+                            : count > 0 ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100/80 hover:scale-105"
+                            : isFuture  ? "bg-gray-50/50 text-gray-300 border-gray-50 cursor-not-allowed"
+                            :             "bg-white text-gray-600 border-gray-100 hover:bg-gray-50 hover:border-gray-200 hover:scale-105"
+                          }`}>
+                          <span>{day}</span>
+                          {count > 0 && (
+                            <span className={`absolute bottom-0.5 w-1 h-1 rounded-full ${isSelected ? "bg-white" : "bg-emerald-500"}`} />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3.5 mt-3 text-[10px] text-gray-400 font-semibold">
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-purple-600" /> Selected</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-50 border border-emerald-200" /> Visits Recorded</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-white border border-gray-100" /> No Visits</span>
+                  </div>
                 </div>
-              </div>
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
-                {new Date(yr, mo-1).toLocaleString("default", { month: "long", year: "numeric" })} — Visit Activity
-              </p>
-              <div className="flex gap-1.5 overflow-x-auto pb-1">
-                {calDays.map(({ date, day, count }) => {
-                  const isSelected = date === selectedDate;
-                  const isFuture   = date > todayStr();
-                  return (
-                    <button key={date} onClick={() => !isFuture && setSelectedDate(date)} disabled={isFuture}
-                      className={`flex-shrink-0 w-9 h-9 rounded-lg flex flex-col items-center justify-center text-[10px] font-bold transition-all border ${
-                        isSelected  ? "bg-purple-600 text-white border-purple-600 shadow-sm"
-                        : count > 0 ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                        : isFuture  ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed"
-                        :             "bg-gray-50 text-gray-400 border-gray-100 hover:bg-gray-100"
-                      }`}>
-                      <span>{day}</span>
-                      {count > 0 && !isSelected && <span className="w-1 h-1 bg-emerald-500 rounded-full mt-0.5" />}
-                    </button>
-                  );
-                })}
+
               </div>
             </div>
           )}
@@ -2165,11 +2452,10 @@ function AdminDCRSection() {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+              <div className="grid grid-cols-5 sm:grid-cols-5 gap-3">
                 {[
                   { label: "Visits",      value: totalVisits,    color: "text-purple-700", bg: "bg-purple-50 border-purple-100",  icon: "📅" },
                   { label: "Samples",     value: totalSamples,   color: "text-blue-700",   bg: "bg-blue-50 border-blue-100",      icon: "💉" },
-                  { label: "Rx Commits",  value: rxCommitments,  color: "text-emerald-700",bg: "bg-emerald-50 border-emerald-100",icon: "✅" },
                   { label: "Follow-ups",  value: followUps,      color: "text-orange-700", bg: "bg-orange-50 border-orange-100",  icon: "📆" },
                   { label: "Competitors", value: competitorsMet, color: "text-red-700",    bg: "bg-red-50 border-red-100",        icon: "⚔️" },
                   { label: "Products",    value: productsToday.length, color: "text-indigo-700", bg: "bg-indigo-50 border-indigo-100", icon: "💊" },
@@ -2238,7 +2524,7 @@ function AdminDCRSection() {
                             <div>
                               <p className="text-sm font-bold text-gray-900">{v.doctor_name}</p>
                               <div className="flex items-center gap-2 mt-0.5">
-                                {v.location && <span className="text-[11px] text-gray-400">📍 {v.location}</span>}
+                                {formatLoc(v.location) && <span className="text-[11px] text-gray-400">📍 {formatLoc(v.location)}</span>}
                                 {v.duration_minutes > 0 && <span className="text-[11px] text-gray-400">⏱️ {v.duration_minutes} min</span>}
                                 {v.completed_at && <span className="text-[11px] text-gray-400">🕐 {formatISTTime(v.completed_at)}</span>}
                               </div>
@@ -2250,10 +2536,9 @@ function AdminDCRSection() {
                             </span>
                           )}
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                        <div className="grid grid-cols-3 sm:grid-cols-3 gap-2 mb-3">
                           <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-100"><p className="text-[9px] text-gray-400 uppercase font-semibold">Purpose</p><p className="text-xs font-bold text-gray-700 mt-0.5">{v.purpose || "—"}</p></div>
                           <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-100"><p className="text-[9px] text-gray-400 uppercase font-semibold">Samples</p><p className="text-xs font-bold text-gray-700 mt-0.5">{r.samples_given ?? "—"}</p></div>
-                          <div className={`rounded-lg p-2.5 border ${r.rx_commitment ? "bg-emerald-50 border-emerald-100" : "bg-gray-50 border-gray-100"}`}><p className="text-[9px] text-gray-400 uppercase font-semibold">Rx Commit</p><p className={`text-xs font-bold mt-0.5 ${r.rx_commitment ? "text-emerald-700" : "text-gray-500"}`}>{r.rx_commitment ? `Yes · ${r.expected_rx_per_month || "—"}/mo` : "No"}</p></div>
                           <div className={`rounded-lg p-2.5 border ${r.follow_up_date ? "bg-orange-50 border-orange-100" : "bg-gray-50 border-gray-100"}`}><p className="text-[9px] text-gray-400 uppercase font-semibold">Follow-up</p><p className={`text-xs font-bold mt-0.5 ${r.follow_up_date ? "text-orange-700" : "text-gray-400"}`}>{r.follow_up_date ? formatISTDate(r.follow_up_date + "T00:00:00") : "None"}</p></div>
                         </div>
                         {(r.products_discussed || []).length > 0 && (
@@ -2291,7 +2576,6 @@ function AdminDCRSection() {
           moodCounts={moodCounts}
           productsToday={productsToday}
           totalSamples={totalSamples}
-          rxCommits={rxCommitments}
           followUps={followUps}
           competitors={competitorsMet}
           generatedAt={new Date().toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit", hour12:true })}
@@ -2312,13 +2596,13 @@ function VisitTargets() {
   const { data: settings, isLoading } = useQuery({
     queryKey: ["sfe-settings"],
     queryFn: () => get("/api/v1/sfe/settings"),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const { data: doctorsData } = useQuery({
     queryKey: ["doctors"],
     queryFn: () => get("/api/v1/doctors?page_size=1000").then((d) => Array.isArray(d) ? d : (d?.doctors || [])),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const doctors = Array.isArray(doctorsData) ? doctorsData : [];

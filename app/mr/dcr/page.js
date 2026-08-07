@@ -1,8 +1,8 @@
 "use client";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import MRNavbar from "@/components/mr/MRNavbar";
-import Breadcrumb from "@/components/Breadcrumb";
+import MRSidebar from "@/components/mr/MRSidebar";
+import NotificationBell from "@/components/NotificationBell";
 import DCRPrintTemplate from "@/components/DCRPrintTemplate";
 import { get } from "@/lib/api";
 import { formatISTDate, formatISTTime } from "@/lib/time";
@@ -11,6 +11,8 @@ const today = () => new Date().toISOString().split("T")[0];
 
 const MOOD_ICON = { positive: "😊", neutral: "😐", negative: "😞" };
 const MOOD_LABEL = { positive: "Positive", neutral: "Neutral", negative: "Negative" };
+
+const formatLoc = (loc) => loc && typeof loc === "object" ? loc.location_name || loc.temporary_location?.name || "" : loc || "";
 
 export default function MRDCRPage() {
   const [selectedDate, setSelectedDate] = useState(today());
@@ -46,7 +48,7 @@ export default function MRDCRPage() {
     queryKey: ["mr-dcr-month", monthKey],
     queryFn: () => get(`/api/v1/visits?date_from=${monthStart}&date_to=${monthEnd}`),
     enabled: !!mrId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const allVisits   = visitsResponse?.visits || [];
@@ -55,7 +57,6 @@ export default function MRDCRPage() {
 
   // Stats
   const totalSamples  = completed.reduce((a, v) => a + (v.report?.samples_given || 0), 0);
-  const rxCommits     = completed.filter((v) => v.report?.rx_commitment).length;
   const followUps     = completed.filter((v) => v.report?.follow_up_date).length;
   const competitors   = completed.filter((v) => v.report?.competitor_info).length;
   const moodCounts    = { positive: 0, neutral: 0, negative: 0 };
@@ -80,60 +81,172 @@ export default function MRDCRPage() {
 
   const generatedAt = new Date().toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit", hour12:true });
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   return (
-    <div className="min-h-screen bg-[#fafbfd]">
-      <MRNavbar />
-      <main className="max-w-4xl mx-auto px-3 sm:px-5 py-5">
-        <Breadcrumb />
+    <div className="min-h-screen bg-[#f8f9fc] flex">
+      <MRSidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
+      <div className={`${sidebarCollapsed ? "md:ml-[60px]" : "md:ml-[220px]"} flex-1 min-h-screen transition-all duration-300`}>
+        {/* Top Bar */}
+                <header className="bg-white/80 backdrop-blur-md border-b border-gray-100/80 px-4 md:px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+          {/* Mobile hamburger */}
+          <button onClick={() => setMobileOpen(true)} className="md:hidden w-9 h-9 rounded-lg bg-gray-100 hover:bg-purple-50 flex items-center justify-center text-gray-600 hover:text-purple-600 transition-all mr-3">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-sm text-gray-600">
+              <svg className="w-4 h-4 text-indigo-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/></svg>
+              <span className="font-medium">{mrInfo?.territory || "Visakhapatnam, AP"}</span>
+              <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <NotificationBell accentColor="indigo" />
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center text-white text-xs font-bold">{mrName.charAt(0).toUpperCase()}</div>
+              <div className="hidden sm:block">
+                <p className="text-sm font-bold text-gray-800 leading-none">{mrName.split(" ")[0]} {mrName.split(" ")[1]?.charAt(0) || ""}.</p>
+                <p className="text-[10px] text-gray-400">MR - Field Executive</p>
+              </div>
+            </div>
+          </div>
+        </header>
+
+      <main className="px-4 md:px-6 py-4 md:py-5">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-1.5 text-[11px] text-gray-400 mb-3">
+          <span>DCR</span><span>›</span><span className="text-gray-600 font-medium">Daily Call Report</span>
+        </div>
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-extrabold text-gray-900">Daily Call Report</h1>
-            <p className="text-sm text-gray-400 mt-0.5">Your day's field activity summary</p>
+            <h1 className="text-xl font-extrabold text-gray-900">Daily Call Report</h1>
+            <p className="text-xs text-gray-400 mt-0.5">Your day's field activity summary</p>
           </div>
           <div className="flex items-center gap-2">
             <input type="date" value={selectedDate} max={today()}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white font-medium text-gray-700 focus:ring-2 focus:ring-orange-300 outline-none" />
+              className="text-xs border border-gray-200 rounded-lg px-3 py-2 bg-white font-medium text-gray-700 focus:ring-2 focus:ring-indigo-300 outline-none" />
             {completed.length > 0 && (
               <button onClick={() => setShowPrintPreview(true)}
-                className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all">
+                className="flex items-center gap-1.5 bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all">
                 🖨️ Print DCR
               </button>
             )}
           </div>
         </div>
 
-        {/* Calendar strip */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-5">
-          <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-3">
-            {new Date(yr, mo-1).toLocaleString("default", { month: "long", year: "numeric" })} — Activity Calendar
-          </p>
-          <div className="flex gap-1.5 overflow-x-auto pb-1">
-            {calDays.map(({ date, day, count }) => {
-              const isSelected = date === selectedDate;
-              const isFuture   = date > today();
-              return (
-                <button key={date} onClick={() => !isFuture && setSelectedDate(date)} disabled={isFuture}
-                  className={`flex-shrink-0 w-10 h-10 rounded-xl flex flex-col items-center justify-center text-[10px] font-bold transition-all border ${
-                    isSelected     ? "bg-orange-500 text-white border-orange-500 shadow-sm"
-                    : count > 0    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                    : isFuture     ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed"
-                    :                "bg-gray-50 text-gray-400 border-gray-100 hover:bg-gray-100"
-                  }`}>
-                  <span>{day}</span>
-                  {count > 0 && !isSelected && <span className="w-1 h-1 bg-emerald-500 rounded-full mt-0.5" />}
-                </button>
-              );
-            })}
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+          <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center"><span className="text-lg">📅</span></div>
+            <div>
+              <p className="text-xl font-extrabold text-gray-900">{allVisits.filter(v => v.status === "scheduled").length}</p>
+              <p className="text-[10px] text-gray-400">Scheduled</p>
+            </div>
           </div>
-          <div className="flex items-center gap-4 mt-2">
-            {[{ color:"bg-emerald-500", label:"Visits done" },{ color:"bg-orange-500", label:"Selected" },{ color:"bg-gray-200", label:"No visits" }].map((l) => (
-              <span key={l.label} className="flex items-center gap-1.5 text-[10px] text-gray-400">
-                <span className={`w-2 h-2 rounded-full ${l.color}`} />{l.label}
-              </span>
-            ))}
+          <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">
+            <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center"><span className="text-lg">⏳</span></div>
+            <div>
+              <p className="text-xl font-extrabold text-gray-900">{allVisits.filter(v => v.status === "checked_in").length}</p>
+              <p className="text-[10px] text-gray-400">In Progress</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-green-200 flex items-center gap-3">
+            <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center"><span className="text-lg">✅</span></div>
+            <div>
+              <p className="text-xl font-extrabold text-green-600">{completed.length}</p>
+              <p className="text-[10px] text-gray-400">Completed</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">
+            <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center"><span className="text-lg">❌</span></div>
+            <div>
+              <p className="text-xl font-extrabold text-gray-900">{allVisits.filter(v => v.status === "cancelled").length}</p>
+              <p className="text-[10px] text-gray-400">Cancelled</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Calendar + MR Info Block */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-5">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+            
+            {/* Left Side: MR Info */}
+            <div className="md:col-span-5 space-y-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-black text-base shadow-sm shadow-indigo-200">
+                  {(mrInfo?.name || mrName || "M").charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-gray-900 leading-tight">{mrInfo?.name || mrName}</h3>
+                  <p className="text-xs text-gray-400 font-medium mt-0.5">
+                    {mrInfo?.territory ? `${mrInfo.territory} · ${mrInfo.zone}` : "Field Representative"}
+                  </p>
+                </div>
+              </div>
+
+              {mrInfo && (
+                <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-2.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400 font-medium">Email</span>
+                    <span className="font-semibold text-gray-700">{mrInfo.email || "—"}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400 font-medium">Phone</span>
+                    <span className="font-semibold text-gray-700">{mrInfo.phone || "—"}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400 font-medium font-semibold">Territory</span>
+                    <span className="font-semibold text-gray-700">{mrInfo.territory || "—"}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Vertical Divider */}
+            <div className="hidden md:block md:col-span-1 self-stretch border-r border-gray-100 my-1" />
+
+            {/* Right Side: Calendar */}
+            <div className="md:col-span-6 flex flex-col">
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                {new Date(yr, mo-1).toLocaleString("default", { month: "long", year: "numeric" })} — Activity Calendar
+              </p>
+              <div className="grid grid-cols-7 gap-1.5 bg-gray-50/60 p-3 rounded-2xl border border-gray-100/80">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+                  <div key={d} className="text-center text-[9px] font-bold text-gray-400 uppercase tracking-wider py-1">{d}</div>
+                ))}
+                {Array.from({ length: new Date(yr, mo - 1, 1).getDay() }).map((_, idx) => (
+                  <div key={`spacer-${idx}`} className="w-8 h-8" />
+                ))}
+                {calDays.map(({ date, day, count }) => {
+                  const isSelected = date === selectedDate;
+                  const isFuture   = date > today();
+                  return (
+                    <button key={date} onClick={() => !isFuture && setSelectedDate(date)} disabled={isFuture}
+                      className={`w-8 h-8 rounded-lg flex flex-col items-center justify-center text-xs font-bold transition-all border relative ${
+                        isSelected     ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-purple-200/60 scale-105"
+                        : count > 0    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100/80 hover:scale-105"
+                        : isFuture     ? "bg-gray-50/50 text-gray-300 border-gray-50 cursor-not-allowed"
+                        :                "bg-white text-gray-600 border-gray-100 hover:bg-gray-50 hover:border-gray-200 hover:scale-105"
+                      }`}>
+                      <span>{day}</span>
+                      {count > 0 && (
+                        <span className={`absolute bottom-0.5 w-1 h-1 rounded-full ${isSelected ? "bg-white" : "bg-emerald-500"}`} />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex flex-wrap items-center gap-3.5 mt-3 text-[10px] text-gray-400 font-semibold">
+                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-indigo-600" /> Selected</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-50 border border-emerald-200" /> Visits Done</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-white border border-gray-100" /> No Visits</span>
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -149,12 +262,11 @@ export default function MRDCRPage() {
         ) : (
           <div className="space-y-4">
             {/* Stats */}
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+            <div className="grid grid-cols-5 sm:grid-cols-5 gap-3">
               {[
                 { label:"Visits",      value: completed.length, color:"text-purple-700",  bg:"bg-purple-50 border-purple-100",  icon:"📅" },
                 { label:"Samples",     value: totalSamples,     color:"text-blue-700",    bg:"bg-blue-50 border-blue-100",      icon:"💉" },
-                { label:"Rx Commits",  value: rxCommits,        color:"text-emerald-700", bg:"bg-emerald-50 border-emerald-100",icon:"✅" },
-                { label:"Follow-ups",  value: followUps,        color:"text-orange-700",  bg:"bg-orange-50 border-orange-100",  icon:"📆" },
+                { label:"Follow-ups",  value: followUps,        color:"text-indigo-700",  bg:"bg-orange-50 border-orange-100",  icon:"📆" },
                 { label:"Competitors", value: competitors,      color:"text-red-700",     bg:"bg-red-50 border-red-100",        icon:"⚔️" },
                 { label:"Products",    value: productsSet.size, color:"text-indigo-700",  bg:"bg-indigo-50 border-indigo-100",  icon:"💊" },
               ].map((s) => (
@@ -168,13 +280,13 @@ export default function MRDCRPage() {
 
             {/* Visit cards preview */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100 bg-orange-50/50 flex items-center justify-between">
+              <div className="px-5 py-4 border-b border-gray-100 bg-indigo-50/50 flex items-center justify-between">
                 <div>
                   <p className="text-sm font-bold text-gray-900">Visit Details — {displayDate}</p>
                   <p className="text-[11px] text-gray-400 mt-0.5">{completed.length} completed visit{completed.length !== 1 ? "s" : ""}</p>
                 </div>
                 <button onClick={() => setShowPrintPreview(true)}
-                  className="text-xs text-orange-600 font-bold bg-orange-100 hover:bg-orange-200 px-3 py-1.5 rounded-lg transition-all">
+                  className="text-xs text-indigo-600 font-bold bg-indigo-100 hover:bg-indigo-200 px-3 py-1.5 rounded-lg transition-all">
                   🖨️ Print Full Report
                 </button>
               </div>
@@ -183,14 +295,13 @@ export default function MRDCRPage() {
                   const r = v.report || {};
                   return (
                     <div key={v.id} className="px-5 py-3.5 flex items-center gap-3">
-                      <div className="w-7 h-7 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600 font-bold text-xs flex-shrink-0">{i+1}</div>
+                      <div className="w-7 h-7 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600 font-bold text-xs flex-shrink-0">{i+1}</div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-gray-900 truncate">{v.doctor_name}</p>
-                        <p className="text-[11px] text-gray-400">{v.purpose}{v.location ? ` · ${v.location}` : ""}{v.duration_minutes > 0 ? ` · ${v.duration_minutes} min` : ""}</p>
+                        <p className="text-[11px] text-gray-400">{v.purpose}{formatLoc(v.location) ? ` · ${formatLoc(v.location)}` : ""}{v.duration_minutes > 0 ? ` · ${v.duration_minutes} min` : ""}</p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {r.doctor_mood && <span className="text-sm">{MOOD_ICON[r.doctor_mood]}</span>}
-                        {r.rx_commitment && <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100">Rx ✓</span>}
                         {r.samples_given > 0 && <span className="text-[9px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100">{r.samples_given} samp</span>}
                       </div>
                     </div>
@@ -213,7 +324,6 @@ export default function MRDCRPage() {
           moodCounts={moodCounts}
           productsToday={[...productsSet]}
           totalSamples={totalSamples}
-          rxCommits={rxCommits}
           followUps={followUps}
           competitors={competitors}
           generatedAt={generatedAt}
@@ -221,11 +331,12 @@ export default function MRDCRPage() {
         />
       )}
     </div>
+    </div>
   );
 }
 
 // ── DCR Print Modal ──────────────────────────────────────────────────────────
-function DCRPrintModal({ date, displayDate, mrInfo, mrName, completed, moodCounts, productsToday, totalSamples, rxCommits, followUps, competitors, generatedAt, onClose }) {
+function DCRPrintModal({ date, displayDate, mrInfo, mrName, completed, moodCounts, productsToday, totalSamples, followUps, competitors, generatedAt, onClose }) {
 
   const handlePrint = () => {
     const printContents = document.getElementById("dcr-print-area").innerHTML;
@@ -351,7 +462,7 @@ function DCRPrintModal({ date, displayDate, mrInfo, mrName, completed, moodCount
           </div>
           <div className="flex items-center gap-2">
             <button onClick={handlePrint}
-              className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5">
+              className="bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5">
               🖨️ Print / Save PDF
             </button>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-lg">×</button>
@@ -366,7 +477,7 @@ function DCRPrintModal({ date, displayDate, mrInfo, mrName, completed, moodCount
               {/* ── Document Header ── */}
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", paddingBottom:"16px", borderBottom:"2px solid #f97316", marginBottom:"20px" }}>
                 <div>
-                  <div style={{ fontSize:"11px", color:"#f97316", fontWeight:"700", textTransform:"uppercase", letterSpacing:"1px", marginBottom:"4px" }}>MedRepAI · Daily Call Report</div>
+                  <div style={{ fontSize:"11px", color:"#f97316", fontWeight:"700", textTransform:"uppercase", letterSpacing:"1px", marginBottom:"4px" }}>MRX · Daily Call Report</div>
                   <div style={{ fontSize:"22px", fontWeight:"800", color:"#111827" }}>Daily Call Report (DCR)</div>
                   <div style={{ fontSize:"12px", color:"#6b7280", marginTop:"2px" }}>Official field activity record</div>
                 </div>
@@ -409,14 +520,12 @@ function DCRPrintModal({ date, displayDate, mrInfo, mrName, completed, moodCount
                 </div>
               </div>
 
-              {/* ── Day Summary Stats ── */}
               <div style={{ marginBottom:"18px" }}>
                 <div style={{ fontSize:"11px", fontWeight:"800", color:"#374151", textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"10px", paddingBottom:"6px", borderBottom:"1px solid #e5e7eb" }}>Day Summary</div>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:"8px" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:"8px" }}>
                   {[
                     { label:"Total Visits",   value: totalVisits,      bg:"#fff7ed", border:"#fed7aa", color:"#ea580c" },
                     { label:"Samples Given",  value: totalSamples,     bg:"#eff6ff", border:"#bfdbfe", color:"#2563eb" },
-                    { label:"Rx Commitments", value: rxCommits,        bg:"#f0fdf4", border:"#bbf7d0", color:"#16a34a" },
                     { label:"Follow-ups Set", value: followUps,        bg:"#fff7ed", border:"#fed7aa", color:"#d97706" },
                     { label:"Competitor Info",value: competitors,      bg:"#fef2f2", border:"#fecaca", color:"#dc2626" },
                     { label:"Products Discussed", value: [...productsToday].length, bg:"#f5f3ff", border:"#ddd6fe", color:"#7c3aed" },
@@ -482,7 +591,7 @@ function DCRPrintModal({ date, displayDate, mrInfo, mrName, completed, moodCount
                           <div>
                             <div style={{ fontSize:"13px", fontWeight:"800", color:"#111827" }}>{v.doctor_name}</div>
                             <div style={{ fontSize:"10px", color:"#6b7280", marginTop:"1px" }}>
-                              {[v.location && `📍 ${v.location}`, v.completed_at && `🕐 ${formatISTTime(v.completed_at)}`, v.duration_minutes > 0 && `⏱️ ${v.duration_minutes} min`].filter(Boolean).join("  ·  ")}
+                              {[formatLoc(v.location) && `📍 ${formatLoc(v.location)}`, v.completed_at && `🕐 ${formatISTTime(v.completed_at)}`, v.duration_minutes > 0 && `⏱️ ${v.duration_minutes} min`].filter(Boolean).join("  ·  ")}
                             </div>
                           </div>
                         </div>
@@ -496,11 +605,10 @@ function DCRPrintModal({ date, displayDate, mrInfo, mrName, completed, moodCount
                       {/* Visit body */}
                       <div style={{ padding:"12px 14px" }}>
                         {/* Data grid */}
-                        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"8px", marginBottom:"10px" }}>
+                        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"8px", marginBottom:"10px" }}>
                           {[
                             { label:"Purpose",       value: v.purpose || "—",    style:{} },
                             { label:"Samples Given", value: r.samples_given ?? "—", style:{} },
-                            { label:"Rx Commitment", value: r.rx_commitment ? `Yes · ${r.expected_rx_per_month || "—"}/mo` : "No", style: r.rx_commitment ? { color:"#16a34a", background:"#f0fdf4", border:"1px solid #bbf7d0" } : {} },
                             { label:"Follow-up",     value: r.follow_up_date ? formatISTDate(r.follow_up_date + "T00:00:00") : "None", style: r.follow_up_date ? { color:"#d97706", background:"#fffbeb", border:"1px solid #fde68a" } : {} },
                           ].map((f) => (
                             <div key={f.label} style={{ background:"#f9fafb", border:"1px solid #e5e7eb", borderRadius:"6px", padding:"7px 9px", ...f.style }}>
@@ -566,7 +674,7 @@ function DCRPrintModal({ date, displayDate, mrInfo, mrName, completed, moodCount
               {/* ── Footer ── */}
               <div style={{ marginTop:"20px", paddingTop:"12px", borderTop:"1px solid #e5e7eb", display:"flex", justifyContent:"space-between", fontSize:"9px", color:"#9ca3af" }}>
                 <span>Generated: {generatedAt}</span>
-                <span>MedRepAI · Daily Call Report · {date}</span>
+                <span>MRX · Daily Call Report · {date}</span>
               </div>
 
             </div>

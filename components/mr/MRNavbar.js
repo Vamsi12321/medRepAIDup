@@ -32,15 +32,15 @@ export default function MRNavbar() {
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
     if (path === "/mr/dashboard") {
-      queryClient.prefetchQuery({ queryKey: ["mr-dashboard"], queryFn: () => get("/api/v1/dashboard"), staleTime: 2 * 60 * 1000 });
+      queryClient.prefetchQuery({ queryKey: ["mr-dashboard"], queryFn: () => get("/api/v1/dashboard"), staleTime: 7 * 60 * 1000 });
     } else if (path === "/mr/doctors") {
-      queryClient.prefetchQuery({ queryKey: ["mr-doctors"], queryFn: () => get("/api/v1/doctors"), staleTime: 5 * 60 * 1000 });
+      queryClient.prefetchQuery({ queryKey: ["mr-doctors"], queryFn: () => get("/api/v1/doctors"), staleTime: 7 * 60 * 1000 });
     } else if (path === "/mr/visits") {
       queryClient.prefetchQuery({ queryKey: ["visits", mrId, "", "", ""], queryFn: () => get("/api/v1/visits"), staleTime: 0 });
     } else if (path === "/mr/sfe") {
-      queryClient.prefetchQuery({ queryKey: ["sfe-mcr", month, year], queryFn: () => get("/api/v1/sfe/mcr", { month, year }), staleTime: 5 * 60 * 1000 });
+      queryClient.prefetchQuery({ queryKey: ["sfe-mcr", month, year], queryFn: () => get("/api/v1/sfe/mcr", { month, year }), staleTime: 7 * 60 * 1000 });
     } else if (path === "/mr/announcements") {
-      queryClient.prefetchQuery({ queryKey: ["communications"], queryFn: () => get("/api/v1/communications"), staleTime: 2 * 60 * 1000 });
+      queryClient.prefetchQuery({ queryKey: ["communications"], queryFn: () => get("/api/v1/communications"), staleTime: 7 * 60 * 1000 });
     }
   };
 
@@ -66,7 +66,7 @@ export default function MRNavbar() {
     queryKey: ["comms-unread-count"],
     queryFn: () => get("/api/v1/communications/unread/count"),
     refetchInterval: 60000,
-    staleTime: 30000,
+    staleTime: 7 * 60 * 1000,
   });
   const unreadCount = unreadData?.unread_count || 0;
 
@@ -105,7 +105,7 @@ export default function MRNavbar() {
                   key={item.path}
                   href={item.path}
                   onMouseEnter={() => prefetchOnHover(item.path)}
-                  className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
+                  className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                     pathname === item.path
                       ? "bg-gradient-to-r from-orange-600 to-red-600 text-white shadow"
                       : "text-gray-600 hover:bg-gray-100"
@@ -127,10 +127,10 @@ export default function MRNavbar() {
               <NotificationBell accentColor="orange" />
               <button
                 onClick={handleLogout}
-                className="hidden lg:flex items-center gap-1.5 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-semibold transition-all"
+                className="hidden lg:flex items-center justify-center w-9 h-9 text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                title="Logout"
               >
-                <span>🚪</span>
-                <span>Logout</span>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
               </button>
 
               {/* Mobile hamburger */}

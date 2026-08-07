@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useQuery } from "@tanstack/react-query";
 import { get } from "@/lib/api";
 
@@ -6,7 +6,7 @@ export default function CompanyProfileModal({ onClose }) {
   const { data, isLoading } = useQuery({
     queryKey: ["company-profile"],
     queryFn: () => get("/api/v1/profile/company"),
-    staleTime: 300000,
+    staleTime: 7 * 60 * 10000,
   });
 
   return (

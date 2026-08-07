@@ -1,189 +1,220 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 
-// Dynamically import map to avoid SSR issues with Leaflet
-const MapWithNoSSR = dynamic(() => import("./LocationMapInner"), { ssr: false });
+const MapBox = dynamic(() => import("./LocationMapInner"), {
+  ssr: false,
+  loading: () => (
+    <div style={{ height:"100%", background:"#f3f4f6", display:"flex", alignItems:"center", justifyContent:"center" }}>
+      <span style={{ fontSize:"12px", color:"#9ca3af" }}>Loading map…</span>
+    </div>
+  ),
+});
+
+async function reverseGeocode(lat, lng) {
+  try {
+    const r = await fetch(`/api/v1/geocode?lat=${lat}&lng=${lng}`);
+    const d = await r.json();
+    return { display_name: d.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`, structured: d.structured || {} };
+  } catch { return { display_name: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, structured: {} }; }
+}
 
 export default function LocationMapPicker({ value, lat, lng, onChange }) {
-  const [showMap, setShowMap] = useState(false);
-  const [search, setSearch]   = useState("");
-  const [searching, setSearching] = useState(false);
+  const [showMap,    setShowMap]    = useState(false);
+  const [search,     setSearch]     = useState("");
+  const [searching,  setSearching]  = useState(false);
+  const [results,    setResults]    = useState([]);
   const [gpsLoading, setGpsLoading] = useState(false);
-  const [position, setPosition] = useState(
-    lat && lng ? [parseFloat(lat), parseFloat(lng)] : null
-  );
-  const [address, setAddress] = useState(value || "");
+  const [position,   setPosition]   = useState(lat && lng ? [parseFloat(lat), parseFloat(lng)] : null);
+  const [address,    setAddress]    = useState(value || "");
+  const [mounted,    setMounted]    = useState(false);
 
-  const handleSearchSubmit = async () => {
-    if (!search.trim()) return;
-    setSearching(true);
+  // Use ref to always have latest onChange without causing useCallback recreation
+  const onChangeRef = useRef(onChange);
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  const doSearch = async () => {
+    const q = search.trim();
+    if (!q) return;
+    setSearching(true); setResults([]);
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(search)}&format=json&limit=1`,
-        { headers: { "Accept-Language": "en" } }
-      );
-      const data = await res.json();
-      if (data[0]) {
-        const pos = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-        setPosition(pos);
-        const addr = data[0].display_name;
-        setAddress(addr);
-        onChange({ address: addr, latitude: pos[0], longitude: pos[1] });
-      }
+      const r = await fetch(`/api/v1/geocode?q=${encodeURIComponent(q)}`);
+      setResults(await r.json());
     } catch {}
     setSearching(false);
   };
 
-  const handleUseGPS = () => {
-    if (!navigator.geolocation) { alert("GPS not supported"); return; }
-    setGpsLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setPosition([latitude, longitude]);
-        // Reverse geocode
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-            { headers: { "Accept-Language": "en" } }
-          );
-          const data = await res.json();
-          const addr = data.display_name || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
-          setAddress(addr);
-          onChange({ address: addr, latitude, longitude });
-        } catch {
-          const addr = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
-          setAddress(addr);
-          onChange({ address: addr, latitude, longitude });
-        }
-        setGpsLoading(false);
-      },
-      () => { alert("GPS access denied"); setGpsLoading(false); },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+  const pick = (r) => {
+    const pos  = [parseFloat(r.lat), parseFloat(r.lon)];
+    const addr = r.display_name;
+    setPosition(pos); setAddress(addr);
+    setSearch(r.name || r.display_name.split(",")[0]);
+    setResults([]);
+    onChangeRef.current({ address: addr, latitude: pos[0], longitude: pos[1], structured: r.structured || {} });
   };
 
-  const handleMapClick = useCallback(async (latlng) => {
-    setPosition([latlng.lat, latlng.lng]);
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${latlng.lat}&lon=${latlng.lng}&format=json`,
-        { headers: { "Accept-Language": "en" } }
-      );
-      const data = await res.json();
-      const addr = data.display_name || `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
-      setAddress(addr);
-      onChange({ address: addr, latitude: latlng.lat, longitude: latlng.lng });
-    } catch {
-      const addr = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
-      setAddress(addr);
-      onChange({ address: addr, latitude: latlng.lat, longitude: latlng.lng });
-    }
-  }, [onChange]);
+  const handleMapClick = useCallback(async ({ lat, lng }) => {
+    const pos  = [lat, lng];
+    setPosition(pos);
+    setResults([]);
+    const geo = await reverseGeocode(lat, lng);
+    setAddress(geo.display_name);
+    onChangeRef.current({ address: geo.display_name, latitude: lat, longitude: lng, structured: geo.structured || {} });
+  }, []);
 
-  return (
-    <div className="space-y-2">
-      {/* Address display + open map button */}
-      <div className="flex gap-2">
-        <input
-          type="text"
-          readOnly
-          value={address}
-          placeholder="Click 'Pick on Map' to select location…"
-          className="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-700 outline-none cursor-pointer"
-          onClick={() => setShowMap(true)}
-        />
-        <button type="button" onClick={() => setShowMap(true)}
-          className="px-3 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          Pick on Map
-        </button>
+  const handleGPS = () => {
+    if (!navigator.geolocation) { alert("GPS not supported"); return; }
+    setGpsLoading(true);
+    navigator.geolocation.getCurrentPosition(async ({ coords }) => {
+      const pos  = [coords.latitude, coords.longitude];
+      setPosition(pos); setResults([]);
+      const geo = await reverseGeocode(coords.latitude, coords.longitude);
+      setAddress(geo.display_name);
+      onChangeRef.current({ address: geo.display_name, latitude: coords.latitude, longitude: coords.longitude, structured: geo.structured || {} });
+      setGpsLoading(false);
+    }, () => { alert("GPS access denied"); setGpsLoading(false); }, { enableHighAccuracy: true, timeout: 10000 });
+  };
+
+  const modal = mounted && showMap ? createPortal(
+    <div style={{
+      position:"fixed", inset:0, background:"rgba(0,0,0,0.55)",
+      zIndex:2147483647,
+      display:"flex", alignItems:"center", justifyContent:"center", padding:"20px"
+    }} onClick={(e) => { if (e.target === e.currentTarget) { setShowMap(false); setResults([]); } }}>
+      <div style={{
+        background:"white", borderRadius:"20px",
+        boxShadow:"0 25px 60px rgba(0,0,0,0.3)",
+        width:"100%", maxWidth:"520px",
+        display:"flex", flexDirection:"column",
+        overflow:"hidden",
+        maxHeight:"85vh",
+        animation: "fadeInScale 0.2s ease-out"
+      }}>
+
+        {/* ─── Header ─────────────────────────────────── */}
+        <div style={{
+          padding:"16px 20px", 
+          background:"linear-gradient(135deg, #7c3aed, #a855f7)",
+          display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0
+        }}>
+          <div>
+            <p style={{ fontWeight:800, fontSize:"14px", color:"white", margin:0, letterSpacing:"-0.3px" }}>📍 Pick Location</p>
+            <p style={{ fontSize:"10px", color:"rgba(255,255,255,0.7)", margin:"2px 0 0" }}>Search, use GPS, or tap the map</p>
+          </div>
+          <button type="button" onClick={() => { setShowMap(false); setResults([]); }}
+            style={{ fontSize:"18px", color:"rgba(255,255,255,0.8)", background:"rgba(255,255,255,0.15)", border:"none", cursor:"pointer", lineHeight:1, width:"30px", height:"30px", borderRadius:"8px", display:"flex", alignItems:"center", justifyContent:"center" }}
+            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.25)"}
+            onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}>×</button>
+        </div>
+
+        {/* ─── Search bar ─────────────────────────────── */}
+        <div style={{ padding:"12px 16px", background:"#fafafa", borderBottom:"1px solid #f3f4f6", display:"flex", gap:"6px", alignItems:"center", flexShrink:0 }}>
+          <div style={{ flex:1, position:"relative" }}>
+            <input
+              type="text" value={search}
+              onChange={(e) => { setSearch(e.target.value); setResults([]); }}
+              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), doSearch())}
+              placeholder="Search hospital, clinic..."
+              style={{ width:"100%", padding:"8px 10px 8px 30px", border:"1.5px solid #e5e7eb", borderRadius:"10px", fontSize:"12px", outline:"none", boxSizing:"border-box", background:"white" }}
+            />
+            <span style={{ position:"absolute", left:"10px", top:"50%", transform:"translateY(-50%)", fontSize:"12px", color:"#9ca3af", pointerEvents:"none" }}>🔍</span>
+          </div>
+          <button type="button" onClick={doSearch} disabled={searching}
+            style={{ padding:"8px 14px", background: searching ? "#a78bfa" : "#7c3aed", color:"white", border:"none", borderRadius:"10px", fontSize:"11px", fontWeight:700, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0 }}>
+            {searching ? "…" : "Search"}
+          </button>
+          <button type="button" onClick={handleGPS} disabled={gpsLoading}
+            style={{ padding:"8px 12px", background:"white", color:"#15803d", border:"1.5px solid #d1d5db", borderRadius:"10px", fontSize:"11px", fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0, display:"flex", alignItems:"center", gap:"4px" }}>
+            {gpsLoading ? "⏳" : "📍"} GPS
+          </button>
+        </div>
+
+        {/* ─── Search results ─────────────────────────── */}
+        {results.length > 0 && (
+          <div style={{ flexShrink:0, borderBottom:"1px solid #e5e7eb", maxHeight:"150px", overflowY:"auto", background:"white" }}>
+            {results.map((r, i) => (
+              <button key={i} type="button" onClick={() => pick(r)}
+                style={{ display:"flex", alignItems:"center", gap:"8px", width:"100%", textAlign:"left", padding:"8px 16px",
+                  borderBottom: i < results.length-1 ? "1px solid #f9fafb" : "none",
+                  background:"none", cursor:"pointer", border:"none" }}
+                onMouseEnter={(e) => e.currentTarget.style.background="#f5f3ff"}
+                onMouseLeave={(e) => e.currentTarget.style.background="none"}>
+                <span style={{ fontSize:"14px", flexShrink:0, color:"#7c3aed" }}>📍</span>
+                <div style={{ overflow:"hidden", flex:1 }}>
+                  <div style={{ fontWeight:600, fontSize:"11px", color:"#111827", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                    {r.name || r.display_name.split(",")[0]}
+                  </div>
+                  <div style={{ fontSize:"9px", color:"#9ca3af", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", marginTop:"1px" }}>
+                    {r.display_name.split(",").slice(1, 3).join(",")}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ─── Map ────────────────────────────────────── */}
+        <div style={{ height:"260px", width:"100%", flexShrink:0, position:"relative" }}>
+          <MapBox position={position} onMapClick={handleMapClick} />
+        </div>
+
+        {/* ─── Selected address + Actions ─────────────── */}
+        <div style={{ padding:"12px 16px", borderTop:"1px solid #f3f4f6", background:"#fafafa", display:"flex", alignItems:"center", gap:"10px", flexShrink:0 }}>
+          <div style={{ flex:1, minWidth:0 }}>
+            {address ? (
+              <div style={{ display:"flex", alignItems:"center", gap:"6px" }}>
+                <span style={{ color:"#7c3aed", fontSize:"13px", flexShrink:0 }}>📍</span>
+                <p style={{ fontSize:"10px", color:"#374151", lineHeight:"1.4", margin:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{address}</p>
+              </div>
+            ) : (
+              <p style={{ fontSize:"10px", color:"#9ca3af", margin:0, fontStyle:"italic" }}>Tap on the map or search to select a location</p>
+            )}
+          </div>
+          <div style={{ display:"flex", gap:"6px", flexShrink:0 }}>
+            <button type="button" onClick={() => { setShowMap(false); setResults([]); }}
+              style={{ padding:"7px 14px", border:"1.5px solid #e5e7eb", background:"white", color:"#374151", borderRadius:"10px", fontSize:"11px", fontWeight:600, cursor:"pointer" }}>
+              Cancel
+            </button>
+            <button type="button" onClick={() => { setShowMap(false); setResults([]); }} disabled={!position}
+              style={{ padding:"7px 16px", background: position ? "#7c3aed" : "#d1d5db", color:"white", border:"none", borderRadius:"10px", fontSize:"11px", fontWeight:700, cursor: position ? "pointer" : "not-allowed" }}>
+              ✓ Confirm
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Coords display */}
+      <style>{`
+        @keyframes fadeInScale {
+          from { opacity: 0; transform: scale(0.95); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
+    </div>,
+    document.body
+  ) : null;
+
+  return (
+    <div>
+      <div style={{ display:"flex", gap:"8px" }}>
+        <input type="text" readOnly value={address}
+          placeholder="Click to select location on map…"
+          onClick={() => setShowMap(true)}
+          style={{ flex:1, padding:"9px 12px", border:"1.5px solid #e5e7eb", borderRadius:"10px", fontSize:"12px", background:"#fafafa", color:"#374151", cursor:"pointer", outline:"none", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
+        />
+        <button type="button" onClick={() => setShowMap(true)}
+          style={{ padding:"9px 14px", background:"#7c3aed", color:"white", border:"none", borderRadius:"10px", fontSize:"11px", fontWeight:700, cursor:"pointer", whiteSpace:"nowrap", display:"flex", alignItems:"center", gap:"5px" }}>
+          📍 Pick
+        </button>
+      </div>
       {position && (
-        <p className="text-[10px] text-gray-400 font-medium">
+        <p style={{ fontSize:"10px", color:"#9ca3af", marginTop:"4px" }}>
           📍 {position[0].toFixed(6)}, {position[1].toFixed(6)}
         </p>
       )}
-
-      {/* Map Modal */}
-      {showMap && (
-        <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
-              <div>
-                <p className="text-sm font-bold text-gray-900">Pick Doctor Location</p>
-                <p className="text-[11px] text-gray-400 mt-0.5">Search, use GPS, or click on the map to drop a pin</p>
-              </div>
-              <button onClick={() => setShowMap(false)}
-                className="text-gray-400 hover:text-gray-700 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-xl">×</button>
-            </div>
-
-            {/* Search + GPS row */}
-            <div className="flex gap-2 px-5 py-3 border-b border-gray-100">
-              <div className="flex gap-2 flex-1">
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleSearchSubmit())}
-                  placeholder="Search: Apollo Hospital Hyderabad…"
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-purple-200"
-                />
-                <button type="button" onClick={handleSearchSubmit} disabled={searching}
-                  className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50">
-                  {searching ? "…" : "Search"}
-                </button>
-              </div>
-              <button type="button" onClick={handleUseGPS} disabled={gpsLoading}
-                className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition-all disabled:opacity-50 whitespace-nowrap">
-                {gpsLoading
-                  ? <span className="animate-spin">🔄</span>
-                  : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a10 10 0 100 20A10 10 0 0012 2zm0 0v4m0 12v4M2 12h4m12 0h4" /></svg>
-                }
-                My Location
-              </button>
-            </div>
-
-            {/* Map */}
-            <div style={{ height: "380px" }}>
-              <MapWithNoSSR
-                position={position}
-                onMapClick={handleMapClick}
-              />
-            </div>
-
-            {/* Selected address */}
-            {address && (
-              <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex items-start gap-2">
-                <svg className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                </svg>
-                <p className="text-xs text-gray-600 leading-relaxed flex-1">{address}</p>
-              </div>
-            )}
-
-            {/* Confirm button */}
-            <div className="px-5 py-3 border-t border-gray-100 flex justify-end gap-2">
-              <button type="button" onClick={() => setShowMap(false)}
-                className="px-4 py-2 border border-gray-200 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-50">
-                Cancel
-              </button>
-              <button type="button" onClick={() => setShowMap(false)}
-                disabled={!position}
-                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-sm disabled:opacity-50">
-                ✓ Confirm Location
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {modal}
     </div>
   );
 }

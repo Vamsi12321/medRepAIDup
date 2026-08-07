@@ -3,7 +3,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import QueryProvider from "@/components/QueryProvider";
 
 export const metadata = {
-  title: "MedRepAI - AI-Powered Pharma Intelligence Platform",
+  title: "MRX - AI-Powered Pharma Intelligence Platform",
   description: "Connect medical reps, doctors, and pharma companies. Track visits, measure SFE, forecast demand, and grow prescriptions — all powered by AI.",
 };
 

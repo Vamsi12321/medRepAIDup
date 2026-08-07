@@ -8,6 +8,102 @@ import { get, put, post, del } from "@/lib/api";
 import { formatISTDate, formatISTDateTime } from "@/lib/time";
 import { TableSkeleton } from "@/components/Skeleton";
 import { downloadCSVTemplate } from "@/lib/downloadTemplate";
+import Link from "next/link";
+
+// ── Zone → States → Territories Data ─────────────────────────────────────────
+const ZONE_STATES = {
+  North: ["Delhi", "Haryana", "Himachal Pradesh", "Jammu & Kashmir", "Punjab", "Rajasthan", "Uttar Pradesh", "Uttarakhand", "Chandigarh", "Ladakh"],
+  South: ["Andhra Pradesh", "Karnataka", "Kerala", "Tamil Nadu", "Telangana", "Puducherry", "Lakshadweep"],
+  East: ["Bihar", "Jharkhand", "Odisha", "West Bengal", "Assam", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Sikkim", "Tripura", "Arunachal Pradesh"],
+  West: ["Gujarat", "Goa", "Maharashtra", "Dadra & Nagar Haveli", "Daman & Diu"],
+  Central: ["Madhya Pradesh", "Chhattisgarh"],
+};
+
+const STATE_TERRITORIES = {
+  "Telangana": ["Hyderabad", "Warangal", "Nizamabad", "Karimnagar", "Khammam", "Mahbubnagar", "Nalgonda", "Adilabad", "Medak", "Rangareddy"],
+  "Andhra Pradesh": ["Visakhapatnam", "Vijayawada", "Guntur", "Nellore", "Kurnool", "Tirupati", "Rajahmundry", "Kakinada", "Anantapur", "Eluru"],
+  "Karnataka": ["Bangalore", "Mysore", "Hubli-Dharwad", "Mangalore", "Belgaum", "Gulbarga", "Davangere", "Bellary", "Shimoga", "Tumkur"],
+  "Tamil Nadu": ["Chennai", "Coimbatore", "Madurai", "Tiruchirappalli", "Salem", "Tirunelveli", "Erode", "Vellore", "Thoothukudi", "Dindigul"],
+  "Kerala": ["Thiruvananthapuram", "Kochi", "Kozhikode", "Thrissur", "Kollam", "Palakkad", "Kannur", "Alappuzha", "Malappuram", "Kottayam"],
+  "Maharashtra": ["Mumbai", "Pune", "Nagpur", "Thane", "Nashik", "Aurangabad", "Solapur", "Kolhapur", "Amravati", "Nanded"],
+  "Gujarat": ["Ahmedabad", "Surat", "Vadodara", "Rajkot", "Bhavnagar", "Jamnagar", "Junagadh", "Gandhinagar", "Anand", "Mehsana"],
+  "Rajasthan": ["Jaipur", "Jodhpur", "Udaipur", "Kota", "Ajmer", "Bikaner", "Bhilwara", "Alwar", "Sikar", "Pali"],
+  "Uttar Pradesh": ["Lucknow", "Kanpur", "Agra", "Varanasi", "Meerut", "Allahabad", "Bareilly", "Aligarh", "Moradabad", "Ghaziabad"],
+  "Delhi": ["North Delhi", "South Delhi", "East Delhi", "West Delhi", "Central Delhi", "New Delhi"],
+  "West Bengal": ["Kolkata", "Howrah", "Durgapur", "Asansol", "Siliguri", "Bardhaman", "Malda", "Kharagpur", "Haldia", "Baharampur"],
+  "Bihar": ["Patna", "Gaya", "Bhagalpur", "Muzaffarpur", "Darbhanga", "Purnia", "Arrah", "Begusarai", "Katihar", "Munger"],
+  "Punjab": ["Ludhiana", "Amritsar", "Jalandhar", "Patiala", "Bathinda", "Mohali", "Hoshiarpur", "Pathankot", "Moga", "Batala"],
+  "Haryana": ["Gurgaon", "Faridabad", "Panipat", "Ambala", "Karnal", "Hisar", "Rohtak", "Sonipat", "Yamunanagar", "Panchkula"],
+  "Madhya Pradesh": ["Bhopal", "Indore", "Jabalpur", "Gwalior", "Ujjain", "Sagar", "Dewas", "Satna", "Ratlam", "Rewa"],
+  "Odisha": ["Bhubaneswar", "Cuttack", "Rourkela", "Berhampur", "Sambalpur", "Puri", "Balasore", "Bhadrak", "Baripada", "Jharsuguda"],
+  "Jharkhand": ["Ranchi", "Jamshedpur", "Dhanbad", "Bokaro", "Hazaribagh", "Deoghar", "Giridih", "Ramgarh", "Dumka", "Phusro"],
+  "Chhattisgarh": ["Raipur", "Bhilai", "Bilaspur", "Korba", "Durg", "Rajnandgaon", "Raigarh", "Jagdalpur", "Ambikapur", "Dhamtari"],
+  "Assam": ["Guwahati", "Silchar", "Dibrugarh", "Nagaon", "Tinsukia", "Jorhat", "Tezpur", "Bongaigaon", "Karimganj", "Dhubri"],
+  "Goa": ["Panaji", "Margao", "Vasco da Gama", "Mapusa", "Ponda"],
+  "Himachal Pradesh": ["Shimla", "Manali", "Dharamsala", "Solan", "Mandi", "Kullu", "Hamirpur", "Una", "Bilaspur", "Palampur"],
+  "Uttarakhand": ["Dehradun", "Haridwar", "Rishikesh", "Nainital", "Haldwani", "Roorkee", "Rudrapur", "Kashipur", "Almora", "Mussoorie"],
+};
+
+function getStatesForZone(zone) {
+  if (!zone) return Object.values(ZONE_STATES).flat().sort();
+  return ZONE_STATES[zone] || [];
+}
+
+function getTerritoriesForState(state) {
+  if (!state) return [];
+  return STATE_TERRITORIES[state] || [state]; // fallback: use state name itself
+}
+
+// ── Searchable Dropdown ───────────────────────────────────────────────────────
+function SearchableDropdown({ value, onChange, placeholder, options }) {
+  const [open, setOpen] = React.useState(false);
+  const [search, setSearch] = React.useState("");
+  const ref = React.useRef(null);
+
+  React.useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = search.trim()
+    ? options.filter((o) => o.toLowerCase().includes(search.toLowerCase()))
+    : options;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => setOpen(!open)}
+        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm text-left bg-white flex items-center justify-between focus:ring-2 focus:ring-orange-400 outline-none">
+        <span className={value ? "text-gray-800" : "text-gray-400"}>{value || placeholder}</span>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-hidden flex flex-col">
+          <div className="p-2 border-b border-gray-100 flex-shrink-0">
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Type to search..." autoFocus
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-orange-200" />
+          </div>
+          <div className="overflow-y-auto flex-1">
+            {value && (
+              <button type="button" onClick={() => { onChange(""); setOpen(false); setSearch(""); }}
+                className="w-full text-left px-4 py-2 text-xs text-gray-400 hover:bg-gray-50 border-b border-gray-50">✕ Clear</button>
+            )}
+            {filtered.length === 0 ? (
+              <p className="px-4 py-3 text-xs text-gray-400 text-center">No matches</p>
+            ) : filtered.map((o) => (
+              <button key={o} type="button" onClick={() => { onChange(o); setOpen(false); setSearch(""); }}
+                className={`w-full text-left px-4 py-2 text-xs hover:bg-orange-50 transition-colors ${value === o ? "bg-orange-50 text-orange-700 font-semibold" : "text-gray-700"}`}>
+                {o}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const formatLoc = (loc) => loc && typeof loc === "object" ? loc.location_name || loc.temporary_location?.name || "" : loc || "";
 
 const MR_HEADERS = ["name","email","phone","territory"];
 const MR_SAMPLE  = [["Rajesh Kumar","rajesh@company.com","+919876543210","Mumbai North"]];
@@ -143,7 +239,6 @@ export default function CompanyMedicalReps() {
   const [showModal, setShowModal]       = useState(false);
   const [selectedMR, setSelectedMR]     = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
-  const [visitsMR, setVisitsMR]         = useState(null);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [filterTerritory, setFilterTerritory] = useState("");
   const [filterStatus, setFilterStatus]       = useState("all");
@@ -156,7 +251,7 @@ export default function CompanyMedicalReps() {
       return [];
     }),
     gcTime: 30 * 60 * 1000,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 7 * 60 * 1000,
     placeholderData: (prev) => prev,
     retry: 2,
   });
@@ -286,14 +381,14 @@ export default function CompanyMedicalReps() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <button onClick={() => setVisitsMR(mr)}
-                        className="bg-purple-100 text-purple-600 px-2.5 py-1 rounded-lg font-semibold hover:bg-purple-200 transition-all text-xs">
+                      <Link href={`/company/medical-reps/${mr.id}/visits`}
+                        className="bg-purple-100 text-purple-600 px-2.5 py-1 rounded-lg font-semibold hover:bg-purple-200 transition-all text-xs flex items-center justify-center">
                         Visits
-                      </button>
+                      </Link>
                       <button onClick={() => handleToggleStatus(mr)}
-                        className={`relative w-9 h-5 rounded-full transition-colors duration-300 ${mr.is_active ? "bg-green-500" : "bg-gray-300"}`}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full p-0.5 transition-colors duration-300 focus:outline-none ${mr.is_active ? "bg-green-500" : "bg-gray-300"}`}
                         title={mr.is_active ? "Active — click to deactivate" : "Inactive — click to activate"}>
-                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-300 ${mr.is_active ? "translate-x-4" : "translate-x-0.5"}`} />
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-300 ${mr.is_active ? "translate-x-4" : "translate-x-0"}`} />
                       </button>
                       <button onClick={() => { setSelectedMR(mr); setShowModal(true); }}
                         className="bg-blue-100 text-blue-600 px-2.5 py-1 rounded-lg font-semibold hover:bg-blue-200 transition-all text-xs">
@@ -364,10 +459,6 @@ export default function CompanyMedicalReps() {
           </>
         )}
       </main>
-
-      {visitsMR && (
-        <MRVisitsPanel mr={visitsMR} onClose={() => setVisitsMR(null)} />
-      )}
 
       {showBulkModal && <MRBulkUploadModal onClose={() => setShowBulkModal(false)} onSuccess={invalidate} />}
 
@@ -452,7 +543,7 @@ function MRModal({ mr, onClose, onSaved }) {
       .then((data) => {
         const drugs = (data.drugs || []).map((d) => ({
           id: d._id || d.id,
-          name: d.name || d.field_values?.find((f) => f.key === "brand_name")?.value || d.field_values?.find((f) => f.key === "name")?.value || "Unknown Drug",
+          name: d.name || d.drug_name || d.field_values?.find((f) => f.key === "drug_name")?.value || d.field_values?.find((f) => f.key === "brand_name")?.value || "Unknown Drug",
         }));
         setAllDrugs(drugs);
       })
@@ -590,29 +681,33 @@ function MRModal({ mr, onClose, onSaved }) {
             {field("Phone", "phone", "tel", "+91 98765 43210", true)}
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1.5">Zone <span className="text-red-500">*</span></label>
-              <select value={form.zone} onChange={(e) => setForm({ ...form, zone: e.target.value })} required
+              <select value={form.zone} onChange={(e) => setForm({ ...form, zone: e.target.value, state: "", territory: "" })} required
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-400 focus:border-transparent text-sm outline-none bg-white">
                 <option value="">Select Zone</option>
+                <option value="North">North</option>
                 <option value="South">South</option>
+                <option value="East">East</option>
+                <option value="West">West</option>
+                <option value="Central">Central</option>
               </select>
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1.5">State <span className="text-red-500">*</span></label>
-              <select value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} required
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-400 focus:border-transparent text-sm outline-none bg-white">
-                <option value="">Select State</option>
-                <option value="Telangana">Telangana</option>
-                <option value="Andhra Pradesh">Andhra Pradesh</option>
-              </select>
+              <SearchableDropdown
+                value={form.state}
+                onChange={(v) => setForm({ ...form, state: v, territory: "" })}
+                placeholder="Search state..."
+                options={getStatesForZone(form.zone)}
+              />
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1.5">Territory <span className="text-red-500">*</span></label>
-              <select value={form.territory} onChange={(e) => setForm({ ...form, territory: e.target.value })} required
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-400 focus:border-transparent text-sm outline-none bg-white">
-                <option value="">Select Territory</option>
-                <option value="Hyderabad">Hyderabad</option>
-                <option value="Visakhapatnam">Visakhapatnam</option>
-              </select>
+              <SearchableDropdown
+                value={form.territory}
+                onChange={(v) => setForm({ ...form, territory: v })}
+                placeholder="Search territory..."
+                options={getTerritoriesForState(form.state)}
+              />
             </div>
           </div>
 
@@ -760,340 +855,3 @@ const STATUS_STYLES = {
   cancelled: { bg: "bg-red-100",   text: "text-red-600",   label: "Cancelled" },
 };
 
-function MRVisitsPanel({ mr, onClose }) {
-  const [visits, setVisits] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState("");
-  const [filterDoctor, setFilterDoctor] = useState("");
-
-  const assignedDoctors = mr.assigned_doctors || [];
-
-  useEffect(() => {
-    setLoading(true);
-    const params = new URLSearchParams({ mr_id: mr.id });
-    if (filterStatus) params.append("status",    filterStatus);
-    if (filterDoctor) params.append("doctor_id", filterDoctor);
-    get(`/api/v1/visits?${params}`)
-      .then((data) => setVisits(data.visits || []))
-      .catch(() => setVisits([]))
-      .finally(() => setLoading(false));
-  }, [mr.id, filterStatus, filterDoctor]);
-
-  const total      = visits.length;
-  const scheduled  = visits.filter((v) => v.status === "scheduled").length;
-  const completed  = visits.filter((v) => v.status === "completed").length;
-  const cancelled  = visits.filter((v) => v.status === "cancelled").length;
-  const successRate = total ? Math.round((completed / total) * 100) : 0;
-
-  return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-black/40" onClick={onClose} />
-
-      {/* Panel */}
-      <div className="w-full max-w-lg bg-[#fafbfd] shadow-2xl flex flex-col h-full overflow-hidden border-l border-gray-200 animate-[fadeSlide_0.25s_ease-out]">
-
-        {/* Header — clean white */}
-        <div className="bg-white p-5 flex-shrink-0 border-b border-gray-100">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 bg-purple-50 rounded-full flex items-center justify-center text-purple-600 font-bold text-base border border-purple-100">
-                {mr.name?.charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <h2 className="text-lg font-extrabold text-gray-900">{mr.name}</h2>
-                <div className="flex items-center gap-2 mt-0.5">
-                  {mr.territory && <span className="text-[11px] text-gray-500">{mr.territory}</span>}
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${mr.is_active ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-gray-100 text-gray-500"}`}>
-                    {mr.is_active ? "Active" : "Inactive"}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg p-1.5 transition-all">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Stats row */}
-          <div className="grid grid-cols-4 gap-2">
-            {[
-              { label: "Total", value: total, color: "text-gray-900" },
-              { label: "Scheduled", value: scheduled, color: "text-blue-600" },
-              { label: "Completed", value: completed, color: "text-emerald-600" },
-              { label: "Cancelled", value: cancelled, color: "text-red-500" },
-            ].map((s) => (
-              <div key={s.label} className="bg-gray-50 rounded-xl p-2.5 text-center border border-gray-100">
-                <p className={`text-lg font-extrabold ${s.color}`}>{s.value}</p>
-                <p className="text-[9px] text-gray-400 font-medium uppercase">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Success rate */}
-        {total > 0 && (
-          <div className="px-5 py-3 bg-white border-b border-gray-100 flex-shrink-0">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] text-gray-500 font-medium">Success Rate</span>
-              <span className="text-[11px] font-bold text-emerald-600">{successRate}%</span>
-            </div>
-            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${successRate}%` }} />
-            </div>
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="px-5 py-3 bg-white border-b border-gray-100 flex-shrink-0 space-y-2.5">
-          {assignedDoctors.length > 0 && (
-            <select value={filterDoctor} onChange={(e) => setFilterDoctor(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-purple-200 bg-white text-gray-700">
-              <option value="">All Doctors</option>
-              {assignedDoctors.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-          )}
-          <div className="flex gap-1.5">
-            {["", "scheduled", "completed", "cancelled"].map((s) => {
-              const count = s ? visits.filter((v) => v.status === s).length : total;
-              return (
-                <button key={s} onClick={() => setFilterStatus(s)}
-                  className={`flex-1 py-2 rounded-full text-[10px] font-bold transition-all ${
-                    filterStatus === s ? "bg-purple-600 text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                  }`}>
-                  {s ? (STATUS_STYLES[s]?.label || s) : "All"} ({count})
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Visit list */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {loading ? (
-            <div className="space-y-3">
-              {[1,2,3].map((i) => (
-                <div key={i} className="bg-white rounded-2xl p-4 animate-pulse">
-                  <div className="flex justify-between mb-3">
-                    <div className="space-y-1.5">
-                      <div className="h-3.5 bg-gray-200 rounded w-32" />
-                      <div className="h-2.5 bg-gray-100 rounded w-20" />
-                    </div>
-                    <div className="h-6 bg-gray-200 rounded-full w-20" />
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[1,2,3].map((j) => <div key={j} className="h-10 bg-gray-100 rounded-lg" />)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : visits.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <span className="text-3xl">📅</span>
-              </div>
-              <p className="text-gray-500 font-semibold text-sm">No visits found</p>
-              <p className="text-gray-400 text-xs mt-1">Try changing the filters</p>
-            </div>
-          ) : (
-            visits.map((visit) => {
-              const s = STATUS_STYLES[visit.status] || STATUS_STYLES.scheduled;
-              const report = visit.report || {};
-              const isNegative = report.doctor_mood === "negative";
-              return (
-                <VisitDetailCard key={visit.id} visit={visit} s={s} report={report} isNegative={isNegative} />
-              );
-            })
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function VisitDetailCard({ visit, s, report, isNegative }) {
-  const [expanded, setExpanded] = useState(false);
-
-  const MOOD = {
-    positive: { icon: "😊", label: "Positive", cls: "bg-green-100 text-green-700" },
-    neutral:  { icon: "😐", label: "Neutral",  cls: "bg-yellow-100 text-yellow-700" },
-    negative: { icon: "😞", label: "Negative", cls: "bg-red-100 text-red-700" },
-  };
-
-  const to12hLocal = (t) => {
-    if (!t) return "—";
-    const [h, m] = t.split(":").map(Number);
-    const ampm = h >= 12 ? "PM" : "AM";
-    const hour = h % 12 || 12;
-    return `${hour}:${String(m).padStart(2, "0")} ${ampm}`;
-  };
-
-  // Convert UTC timestamp to IST time string
-  const toIST = (ts) => {
-    if (!ts) return "—";
-    const s = String(ts);
-    const d = s.endsWith("Z") || s.includes("+") ? new Date(s) : new Date(s + "Z");
-    if (isNaN(d)) return "—";
-    return d.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: true });
-  };
-
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all">
-      <div className={`h-1 w-full ${
-        visit.status === "completed" ? (isNegative ? "bg-red-400" : "bg-green-400") :
-        visit.status === "cancelled" ? "bg-red-300" : "bg-blue-400"
-      }`} />
-
-      <button onClick={() => setExpanded(!expanded)} className="w-full p-4 text-left">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl flex items-center justify-center text-sm font-bold text-indigo-600 flex-shrink-0">
-              {visit.doctor_name?.charAt(0)}
-            </div>
-            <div>
-              <p className="font-bold text-gray-800 text-sm">{visit.doctor_name}</p>
-              <p className="text-xs text-gray-400">{visit.purpose}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${s.bg} ${s.text} flex-shrink-0`}>{s.label}</span>
-            <span className="text-gray-400 text-xs">{expanded ? "▲" : "▼"}</span>
-          </div>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            { icon: "📅", label: "Date", value: visit.scheduled_date },
-            { icon: "⏰", label: "Time", value: to12hLocal(visit.scheduled_time) },
-            { icon: "📍", label: "Location", value: visit.location || "—" },
-          ].map((row) => (
-            <div key={row.label} className="bg-gray-50 rounded-xl p-2 border border-gray-100">
-              <p className="text-gray-400 text-xs mb-0.5">{row.icon} {row.label}</p>
-              <p className="font-semibold text-gray-700 text-xs truncate">{row.value}</p>
-            </div>
-          ))}
-        </div>
-      </button>
-
-      {expanded && (
-        <div className="border-t border-gray-100 p-4 bg-gray-50/50 space-y-3">
-          {/* Check-in / Check-out */}
-          {(visit.check_in || visit.check_out) && (
-            <div className="grid grid-cols-2 gap-2">
-              {visit.check_in && (
-                <div className="bg-white rounded-lg p-2.5 border border-gray-100">
-                  <p className="text-[10px] text-gray-400 font-medium">📍 Check-In</p>
-                  <p className="text-xs font-semibold text-gray-700">{toIST(visit.check_in.timestamp)}</p>
-                  <p className="text-[9px] text-gray-400 font-mono">{visit.check_in.latitude?.toFixed(5)}, {visit.check_in.longitude?.toFixed(5)}</p>
-                </div>
-              )}
-              {visit.check_out && (
-                <div className="bg-white rounded-lg p-2.5 border border-gray-100">
-                  <p className="text-[10px] text-gray-400 font-medium">🏁 Check-Out</p>
-                  <p className="text-xs font-semibold text-gray-700">{toIST(visit.check_out.timestamp)}</p>
-                  <p className="text-[9px] text-gray-400 font-mono">{visit.check_out.latitude?.toFixed(5)}, {visit.check_out.longitude?.toFixed(5)}</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {visit.duration_minutes > 0 && (
-            <div className="bg-white rounded-lg px-3 py-2 border border-gray-100 inline-block">
-              <span className="text-xs text-gray-500">⏱️ Duration: </span>
-              <span className="text-xs font-bold text-gray-800">{visit.duration_minutes} min</span>
-            </div>
-          )}
-
-          {/* Report details */}
-          {visit.status === "completed" && Object.keys(report).length > 0 && (
-            <div className="space-y-2.5">
-              {report.doctor_mood && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">Doctor Mood:</span>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold ${MOOD[report.doctor_mood]?.cls || "bg-gray-100 text-gray-600"}`}>
-                    {MOOD[report.doctor_mood]?.icon} {MOOD[report.doctor_mood]?.label || report.doctor_mood}
-                  </span>
-                </div>
-              )}
-
-              {(report.products_discussed || []).length > 0 && (
-                <div>
-                  <p className="text-[10px] text-gray-400 font-medium mb-1">💊 Products Discussed</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {report.products_discussed.map((p, i) => (
-                      <span key={i} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md font-medium">{typeof p === "string" ? p : p.name}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-2">
-                {report.samples_given > 0 && (
-                  <div className="bg-white rounded-lg px-2.5 py-1.5 border border-gray-100">
-                    <p className="text-[10px] text-gray-400">Samples Given</p>
-                    <p className="text-xs font-bold text-gray-800">{report.samples_given}</p>
-                  </div>
-                )}
-                {report.rx_commitment != null && (
-                  <div className="bg-white rounded-lg px-2.5 py-1.5 border border-gray-100">
-                    <p className="text-[10px] text-gray-400">Rx Commitment</p>
-                    <p className={"text-xs font-bold " + (report.rx_commitment ? "text-green-700" : "text-gray-500")}>
-                      {report.rx_commitment ? `Yes (${report.expected_rx_per_month || "—"}/month)` : "No"}
-                    </p>
-                  </div>
-                )}
-                {report.competitor_info && (
-                  <div className="bg-white rounded-lg px-2.5 py-1.5 border border-red-100">
-                    <p className="text-[10px] text-red-400">Competitor</p>
-                    <p className="text-xs font-bold text-red-700">{report.competitor_info}</p>
-                  </div>
-                )}
-                {report.follow_up_date && (
-                  <div className="bg-white rounded-lg px-2.5 py-1.5 border border-gray-100">
-                    <p className="text-[10px] text-gray-400">Follow-up</p>
-                    <p className="text-xs font-bold text-purple-700">{formatISTDate(report.follow_up_date)}</p>
-                  </div>
-                )}
-              </div>
-
-              {report.outcome && (
-                <div className={`rounded-lg px-3 py-2 border-l-3 ${isNegative ? "border-l-red-400 bg-red-50 border border-red-100" : "border-l-green-400 bg-green-50 border border-green-100"}`}>
-                  <p className="text-[10px] text-gray-400 font-medium mb-0.5">Outcome</p>
-                  <p className={`text-xs font-medium ${isNegative ? "text-red-700" : "text-green-700"}`}>{report.outcome}</p>
-                </div>
-              )}
-
-              {report.notes && (
-                <div className="bg-white rounded-lg px-3 py-2 border-l-3 border-l-gray-300 border border-gray-100">
-                  <p className="text-[10px] text-gray-400 font-medium mb-0.5">Report Notes</p>
-                  <p className="text-xs text-gray-600 italic">{report.notes}</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {visit.notes && (
-            <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-              <p className="text-[10px] text-amber-500 font-medium mb-0.5">📝 Visit Notes</p>
-              <p className="text-xs text-amber-800">{visit.notes}</p>
-            </div>
-          )}
-
-          {visit.status === "cancelled" && visit.cancel_reason && (
-            <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-              <p className="text-[10px] text-red-400 font-medium mb-0.5">🚫 Cancel Reason</p>
-              <p className="text-xs text-red-600">{visit.cancel_reason}</p>
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-3 text-[10px] text-gray-400 pt-1">
-            <span>Created: {formatISTDateTime(visit.created_at)}</span>
-            {visit.completed_at && <span>Completed: {formatISTDateTime(visit.completed_at)}</span>}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}

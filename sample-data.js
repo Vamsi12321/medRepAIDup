@@ -74,7 +74,7 @@ const sampleCompanies = [
 // Sample Users
 const sampleUsers = [
   {
-    email: "admin@medrepai.com",
+    email: "admin@mrx.com",
     password: "$2b$10$hashedpassword", // In real app, hash with bcrypt
     role: "admin",
     firstName: "System",

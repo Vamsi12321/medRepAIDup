@@ -6,6 +6,8 @@ import Breadcrumb from "@/components/Breadcrumb";
 import { get, post, put } from "@/lib/api";
 import { formatIST } from "@/lib/time";
 
+const formatLoc = (loc) => loc && typeof loc === "object" ? loc.location_name || loc.temporary_location?.name || "" : loc || "";
+
 const STATUS_STYLES = {
   upcoming:    { bg: "bg-green-100",  text: "text-green-700",  label: "Upcoming" },
   completed:   { bg: "bg-blue-100",   text: "text-blue-700",   label: "Completed" },
@@ -147,7 +149,7 @@ export default function CompanyCMEEvents() {
                           : null,
                         // Fallback to location string if no mode set
                         !event.event_mode && event.location
-                          ? { icon: "📍", label: "Location", value: event.location }
+                          ? { icon: "📍", label: "Location", value: formatLoc(event.location) }
                           : null,
                       ].filter(Boolean).filter((r) => r.value).map((row) => (
                         <div key={row.label} className="flex items-start gap-2 bg-gray-50 rounded-lg px-2.5 py-1.5">
@@ -165,20 +167,13 @@ export default function CompanyCMEEvents() {
                     </div>
 
                     <div className="flex gap-2">
-                      <button onClick={() => { setEditingEvent(event); setShowModal(true); }}
-                        disabled={event.status === "cancelled"}
-                        className="flex-1 bg-blue-100 text-blue-600 py-2 rounded-lg font-semibold hover:bg-blue-200 transition-all text-xs disabled:opacity-40 disabled:cursor-not-allowed">Edit</button>
-                      <button onClick={() => setStatsEvent(event)}
-                        className="flex-1 bg-indigo-100 text-indigo-600 py-2 rounded-lg font-semibold hover:bg-indigo-200 transition-all text-xs">
-                        Registrations
-                      </button>
-                      {event.status === "completed" && !event.event_recording && (
-                        <button onClick={() => { setEditingEvent(event); setFocusRecording(true); setShowModal(true); }}
-                          className="flex-1 bg-purple-100 text-purple-600 py-2 rounded-lg font-semibold hover:bg-purple-200 transition-all text-xs">Upload Recording</button>
-                      )}
+                      <a href={`/company/cme-events/${event._id}`}
+                        className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-2 rounded-lg font-semibold hover:shadow-lg transition-all text-xs text-center">
+                        👁️ View Details
+                      </a>
                       {event.event_recording && (
                         <a href={event.event_recording} target="_blank" rel="noreferrer"
-                          className="flex-1 bg-green-100 text-green-600 py-2 rounded-lg font-semibold hover:bg-green-200 transition-all text-xs text-center">View Recording</a>
+                          className="flex-1 bg-purple-100 text-purple-600 py-2 rounded-lg font-semibold hover:bg-purple-200 transition-all text-xs text-center">▶️ Recording</a>
                       )}
                     </div>
                   </div>
@@ -216,7 +211,7 @@ function EventModal({ editingEvent, focusRecording, onClose, onSaved }) {
     max_attendees:   editingEvent?.max_attendees   || "",
     location:        editingEvent?.location        || "",
     speaker:         editingEvent?.speaker         || "",
-    status:          editingEvent?.status          || "",
+    status:          editingEvent?.status          || "upcoming",
     event_recording: editingEvent?.event_recording || "",
     // event mode fields (derived from location if editing)
     event_mode:      editingEvent?.event_mode      || "",
@@ -250,7 +245,7 @@ function EventModal({ editingEvent, focusRecording, onClose, onSaved }) {
         event_type:    form.event_type,
         speaker:       form.speaker,
         ...(form.max_attendees ? { max_attendees: Number(form.max_attendees) } : {}),
-        ...(form.status        ? { status: form.status }                       : {}),
+        ...(form.status ? { status: form.status } : { status: "upcoming" }),
         // event_mode fields
         ...(form.event_mode ? { event_mode: form.event_mode } : {}),
         ...(form.event_mode === "online" ? {
@@ -407,7 +402,7 @@ function EventModal({ editingEvent, focusRecording, onClose, onSaved }) {
               <label className="block text-xs font-bold text-gray-700 mb-1">Status</label>
               <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-400 outline-none bg-white">
-                <option value="">Auto (based on date)</option>
+                <option value="upcoming">Upcoming</option>
                 {["completed","cancelled","rescheduled"].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
               </select>
             </div>
@@ -450,14 +445,14 @@ function RegistrationsModal({ event, onClose }) {
   const { data: statsData, isLoading: statsLoading } = useQuery({
     queryKey: ["cme-stats", event._id],
     queryFn: () => get(`/api/v1/cme/${event._id}/statistics`),
-    staleTime: 30000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const { data: regsData, isLoading: regsLoading } = useQuery({
-    queryKey: ["cme-registrations", event._id, tab],
-    queryFn: () => get(`/api/v1/cme/${event._id}/registrations?status=${tab === "cancelled" ? "cancelled" : "registered"}&limit=100`),
+    queryKey: ["cme-registrations", event._id],
+    queryFn: () => get(`/api/v1/cme/${event._id}/registrations?limit=100`),
     enabled: tab !== "stats",
-    staleTime: 30000,
+    staleTime: 7 * 60 * 1000,
   });
 
   const stats = statsData || {};

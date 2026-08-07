@@ -1,6 +1,8 @@
-﻿"use client";
+"use client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { get, post as apiPost, del } from "@/lib/api";
+
+const formatLoc = (loc) => loc && typeof loc === "object" ? loc.location_name || loc.temporary_location?.name || "" : loc || "";
 
 export default function UserProfileModal({ userId, onClose }) {
   const queryClient = useQueryClient();
@@ -8,7 +10,7 @@ export default function UserProfileModal({ userId, onClose }) {
   const { data: profile, isLoading } = useQuery({
     queryKey: ["user-profile", userId],
     queryFn: () => get(`/api/v1/profile/${userId}`),
-    staleTime: 60000,
+    staleTime: 7 * 60 * 1000,
     enabled: !!userId,
   });
 
@@ -63,7 +65,7 @@ export default function UserProfileModal({ userId, onClose }) {
               <p className={`text-sm font-semibold mt-0.5 ${isDoctor ? "text-indigo-600" : "text-orange-600"}`}>
                 {isDoctor ? (profile?.specialization || "Doctor") : "Medical Representative"}
               </p>
-              {profile?.location && <p className="text-xs text-gray-400 mt-1">{profile.location}</p>}
+              {formatLoc(profile?.location) && <p className="text-xs text-gray-400 mt-1">{formatLoc(profile.location)}</p>}
               {profile?.bio && <p className="text-gray-600 text-sm mt-3 leading-relaxed">{profile.bio}</p>}
 
               <div className="mt-4 space-y-2">

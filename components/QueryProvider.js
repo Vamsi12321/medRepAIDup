@@ -7,7 +7,7 @@ export default function QueryProvider({ children }) {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime:            5 * 60 * 1000,
+        staleTime:            7 * 60 * 1000,  // 7 minutes
         gcTime:               30 * 60 * 1000,
         retry:                1,
         refetchOnWindowFocus: false,

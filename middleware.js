@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 
 // Routes that don't require authentication
-const PUBLIC_PATHS = ["/login", "/forgot-password", "/api/"];
+const PUBLIC_PATHS = ["/login", "/admin/login", "/forgot-password", "/api/"];
 
 // Role-based route prefixes — each role can only access its own section
 const ROLE_ROUTES = {
-  doctor:  ["/doctor"],
   company: ["/company"],
   mr:      ["/mr"],
   admin:   ["/admin"],
@@ -26,9 +25,8 @@ export function middleware(request) {
     pathname.startsWith("/favicon")
   ) {
     // If already logged in and visiting login or landing, redirect to dashboard
-    if (token && userRole && (pathname === "/" || pathname === "/login")) {
+    if (token && userRole && (pathname === "/" || pathname === "/login" || pathname === "/admin/login")) {
       const redirectMap = {
-        doctor:  "/doctor/home",
         company: "/company/overview",
         mr:      "/mr/dashboard",
         admin:   "/admin/dashboard",
@@ -62,7 +60,6 @@ export function middleware(request) {
     if (!isAllowed) {
       // Redirect to their own dashboard instead of showing forbidden
       const redirectMap = {
-        doctor:  "/doctor/home",
         company: "/company/overview",
         mr:      "/mr/dashboard",
         admin:   "/admin/dashboard",

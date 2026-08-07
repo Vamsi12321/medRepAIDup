@@ -32,7 +32,7 @@ export default function CompanyOverview() {
   const { data, isLoading: loading } = useQuery({
     queryKey: ["dashboard"],
     queryFn:  () => get("/api/v1/dashboard"),
-    staleTime: 2 * 60 * 1000, // dashboard refreshes every 2 min
+    staleTime: 7 * 60 * 1000, // dashboard refreshes every 2 min
   });
 
   const stats    = data?.statistics    || null;

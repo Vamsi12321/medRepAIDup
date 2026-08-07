@@ -1,6 +1,11 @@
 "use client";
 import { formatISTDate, formatISTTime } from "@/lib/time";
 
+const formatLoc = (loc) =>
+  loc && typeof loc === "object"
+    ? loc.location_name || loc.temporary_location?.name || loc.name || ""
+    : loc || "";
+
 function buildMCRHTML({ mrInfo, month, year, data, generatedAt }) {
   const s           = data || {};
   const pct         = s.mcr_percentage || 0;
@@ -32,10 +37,9 @@ function buildMCRHTML({ mrInfo, month, year, data, generatedAt }) {
         <td style="padding:6px 10px;font-size:10px;color:#374151;white-space:nowrap;">Visit ${vi + 1}</td>
         <td style="padding:6px 10px;font-size:10px;color:#374151;">${dateStr}</td>
         <td style="padding:6px 10px;font-size:10px;color:#374151;">${v.purpose || "—"}</td>
-        <td style="padding:6px 10px;font-size:10px;color:#374151;">${v.location || "—"}</td>
+        <td style="padding:6px 10px;font-size:10px;color:#374151;">${formatLoc(v.location) || "—"}</td>
         <td style="padding:6px 10px;font-size:10px;color:${mood === "positive" ? "#16a34a" : mood === "negative" ? "#dc2626" : "#374151"};">${mood ? (mood.charAt(0).toUpperCase() + mood.slice(1)) : "—"}</td>
         <td style="padding:6px 10px;font-size:10px;color:#374151;">${v.samples_given ?? "0"}</td>
-        <td style="padding:6px 10px;font-size:10px;color:${v.rx_commitment ? "#16a34a" : "#374151"};">${v.rx_commitment ? `Yes (${v.expected_rx_per_month || "—"}/mo)` : "No"}</td>
         <td style="padding:6px 10px;font-size:10px;color:#374151;">${prods}</td>
         <td style="padding:6px 10px;font-size:10px;color:#374151;">${v.outcome ? v.outcome.slice(0, 60) + (v.outcome.length > 60 ? "…" : "") : "—"}</td>
       </tr>`;
@@ -61,7 +65,6 @@ function buildMCRHTML({ mrInfo, month, year, data, generatedAt }) {
             <th style="padding:6px 10px;text-align:left;font-size:8px;color:#6b7280;font-weight:700;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Location</th>
             <th style="padding:6px 10px;text-align:left;font-size:8px;color:#6b7280;font-weight:700;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Mood</th>
             <th style="padding:6px 10px;text-align:left;font-size:8px;color:#6b7280;font-weight:700;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Samples</th>
-            <th style="padding:6px 10px;text-align:left;font-size:8px;color:#6b7280;font-weight:700;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Rx Commit</th>
             <th style="padding:6px 10px;text-align:left;font-size:8px;color:#6b7280;font-weight:700;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Products</th>
             <th style="padding:6px 10px;text-align:left;font-size:8px;color:#6b7280;font-weight:700;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Outcome</th>
           </tr>
@@ -98,7 +101,7 @@ function buildMCRHTML({ mrInfo, month, year, data, generatedAt }) {
   <table style="width:100%;border-collapse:collapse;background:#111827;padding:0;" cellpadding="0" cellspacing="0">
     <tr>
       <td style="padding:20px 28px 16px;">
-        <div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:2px;margin-bottom:3px;">MedRepAI · MCR Report</div>
+        <div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:2px;margin-bottom:3px;">MRX · MCR Report</div>
         <div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-0.5px;">Monthly Call Report</div>
         <div style="font-size:11px;color:#9ca3af;margin-top:2px;">${monthName} ${year}</div>
       </td>
@@ -216,7 +219,7 @@ function buildMCRHTML({ mrInfo, month, year, data, generatedAt }) {
   <!-- FOOTER -->
   <div style="background:linear-gradient(135deg,#1e3a5f,#1d4ed8);padding:10px 24px;display:flex;justify-content:space-between;align-items:center;">
     <span style="font-size:8px;color:rgba(255,255,255,0.55);">Generated: ${generatedAt}</span>
-    <span style="font-size:8px;color:rgba(255,255,255,0.55);">MedRepAI · Monthly Call Report · CONFIDENTIAL</span>
+    <span style="font-size:8px;color:rgba(255,255,255,0.55);">MRX · Monthly Call Report · CONFIDENTIAL</span>
     <span style="font-size:8px;color:rgba(255,255,255,0.55);">${reportId}</span>
   </div>
 
@@ -276,8 +279,8 @@ export default function MCRPrintTemplate({ mrInfo, month, year, data, onClose })
             <div className="flex items-start justify-between pb-4 mb-0">
               <div className="flex items-center gap-5">
                 <div>
-                  <div style={{ fontSize:"20px", fontWeight:"900", color:"#111827", letterSpacing:"-1px", lineHeight:1 }}>MedRep<span style={{ color:"#1d4ed8" }}>AI</span></div>
-                  <div style={{ fontSize:"9px", color:"#6b7280", marginTop:"3px" }}>Pharma Field Force Management</div>
+                  <div style={{ fontSize:"20px", fontWeight:"900", color:"#111827", letterSpacing:"-1px", lineHeight:1 }}>MR<span style={{ color:"#7c3aed" }}>X</span></div>
+                  <div style={{ fontSize:"9px", color:"#6b7280", marginTop:"3px" }}>Pharma Intelligence Platform</div>
                 </div>
                 <div style={{ width:"1px", height:"44px", background:"#d1d5db" }} />
                 <div>
@@ -342,7 +345,7 @@ export default function MCRPrintTemplate({ mrInfo, month, year, data, onClose })
                     <div className="overflow-x-auto">
                       <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"10px" }}>
                         <thead style={{ background:"#f3f4f6" }}>
-                          <tr>{["#","Date","Purpose","Location","Mood","Samples","Rx Commit","Products","Outcome"].map(h=>(
+                          <tr>{["#","Date","Purpose","Location","Mood","Samples","Products","Outcome"].map(h=>(
                             <th key={h} style={{ padding:"5px 8px", textAlign:"left", fontSize:"8px", color:"#6b7280", fontWeight:"700", textTransform:"uppercase", borderBottom:"1px solid #e5e7eb" }}>{h}</th>
                           ))}</tr>
                         </thead>
@@ -358,11 +361,10 @@ export default function MCRPrintTemplate({ mrInfo, month, year, data, onClose })
                                 <td style={{ padding:"5px 8px", color:"#374151" }}>V{vi+1}</td>
                                 <td style={{ padding:"5px 8px", color:"#374151", whiteSpace:"nowrap" }}>{dateStr}</td>
                                 <td style={{ padding:"5px 8px", color:"#374151" }}>{v.purpose||"—"}</td>
-                                <td style={{ padding:"5px 8px", color:"#374151" }}>{v.location||"—"}</td>
+                                <td style={{ padding:"5px 8px", color:"#374151" }}>{formatLoc(v.location)||"—"}</td>
                                 <td style={{ padding:"5px 8px", color: mood==="positive"?"#16a34a":mood==="negative"?"#dc2626":"#374151" }}>{mood?mood.charAt(0).toUpperCase()+mood.slice(1):"—"}</td>
                                 <td style={{ padding:"5px 8px", color:"#374151" }}>{v.samples_given??0}</td>
-                                <td style={{ padding:"5px 8px", color:v.rx_commitment?"#16a34a":"#374151" }}>{v.rx_commitment?`Yes (${v.expected_rx_per_month||"—"}/mo)`:"No"}</td>
-                                <td style={{ padding:"5px 8px", color:"#374151", maxWidth:"120px" }}>{prods}</td>
+                                <td style={{ padding:"5px 8px", color:"#374151" }}>{prods}</td>
                                 <td style={{ padding:"5px 8px", color:"#374151", maxWidth:"150px" }}>{v.outcome?v.outcome.slice(0,50)+(v.outcome.length>50?"…":""):"—"}</td>
                               </tr>
                             );
@@ -394,7 +396,7 @@ export default function MCRPrintTemplate({ mrInfo, month, year, data, onClose })
 
             {/* Footer */}
             <div style={{ marginTop:"20px", borderTop:"1.5px solid #1d4ed8", paddingTop:"8px", display:"flex", justifyContent:"space-between" }}>
-              <span style={{ fontSize:"8px", color:"#9ca3af" }}>MedRepAI · Monthly Call Report</span>
+              <span style={{ fontSize:"8px", color:"#9ca3af" }}>MRX · Monthly Call Report</span>
               <span style={{ fontSize:"8px", color:"#9ca3af" }}>CONFIDENTIAL</span>
               <span style={{ fontSize:"8px", color:"#9ca3af" }}>Generated: {generatedAt}</span>
             </div>
