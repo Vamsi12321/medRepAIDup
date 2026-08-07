@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import MRSidebar from "@/components/mr/MRSidebar";
@@ -41,7 +41,15 @@ const getGPS = () => new Promise((resolve, reject) => {
   );
 });
 
-export default function MRVisits() {
+export default function MRVisitsPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full" /></div>}>
+      <MRVisits />
+    </Suspense>
+  );
+}
+
+function MRVisits() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const searchParams = useSearchParams();
