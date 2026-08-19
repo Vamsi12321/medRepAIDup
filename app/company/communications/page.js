@@ -51,7 +51,7 @@ export default function AdminCommunications() {
   const createMutation = useMutation({
     mutationFn: (formData) => {
       const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-      return fetch("/api/v1/communications", {
+      return fetch((process.env.NEXT_PUBLIC_BASE_PATH || '') + "/api/v1/communications", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -72,7 +72,7 @@ export default function AdminCommunications() {
     if (!confirm("Deactivate this communication? MRs will no longer see it.")) return;
     try {
       const token = localStorage.getItem("access_token");
-      const res = await fetch(`/api/v1/communications/${id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/v1/communications/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

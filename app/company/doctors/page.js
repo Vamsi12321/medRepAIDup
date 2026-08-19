@@ -27,7 +27,7 @@ function BulkUploadModal({ onClose, onSuccess }) {
       const token = localStorage.getItem("access_token");
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/v1/doctors/bulk-upload", {
+      const res = await fetch((process.env.NEXT_PUBLIC_BASE_PATH || '') + "/api/v1/doctors/bulk-upload", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: fd,
@@ -228,11 +228,11 @@ export default function CompanyDoctors() {
             <p className="text-gray-400 text-sm mt-0.5">Manage healthcare professionals · {total} total</p>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <a href="/company/drx-doctors"
+            <a href={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/company/drx-doctors`}
               className="bg-white text-gray-700 border border-gray-200 px-4 py-2.5 rounded-xl font-bold hover:border-indigo-300 hover:text-indigo-600 transition-all flex items-center gap-1.5 text-xs">
               <span>🌐</span><span>DRX Doctors</span>
             </a>
-            <a href="/company/drx-requests"
+            <a href={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/company/drx-requests`}
               className="bg-white text-gray-700 border border-gray-200 px-4 py-2.5 rounded-xl font-bold hover:border-blue-300 hover:text-blue-600 transition-all flex items-center gap-1.5 text-xs">
               <span>📨</span><span>DRX Requests</span>
             </a>

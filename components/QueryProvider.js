@@ -25,7 +25,7 @@ export default function QueryProvider({ children }) {
 
   const handleDone = () => {
     setShowExpired(false);
-    window.location.href = "/login";
+    window.location.href = (process.env.NEXT_PUBLIC_BASE_PATH || '') + "/login";
   };
 
   return (

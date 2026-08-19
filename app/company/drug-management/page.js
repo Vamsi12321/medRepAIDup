@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
@@ -1303,7 +1303,7 @@ function DrugActiveToggle({ drug, onToggled }) {
       const token = localStorage.getItem("access_token");
       if (isActive) {
         // Deactivate — soft delete via DELETE endpoint
-        const res = await fetch(`/api/v1/drugs/${drug._id}`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/v1/drugs/${drug._id}`, {
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -1322,7 +1322,7 @@ function DrugActiveToggle({ drug, onToggled }) {
           key: fv.key,
           value: fv.value,
         }));
-        const res = await fetch(`/api/v1/drugs/${drug._id}`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/v1/drugs/${drug._id}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -1388,7 +1388,7 @@ function BrochureUploadButton({ drug, onUploaded }) {
       const token = localStorage.getItem("access_token");
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch(`/api/v1/drugs/${drug._id}/brochure`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/v1/drugs/${drug._id}/brochure`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: fd,
@@ -1409,7 +1409,7 @@ function BrochureUploadButton({ drug, onUploaded }) {
     setDeleting(true);
     try {
       const token = localStorage.getItem("access_token");
-      const res = await fetch(`/api/v1/drugs/${drug._id}/brochure`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/v1/drugs/${drug._id}/brochure`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
       });
@@ -1427,7 +1427,7 @@ function BrochureUploadButton({ drug, onUploaded }) {
     setDownloading(true);
     try {
       const token = localStorage.getItem("access_token");
-      const res = await fetch(`/api/v1/drugs/${drug._id}/brochure/download`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/v1/drugs/${drug._id}/brochure/download`, {
         headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
       });
       if (!res.ok) {
@@ -1509,7 +1509,7 @@ function BulkUploadModal({ onClose, onSuccess }) {
   const handleDownload = async () => {
     try {
       const token = localStorage.getItem("access_token");
-      const res = await fetch("/api/v1/drugs/download-template", {
+      const res = await fetch((process.env.NEXT_PUBLIC_BASE_PATH || '') + "/api/v1/drugs/download-template", {
         headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
       });
       if (!res.ok) throw new Error("Download failed");
@@ -1538,7 +1538,7 @@ function BulkUploadModal({ onClose, onSuccess }) {
       const token = localStorage.getItem("access_token");
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/v1/drugs/bulk-upload", {
+      const res = await fetch((process.env.NEXT_PUBLIC_BASE_PATH || '') + "/api/v1/drugs/bulk-upload", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: fd,

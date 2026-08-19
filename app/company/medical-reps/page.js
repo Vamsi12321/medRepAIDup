@@ -123,7 +123,7 @@ function MRBulkUploadModal({ onClose, onSuccess }) {
       const token = localStorage.getItem("access_token");
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/v1/mrs/bulk-upload", {
+      const res = await fetch((process.env.NEXT_PUBLIC_BASE_PATH || '') + "/api/v1/mrs/bulk-upload", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: fd,
@@ -491,8 +491,9 @@ function MRModal({ mr, onClose, onSaved }) {
   const isEdit = !!mr;
   const [form, setForm] = useState({
     name:        mr?.name        || "",
+    username:    mr?.username    || "",
     email:       mr?.email       || "",
-    password:    "",
+    password:    "Welcome@123",
     phone:       mr?.phone       || "",
     zone:        mr?.zone        || "",
     state:       mr?.state       || "",
@@ -604,6 +605,37 @@ function MRModal({ mr, onClose, onSaved }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    // Frontend validation for Proxzar fields (create only)
+    if (!isEdit) {
+      // Username: 3-30 chars, lowercase letters, numbers, underscores only
+      if (!/^[a-z0-9_]{3,30}$/.test(form.username)) {
+        setError("Username must be 3-30 characters, only lowercase letters, numbers, and underscores.");
+        return;
+      }
+      // Password: 8-64 chars, 1 uppercase, 1 lowercase, 1 number, 1 symbol
+      const pwd = form.password || "Welcome@123";
+      if (pwd.length < 8 || pwd.length > 64) {
+        setError("Password must be 8-64 characters.");
+        return;
+      }
+      if (!/[A-Z]/.test(pwd)) { setError("Password must contain at least 1 uppercase letter."); return; }
+      if (!/[a-z]/.test(pwd)) { setError("Password must contain at least 1 lowercase letter."); return; }
+      if (!/[0-9]/.test(pwd)) { setError("Password must contain at least 1 number."); return; }
+      if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd)) { setError("Password must contain at least 1 symbol."); return; }
+      // Phone: 10 digits starting with 6-9
+      const phoneDigits = form.phone.replace(/\D/g, "").replace(/^91/, "");
+      if (!/^[6-9]\d{9}$/.test(phoneDigits)) {
+        setError("Phone must be a valid 10-digit Indian mobile number (starting with 6-9).");
+        return;
+      }
+      // Full Name: 2-100 chars
+      if (form.name.length < 2 || form.name.length > 100) {
+        setError("Full name must be 2-100 characters.");
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       if (isEdit) {
@@ -617,10 +649,35 @@ function MRModal({ mr, onClose, onSaved }) {
           assigned_drugs:   assignedDrugs,
         });
       } else {
+        // Step 1: Register user in Proxzar OAuth2
+        const pwd = form.password || "Welcome@123";
+        const proxzarRes = await fetch((process.env.NEXT_PUBLIC_BASE_PATH || '') + "/api/v1/auth/addUser", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            UserName: form.username,
+            UserPassword: pwd,
+            UserFullName: form.name,
+            UserEmail: form.email,
+            UserPhone: form.phone.startsWith("+91") ? form.phone : `+91${form.phone.replace(/\D/g, "")}`,
+            DataSource: "MRX",
+          }),
+        });
+        const proxzarData = await proxzarRes.json();
+        if (!proxzarRes.ok) {
+          const detail = proxzarData.detail;
+          const msg = Array.isArray(detail)
+            ? detail.map((d) => d.msg || JSON.stringify(d)).join(", ")
+            : typeof detail === "string" ? detail : "Failed to register user in auth system";
+          throw new Error(msg);
+        }
+
+        // Step 2: Create MR in platform
         await post(`/api/v1/mrs`, {
           name:             form.name,
+          username:         form.username,
           email:            form.email,
-          password:         form.password || "Welcome@123",
+          password:         pwd,
           phone:            form.phone,
           zone:             form.zone,
           state:            form.state,
@@ -676,9 +733,33 @@ function MRModal({ mr, onClose, onSaved }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {field("Full Name", "name", "text", "Rajesh Kumar", true)}
+            {!isEdit && (
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                  Username <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={form.username}
+                    onChange={(e) => setForm({ ...form, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "") })}
+                    placeholder="rajesh_kumar"
+                    required
+                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-400 focus:border-transparent text-sm outline-none"
+                  />
+                  <button type="button" onClick={() => {
+                    const name = form.name.trim().toLowerCase().replace(/[^a-z\s]/g, "").replace(/\s+/g, "_");
+                    const rand = Math.floor(100 + Math.random() * 900);
+                    setForm({ ...form, username: name ? `${name}_${rand}` : "" });
+                  }} className="px-3 py-2 bg-orange-100 text-orange-700 rounded-xl text-xs font-bold hover:bg-orange-200 transition-all whitespace-nowrap">
+                    Auto
+                  </button>
+                </div>
+              </div>
+            )}
             {field("Email", "email", "email", "mr@company.com", !isEdit)}
-            {!isEdit && field("Password (default: Welcome@123)", "password", "password", "Leave blank for default")}
-            {field("Phone", "phone", "tel", "+91 98765 43210", true)}
+            {!isEdit && field("Password", "password", "password", "Welcome@123")}
+            {field("Phone", "phone", "tel", "9876543210", true)}
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1.5">Zone <span className="text-red-500">*</span></label>
               <select value={form.zone} onChange={(e) => setForm({ ...form, zone: e.target.value, state: "", territory: "" })} required

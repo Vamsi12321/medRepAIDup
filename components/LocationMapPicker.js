@@ -14,7 +14,7 @@ const MapBox = dynamic(() => import("./LocationMapInner"), {
 
 async function reverseGeocode(lat, lng) {
   try {
-    const r = await fetch(`/api/v1/geocode?lat=${lat}&lng=${lng}`);
+    const r = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/v1/geocode?lat=${lat}&lng=${lng}`);
     const d = await r.json();
     return { display_name: d.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`, structured: d.structured || {} };
   } catch { return { display_name: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, structured: {} }; }
@@ -41,7 +41,7 @@ export default function LocationMapPicker({ value, lat, lng, onChange }) {
     if (!q) return;
     setSearching(true); setResults([]);
     try {
-      const r = await fetch(`/api/v1/geocode?q=${encodeURIComponent(q)}`);
+      const r = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/v1/geocode?q=${encodeURIComponent(q)}`);
       setResults(await r.json());
     } catch {}
     setSearching(false);
