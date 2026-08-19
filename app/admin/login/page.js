@@ -17,13 +17,20 @@ export default function AdminLogin() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
-    if (!email || !password) { setError("Please enter both email and password"); return; }
+    if (!email || !password) { setError("Please enter both username and password"); return; }
     setIsLoggingIn(true);
     try {
-      const res = await fetch("/api/v1/auth/login", {
+      // Call Proxzar OAuth2 endpoint with form-urlencoded
+      const formBody = new URLSearchParams();
+      formBody.append("username", email);
+      formBody.append("password", password);
+      formBody.append("grant_type", "password");
+      formBody.append("additional_claims", JSON.stringify({ role: "ADMIN" }));
+
+      const res = await fetch((process.env.NEXT_PUBLIC_BASE_PATH || '') + "/api/v1/auth/token", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, role: "ADMIN" }),
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formBody.toString(),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -36,35 +43,39 @@ export default function AdminLogin() {
         return;
       }
 
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("token_type", data.token_type);
+      // Proxzar returns { accessToken, tokenType }
+      const token = data.accessToken || data.access_token;
+      localStorage.setItem("access_token", token);
+      localStorage.setItem("token_type", data.tokenType || data.token_type || "bearer");
+
+      // Decode JWT to extract user info and expiry
       let expiry;
+      let payload = {};
       try {
-        const payload = JSON.parse(atob(data.access_token.split(".")[1]));
-        const backendExpiry = payload.exp ? payload.exp * 1000 : Date.now() + (data.expires_in || 3600) * 1000;
-        // Enforce minimum 30 minutes
+        payload = JSON.parse(atob(token.split(".")[1]));
+        const backendExpiry = payload.exp ? payload.exp * 1000 : Date.now() + 3600 * 1000;
         const minExpiry = Date.now() + (30 * 60 * 1000);
         expiry = Math.max(backendExpiry, minExpiry);
       } catch {
-        expiry = Date.now() + Math.max((data.expires_in || 3600), 30 * 60) * 1000;
+        expiry = Date.now() + 30 * 60 * 1000;
       }
       localStorage.setItem("token_expiry", expiry);
-      localStorage.setItem("userEmail", data.user.email);
-      localStorage.setItem("userName", data.user.name || data.user.full_name);
-      localStorage.setItem("userId", data.user.id);
-      localStorage.setItem("apiRole", data.user.role);
+      localStorage.setItem("userEmail", payload.sub || payload.email || email);
+      localStorage.setItem("userName", payload.name || payload.full_name || email.split("@")[0]);
+      localStorage.setItem("userId", payload.user_id || payload.sub || "");
+      localStorage.setItem("apiRole", payload.role || "ADMIN");
       localStorage.setItem("userRole", "company");
-      localStorage.setItem("userDepartment", data.user.department || "");
-      localStorage.setItem("companyName", data.user.company_name || data.company_name || "");
+      localStorage.setItem("userDepartment", payload.department || "");
+      localStorage.setItem("companyName", payload.company_name || payload.org || "");
 
-      document.cookie = `access_token=${data.access_token}; path=/; max-age=3600; SameSite=Lax`;
+      document.cookie = `access_token=${token}; path=/; max-age=3600; SameSite=Lax`;
       document.cookie = `userRole=company; path=/; max-age=3600; SameSite=Lax`;
 
-      setLoggedInUser(data.user.name || data.user.full_name);
+      setLoggedInUser(payload.name || payload.full_name || email.split("@")[0]);
       setLoginSuccess(true);
       setIsLoggingIn(false);
 
-      if (data.must_change_password) {
+      if (payload.must_change_password) {
         setTimeout(() => router.push("/change-password"), 1800);
       } else {
         setTimeout(() => router.push("/company/overview"), 1800);
@@ -169,7 +180,7 @@ export default function AdminLogin() {
             {/* Tab/Dashboard Image - slanted */}
             <div className="flex-1 flex items-center justify-center ml-4 relative">
               <Image
-                src="/images/admin/tab.png"
+                src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/images/admin/tab.png`}
                 alt="Admin Dashboard"
                 width={400}
                 height={300}
@@ -217,9 +228,9 @@ export default function AdminLogin() {
           )}
 
           <form onSubmit={handleLogin} className="space-y-4">
-            {/* Email */}
+            {/* Username */}
             <div>
-              <label className="block text-[12px] font-semibold text-gray-700 mb-1.5">Email address</label>
+              <label className="block text-[12px] font-semibold text-gray-700 mb-1.5">Username</label>
               <div className="relative">
                 <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -227,11 +238,11 @@ export default function AdminLogin() {
                   </svg>
                 </div>
                 <input
-                  type="email"
+                  type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email address"
-                  autoComplete="email"
+                  placeholder="Enter your username"
+                  autoComplete="username"
                   className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-[13px] bg-white focus:ring-2 focus:ring-purple-400 focus:border-purple-400 outline-none placeholder:text-gray-400 transition-all"
                 />
               </div>
@@ -241,7 +252,7 @@ export default function AdminLogin() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-[12px] font-semibold text-gray-700">Password</label>
-                <a href="/forgot-password" className="text-[11px] text-purple-600 font-semibold hover:text-purple-700">Forgot password?</a>
+                <a href={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/forgot-password`} className="text-[11px] text-purple-600 font-semibold hover:text-purple-700">Forgot password?</a>
               </div>
               <div className="relative">
                 <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
@@ -321,7 +332,7 @@ export default function AdminLogin() {
 
           {/* MR Login link */}
           <a
-            href="/login"
+            href={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/login`}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all"
           >
             <span className="text-[13px] text-gray-600">Medical Rep?</span>

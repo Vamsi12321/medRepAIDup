@@ -416,7 +416,7 @@ function BrochureDownloadBtn({ drugId }) {
     setDownloading(true);
     try {
       const token = localStorage.getItem("access_token");
-      const res = await fetch(`/api/v1/drugs/${drugId}/brochure/download`, { headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" } });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/v1/drugs/${drugId}/brochure/download`, { headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" } });
       if (!res.ok) throw new Error("Download failed");
       const disposition = res.headers.get("content-disposition") || "";
       const match = disposition.match(/filename[^;=\n]*=["']?([^"'\n;]+)/i);
@@ -634,7 +634,7 @@ function BrochureUploadModal({ drugId, hasBrochure, onClose, onUploaded }) {
     try {
       const token = localStorage.getItem("access_token");
       const fd = new FormData(); fd.append("file", file);
-      const res = await fetch(`/api/v1/drugs/${drugId}/brochure`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" }, body: fd });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/v1/drugs/${drugId}/brochure`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" }, body: fd });
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || "Upload failed"); }
       setSuccess("Brochure uploaded!");
       setTimeout(() => onUploaded(), 800);

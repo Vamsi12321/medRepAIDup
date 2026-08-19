@@ -90,7 +90,7 @@ export default function ActivityLogsPage() {
     if (dateFrom)   params.append("date_from", new Date(dateFrom).toISOString());
     if (dateTo)     params.append("date_to", new Date(dateTo + "T23:59:59").toISOString());
     try {
-      const res  = await fetch(`/api/v1/admin/activity-logs/export?${params}`, {
+      const res  = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/v1/admin/activity-logs/export?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const blob = await res.blob();
