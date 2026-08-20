@@ -48,34 +48,40 @@ export default function AdminLogin() {
       localStorage.setItem("access_token", token);
       localStorage.setItem("token_type", data.tokenType || data.token_type || "bearer");
 
-      // Decode JWT to extract user info and expiry
+      // Set token expiry from JWT
       let expiry;
-      let payload = {};
       try {
-        payload = JSON.parse(atob(token.split(".")[1]));
-        const backendExpiry = payload.exp ? payload.exp * 1000 : Date.now() + 3600 * 1000;
+        const jwtPayload = JSON.parse(atob(token.split(".")[1]));
+        const backendExpiry = jwtPayload.exp ? jwtPayload.exp * 1000 : Date.now() + 3600 * 1000;
         const minExpiry = Date.now() + (30 * 60 * 1000);
         expiry = Math.max(backendExpiry, minExpiry);
       } catch {
         expiry = Date.now() + 30 * 60 * 1000;
       }
       localStorage.setItem("token_expiry", expiry);
-      localStorage.setItem("userEmail", payload.sub || payload.email || email);
-      localStorage.setItem("userName", payload.name || payload.full_name || email.split("@")[0]);
-      localStorage.setItem("userId", payload.user_id || payload.sub || "");
-      localStorage.setItem("apiRole", payload.role || "ADMIN");
-      localStorage.setItem("userRole", "company");
-      localStorage.setItem("userDepartment", payload.department || "");
-      localStorage.setItem("companyName", payload.company_name || payload.org || "");
 
       document.cookie = `access_token=${token}; path=/; max-age=3600; SameSite=Lax`;
       document.cookie = `userRole=company; path=/; max-age=3600; SameSite=Lax`;
 
-      setLoggedInUser(payload.name || payload.full_name || email.split("@")[0]);
+      // Call /auth/me to get real user info from platform DB
+      const meRes = await fetch((process.env.NEXT_PUBLIC_BASE_PATH || '') + "/api/v1/auth/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const user = meRes.ok ? await meRes.json() : {};
+
+      localStorage.setItem("userEmail", user.email || email);
+      localStorage.setItem("userName", user.full_name || user.name || email);
+      localStorage.setItem("userId", user._id || user.id || "");
+      localStorage.setItem("apiRole", user.role || "ADMIN");
+      localStorage.setItem("userRole", "company");
+      localStorage.setItem("userDepartment", user.department || "");
+      localStorage.setItem("companyName", user.company_name || "");
+
+      setLoggedInUser(user.full_name || user.name || email);
       setLoginSuccess(true);
       setIsLoggingIn(false);
 
-      if (payload.must_change_password) {
+      if (user.must_change_password) {
         setTimeout(() => router.push("/change-password"), 1800);
       } else {
         setTimeout(() => router.push("/company/overview"), 1800);
