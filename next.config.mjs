@@ -2,8 +2,7 @@
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 const nextConfig = {
-  basePath: basePath || undefined,
-  assetPrefix: basePath || undefined,
+  ...(basePath ? { basePath, assetPrefix: basePath } : {}),
 };
 
 export default nextConfig;
