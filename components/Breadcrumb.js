@@ -19,6 +19,8 @@ const segmentLabel = {
   "drug-management": "💊 Drug Management",
   "cme-events":      "🎓 CME Events",
   "doctors":         "🩺 Doctors",
+  "drx-doctors":     "🌐 DRX Doctors",
+  "drx-requests":    "📨 DRX Requests",
   "medical-reps":    "💼 Medical Reps",
   "profile":         "👤 Profile",
   "drug-search":     "🔍 Drug Search",

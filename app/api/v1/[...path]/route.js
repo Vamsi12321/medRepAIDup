@@ -19,6 +19,7 @@ async function forward(req, { params }) {
 
   const forwardHeaders = {
     Authorization: auth,
+    Accept: "application/json",
     "ngrok-skip-browser-warning": "true",
     "User-Agent": "MRX-Proxy/1.0",
   };
@@ -62,6 +63,11 @@ async function forward(req, { params }) {
 
   // ── LOG: after response ─────────────────────────────────────────────────────
   console.log(`[proxy] ◀ ${method} ${url} → ${res.status} ${res.statusText}`);
+  if (url.includes("integration/drx")) {
+    const cloned = res.clone();
+    const debugBody = await cloned.text();
+    console.log(`[proxy]   DRX response body: ${debugBody.slice(0, 500)}`);
+  }
   // ───────────────────────────────────────────────────────────────────────────
 
   // Forward binary/CSV/PDF responses as-is
