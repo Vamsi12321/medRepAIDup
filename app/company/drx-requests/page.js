@@ -6,10 +6,10 @@ import Breadcrumb from "@/components/Breadcrumb";
 import { get } from "@/lib/api";
 
 const statusConfig = {
-  pending:  { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", dot: "bg-amber-400", label: "Pending" },
-  accepted: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", dot: "bg-blue-400", label: "Accepted" },
-  approved: { bg: "bg-green-50", text: "text-green-700", border: "border-green-200", dot: "bg-green-500", label: "Approved" },
-  rejected: { bg: "bg-red-50", text: "text-red-600", border: "border-red-200", dot: "bg-red-400", label: "Rejected" },
+  PENDING:  { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", dot: "bg-amber-400", label: "Pending" },
+  ACCEPTED: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", dot: "bg-blue-400", label: "Accepted" },
+  APPROVED: { bg: "bg-green-50", text: "text-green-700", border: "border-green-200", dot: "bg-green-500", label: "Approved" },
+  REJECTED: { bg: "bg-red-50", text: "text-red-600", border: "border-red-200", dot: "bg-red-400", label: "Rejected" },
 };
 
 export default function DRXRequestsPage() {
@@ -24,15 +24,15 @@ export default function DRXRequestsPage() {
   const requests = Array.isArray(data) ? data : (data?.requests || []);
 
   const filtered = filter === "all" ? requests : requests.filter((r) => {
-    const status = (r.status || "").toLowerCase();
-    if (filter === "pending") return status === "pending";
-    if (filter === "accepted") return status === "accepted";
-    if (filter === "approved") return status === "approved";
-    if (filter === "rejected") return status === "rejected";
+    const status = (r.status || "").toUpperCase();
+    if (filter === "pending") return status === "PENDING";
+    if (filter === "accepted") return status === "ACCEPTED";
+    if (filter === "approved") return status === "APPROVED";
+    if (filter === "rejected") return status === "REJECTED";
     return true;
   });
 
-  const pendingCount = requests.filter((r) => (r.status || "").toLowerCase() === "pending").length;
+  const pendingCount = requests.filter((r) => (r.status || "").toUpperCase() === "PENDING").length;
 
   return (
     <div className="min-h-screen bg-[#fafbfd] overflow-x-hidden">
@@ -98,9 +98,9 @@ export default function DRXRequestsPage() {
           {!isLoading && (
             <div className="space-y-4">
               {filtered.map((req, i) => {
-                const status = (req.status || "pending").toLowerCase();
-                const sc = statusConfig[status] || statusConfig.pending;
-                const initials = (req.doctor_name || req.username || "?")
+                const status = (req.status || "PENDING").toUpperCase();
+                const sc = statusConfig[status] || statusConfig.PENDING;
+                const initials = (req.doctor_name || req.doctor_username || req.username || "?")
                   .split(" ")
                   .map((n) => n[0])
                   .join("")
@@ -115,10 +115,10 @@ export default function DRXRequestsPage() {
                           {initials}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-gray-800 truncate">{req.doctor_name || req.username || "Unknown Doctor"}</p>
+                          <p className="text-sm font-bold text-gray-800 truncate">{req.doctor_name || req.doctor_username || "Unknown Doctor"}</p>
                           <div className="flex flex-wrap gap-2 mt-1 text-xs text-gray-500">
                             {req.doctor_gid && <span className="font-mono text-indigo-500">{req.doctor_gid}</span>}
-                            {req.username && <span>@{req.username}</span>}
+                            {req.doctor_username && <span>@{req.doctor_username}</span>}
                           </div>
                           {req.note && (
                             <div className={`mt-2 ${sc.bg} rounded-lg px-3 py-2 border ${sc.border}`}>
