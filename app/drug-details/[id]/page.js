@@ -1,11 +1,11 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import MRSidebar from "@/components/mr/MRSidebar";
 import CompanyNavbar from "@/components/company/CompanyNavbar";
 import NotificationBell from "@/components/NotificationBell";
 import { useParams } from "next/navigation";
-import { get, put } from "@/lib/api";
+import { get, put, post } from "@/lib/api";
 import Link from "next/link";
 
 const fmt = (key) => key?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "";
@@ -236,9 +236,15 @@ export default function DrugDetails() {
                 </Section>
               )}
 
+              {/* Brochure Extracted Text */}
+              {d.brochure_text && ["DONE","SUCCESS"].includes(d.brochure_extraction_status) && (
+                <BrochureTextSection text={d.brochure_text} />
+              )}
+
               {/* Dynamic fields — show all remaining data not already rendered above */}
               {(() => {
                 const SHOWN = new Set(["_id","template_id","field_values","search_text","packaging","packaging_type","created_at","updated_at","is_active","has_brochure",
+                  "brochure_text","brochure_extraction_status","brochure_extracted_at",
                   "drug_name","brand_name","generic_name","manufacturer","drug_class","therapeutic_category","dosage_form","strength","route","prescription_type","storage_conditions",
                   "composition","indications","symptoms","mechanism_of_action","side_effects","contraindications","warnings_precautions","drug_interactions","reference_url"]);
                 const extra = Object.entries(d).filter(([k, v]) => !SHOWN.has(k) && v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0));
@@ -339,7 +345,41 @@ export default function DrugDetails() {
               {/* Documents */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
                 <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2"><span className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 text-xs">📁</span>Documents</h3>
-                {d.has_brochure ? <BrochureDownloadBtn drugId={drugId} /> : <p className="text-xs text-gray-400">No brochure uploaded yet.</p>}
+                {d.has_brochure ? (
+                  <div className="space-y-3">
+                    <BrochureDownloadBtn drugId={drugId} />
+                    {/* Extraction status */}
+                    {d.brochure_extraction_status && (
+                      <div className={`rounded-xl px-3 py-2 text-xs flex items-center justify-between gap-2 ${
+                        ["DONE","SUCCESS"].includes(d.brochure_extraction_status) ? "bg-green-50 border border-green-100" :
+                        d.brochure_extraction_status === "PENDING" ? "bg-amber-50 border border-amber-100" :
+                        d.brochure_extraction_status === "FAILED" ? "bg-red-50 border border-red-100" :
+                        "bg-gray-50 border border-gray-100"
+                      }`}>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${
+                            ["DONE","SUCCESS"].includes(d.brochure_extraction_status) ? "bg-green-500" :
+                            d.brochure_extraction_status === "PENDING" ? "bg-amber-400 animate-pulse" :
+                            "bg-red-400"
+                          }`} />
+                          <span className={`font-semibold ${
+                            ["DONE","SUCCESS"].includes(d.brochure_extraction_status) ? "text-green-700" :
+                            d.brochure_extraction_status === "PENDING" ? "text-amber-700" :
+                            "text-red-600"
+                          }`}>
+                            Text Extraction: {["DONE","SUCCESS"].includes(d.brochure_extraction_status) ? "Complete" : d.brochure_extraction_status === "PENDING" ? "In Progress..." : "Failed"}
+                          </span>
+                        </div>
+                        {isAdmin && d.brochure_extraction_status !== "PENDING" && (
+                          <RetryExtractionBtn drugId={drugId} onRetried={() => queryClient.invalidateQueries({ queryKey: ["drug", drugId] })} />
+                        )}
+                      </div>
+                    )}
+                    {d.brochure_extracted_at && (
+                      <p className="text-[10px] text-gray-400">Extracted: {new Date(d.brochure_extracted_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+                    )}
+                  </div>
+                ) : <p className="text-xs text-gray-400">No brochure uploaded yet.</p>}
               </div>
             </div>
           </div>
@@ -636,8 +676,8 @@ function BrochureUploadModal({ drugId, hasBrochure, onClose, onUploaded }) {
       const fd = new FormData(); fd.append("file", file);
       const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/v1/drugs/${drugId}/brochure`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" }, body: fd });
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || "Upload failed"); }
-      setSuccess("Brochure uploaded!");
-      setTimeout(() => onUploaded(), 800);
+      setSuccess("Brochure uploaded! Text extraction started in background.");
+      setTimeout(() => onUploaded(), 1200);
     } catch (e) { setError(e.message); }
     setUploading(false);
   };
@@ -666,5 +706,94 @@ function BrochureUploadModal({ drugId, hasBrochure, onClose, onUploaded }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Brochure Text Section ─────────────────────────────────────────────────────
+function BrochureTextSection({ text }) {
+  const [lines, setLines] = useState(3);
+
+  // Split by newlines OR sentences — whichever gives cleaner chunks
+  const rawLines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
+  const isShort = rawLines.length <= 3;
+  const hasMore = lines < rawLines.length;
+  const canCollapse = lines > 3;
+  const STEPS = [3, 8, 15, rawLines.length];
+
+  const currentStepIdx = STEPS.findIndex(s => s >= lines);
+  const nextStep = STEPS[Math.min(currentStepIdx + 1, STEPS.length - 1)];
+
+  const visibleText = rawLines.slice(0, lines).join("\n");
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+      <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+        <span className="w-7 h-7 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600 text-xs">📄</span>
+        Brochure Content
+        <span className="ml-auto text-[10px] text-gray-400 font-normal">{rawLines.length} lines</span>
+      </h3>
+
+      <div className="relative">
+        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{visibleText}{hasMore ? "..." : ""}</p>
+        {hasMore && (
+          <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+        )}
+      </div>
+
+      {!isShort && (
+        <div className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-50">
+          {hasMore && (
+            <button onClick={() => setLines(nextStep)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              Show More
+            </button>
+          )}
+          {canCollapse && (
+            <button onClick={() => setLines(3)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-500 rounded-lg text-xs font-semibold hover:bg-gray-200 transition-all">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+              Show Less
+            </button>
+          )}
+          {hasMore && (
+            <button onClick={() => setLines(rawLines.length)}
+              className="ml-auto text-[11px] text-gray-400 hover:text-indigo-500 transition-all font-medium">
+              View All ({rawLines.length})
+            </button>
+          )}
+        </div>
+      )}
+      <p className="text-[10px] text-gray-400 mt-2">
+        {hasMore ? `Showing ${lines} of ${rawLines.length} lines` : `All ${rawLines.length} lines shown`}
+      </p>
+    </div>
+  );
+}
+
+// ── Retry Extraction Button ────────────────────────────────────────────────────
+function RetryExtractionBtn({ drugId, onRetried }) {
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handleRetry = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("access_token");
+      await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/v1/drugs/${drugId}/extract-brochure`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
+      });
+      setDone(true);
+      setTimeout(() => { setDone(false); onRetried?.(); }, 1500);
+    } catch { /* silent */ }
+    setLoading(false);
+  };
+
+  return (
+    <button onClick={handleRetry} disabled={loading || done}
+      className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white border border-gray-200 text-gray-500 hover:text-indigo-600 hover:border-indigo-200 transition-all disabled:opacity-50 flex items-center gap-1">
+      {done ? "✓ Triggered" : loading ? "..." : "↺ Retry"}
+    </button>
   );
 }
