@@ -132,14 +132,14 @@ export default function MRLogin() {
               <span className="text-lg">💊</span>
             </div>
             <div>
-              <p className="text-white font-bold text-lg leading-none">MRX</p>
+              <p className="text-white font-bold text-lg leading-none">MRx</p>
               <p className="text-purple-300/80 text-[12px]">Pharma. Data. Performance.</p>
             </div>
           </div>
 
           {/* Headline */}
           <div className="mt-6 mb-1">
-            <p className="text-white font-bold text-[15px] leading-tight">MRX for</p>
+            <p className="text-white font-bold text-[15px] leading-tight">MRx for</p>
             <h1 className="text-white font-extrabold text-[1.5rem] xl:text-[1.75rem] leading-[1.15]">
               Medical <span className="text-purple-300">Representatives</span>
             </h1>
@@ -210,7 +210,7 @@ export default function MRLogin() {
 
               <Image
                 src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/images/mr/phone.png`}
-                alt="MRX App"
+                alt="MRx App"
                 width={500}
                 height={950}
                 className="object-contain h-[120%] w-auto max-w-[120%] drop-shadow-[0_25px_70px_rgba(120,60,220,0.4)] relative z-10 translate-x-28"
@@ -236,7 +236,7 @@ export default function MRLogin() {
             <span className="text-sm">💊</span>
           </div>
           <div>
-            <p className="text-white font-bold text-base leading-none">MRX</p>
+            <p className="text-white font-bold text-base leading-none">MRx</p>
             <p className="text-purple-300/70 text-[10px]">Pharma. Data. Performance.</p>
           </div>
         </div>
@@ -392,7 +392,7 @@ export default function MRLogin() {
         </div>
 
         {/* Copyright below card */}
-        <p className="mt-4 text-[10px] text-gray-400">© 2025 MRX Pharma. All rights reserved.</p>
+        <p className="mt-4 text-[10px] text-gray-400">© 2025 MRx Pharma. All rights reserved.</p>
       </div>
     </div>
   );

@@ -146,7 +146,7 @@ export default function AdminLogin() {
               <span className="text-base font-bold text-white relative z-10">M</span>
             </div>
             <div>
-              <p className="text-white font-bold text-xl leading-none">MRX</p>
+              <p className="text-white font-bold text-xl leading-none">MRx</p>
               <p className="text-purple-300/70 text-[12px]">Admin Portal</p>
             </div>
           </div>
@@ -154,7 +154,7 @@ export default function AdminLogin() {
           {/* Welcome + Headline */}
           <p className="text-purple-400 text-[13px] font-medium mb-1">Welcome Back!</p>
           <h1 className="text-white font-extrabold text-[1.8rem] xl:text-[2.1rem] leading-[1.15] mb-3">
-            MRX Admin Portal
+            MRx Admin Portal
           </h1>
           <p className="text-purple-200/60 text-[13px] mb-6 max-w-[320px] leading-relaxed">
             Manage your organization, products, users and performance from one powerful platform.
@@ -217,7 +217,7 @@ export default function AdminLogin() {
           <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center">
             <span className="text-sm font-bold text-white">M</span>
           </div>
-          <span className="text-base font-bold text-gray-900">MRX Admin</span>
+          <span className="text-base font-bold text-gray-900">MRx Admin</span>
         </div>
 
         <div className="w-full max-w-[380px]">
@@ -341,7 +341,7 @@ export default function AdminLogin() {
             </div>
           </div>
 
-          <p className="mt-4 text-center text-[10px] text-gray-400">© 2025 MRX Pharma. All rights reserved.</p>
+          <p className="mt-4 text-center text-[10px] text-gray-400">© 2025 MRx Pharma. All rights reserved.</p>
         </div>
       </div>
     </div>
