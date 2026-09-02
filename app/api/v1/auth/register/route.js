@@ -1,10 +1,11 @@
 const PROXZAR_AUTH_URL = process.env.PROXZAR_AUTH_URL || "https://oauth2.proxzar.ai";
+const REGISTER_URL = `${PROXZAR_AUTH_URL}/api/v1/register`;
 
 export async function POST(req) {
   try {
     const body = await req.json();
 
-    const res = await fetch(`${PROXZAR_AUTH_URL}/api/v1/addUser`, {
+    const res = await fetch(REGISTER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -13,6 +14,6 @@ export async function POST(req) {
     const data = await res.json();
     return Response.json(data, { status: res.status });
   } catch (err) {
-    return Response.json({ detail: `Auth proxy error: ${err.message}` }, { status: 502 });
+    return Response.json({ detail: `Registration failed. Please try again.` }, { status: 502 });
   }
 }

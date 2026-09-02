@@ -130,7 +130,6 @@ function SidebarContent({ showLabels, navItems, isActive, prefetchOnHover, onTog
             <span className={`flex-shrink-0 ${isActive(item.path) ? "text-purple-600" : "text-gray-400"}`}>{item.icon}</span>
             {showLabels && <span className="truncate">{item.name}</span>}
             {showLabels && item.badge > 0 && <span className="ml-auto w-4 h-4 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">{item.badge > 9 ? "9+" : item.badge}</span>}
-            {showLabels && item.hasChevron && <svg className="w-3 h-3 ml-auto text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>}
             {!showLabels && item.badge > 0 && <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 rounded-full" />}
           </Link>
         ))}

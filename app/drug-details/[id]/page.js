@@ -33,6 +33,16 @@ export default function DrugDetails() {
     staleTime: 10 * 60 * 1000,
   });
 
+  // Lock background scroll while the AI panel is open
+  useEffect(() => {
+    if (showAI) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [showAI]);
+
   if (isLoading) return <div className="min-h-screen bg-[#f8f9fc] flex items-center justify-center"><div className="animate-pulse text-gray-400 text-sm">Loading drug details...</div></div>;
   if (!drug) return <div className="min-h-screen bg-[#f8f9fc] flex items-center justify-center"><p className="text-gray-500 text-sm">Drug not found.</p></div>;
 
@@ -130,12 +140,6 @@ export default function DrugDetails() {
                   </button>
                 )}
                 {d.has_brochure && <BrochureDownloadBtn drugId={drugId} />}
-                {!isAdmin && (
-                  <button onClick={() => setShowAI(true)} className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-800 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-200 hover:shadow-lg transition-all flex items-center gap-1.5">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-                    Ask AI
-                  </button>
-                )}
               </div>
             </div>
           </div>
@@ -236,8 +240,8 @@ export default function DrugDetails() {
                 </Section>
               )}
 
-              {/* Brochure Extracted Text */}
-              {d.brochure_text && ["DONE","SUCCESS"].includes(d.brochure_extraction_status) && (
+              {/* Brochure Extracted Text — Admin only */}
+              {isAdmin && d.brochure_text && ["DONE","SUCCESS"].includes(d.brochure_extraction_status) && (
                 <BrochureTextSection text={d.brochure_text} />
               )}
 
@@ -390,13 +394,37 @@ export default function DrugDetails() {
       {isAdmin && showEdit && <EditDrugModal drug={d} drugId={drugId} onClose={() => setShowEdit(false)} onSaved={() => { queryClient.invalidateQueries({ queryKey: ["drug", drugId] }); setShowEdit(false); }} />}
       {isAdmin && showBrochure && <BrochureUploadModal drugId={drugId} hasBrochure={d.has_brochure} onClose={() => setShowBrochure(false)} onUploaded={() => { queryClient.invalidateQueries({ queryKey: ["drug", drugId] }); setShowBrochure(false); }} />}
 
+      {/* Floating Ask AI button — MR only, hidden when panel is open */}
+      {!isAdmin && !showAI && (
+        <button
+          onClick={() => setShowAI(true)}
+          className="fixed bottom-6 right-6 z-40 flex items-center gap-2 pl-4 pr-5 py-3.5 bg-gradient-to-r from-purple-600 to-purple-800 text-white rounded-full font-bold text-sm shadow-2xl shadow-purple-500/40 hover:from-purple-700 hover:to-purple-900 hover:scale-105 transition-all group"
+          aria-label="Ask AI about this drug"
+        >
+          <span className="relative flex items-center justify-center w-7 h-7">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-white/20 animate-ping" />
+            <svg className="w-5 h-5 relative" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+          </span>
+          <span>Ask AI</span>
+        </button>
+      )}
+
+      {/* Backdrop overlay for AI panel */}
+      {!isAdmin && showAI && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 transition-opacity"
+          onClick={() => setShowAI(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* AI Assistant Panel — MR only */}
       {!isAdmin && showAI && (
         <div className="fixed top-0 right-0 w-full sm:w-[380px] h-full bg-white border-l border-gray-200 shadow-2xl z-50 flex flex-col">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-purple-800 rounded-xl flex items-center justify-center"><svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg></div>
-              <div><p className="text-sm font-bold text-gray-800">MRX AI Assistant</p><p className="text-[10px] text-gray-400">Ask about {name}</p></div>
+              <div><p className="text-sm font-bold text-gray-800">MRx AI Assistant</p><p className="text-[10px] text-gray-400">Ask about {name}</p></div>
             </div>
             <button onClick={() => setShowAI(false)} className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
           </div>
@@ -406,7 +434,7 @@ export default function DrugDetails() {
               <div className="space-y-2">{[`Side effects of ${name}?`, `Dosage for ${name}?`, `Mechanism of action?`].map(q => <button key={q} onClick={() => setQuestion(q)} className="w-full text-left px-3 py-2.5 rounded-xl border border-purple-100 text-xs text-gray-600 hover:bg-purple-50 transition-all">{q}</button>)}</div>
             </div>
           )}
-          <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
+          <div className="flex-1 overflow-y-auto scrollbar-ai px-5 py-3 space-y-3">
             {chatHistory.map((msg, i) => (
               <div key={i} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[80%] px-3.5 py-2.5 rounded-xl text-xs leading-relaxed ${msg.type === "user" ? "bg-purple-600 text-white rounded-br-sm" : "bg-gray-100 text-gray-700 rounded-bl-sm"}`}>{msg.text}</div>

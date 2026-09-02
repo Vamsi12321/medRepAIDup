@@ -240,6 +240,7 @@ export default function CompanyMedicalReps() {
   const [selectedMR, setSelectedMR]     = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const [filterTerritory, setFilterTerritory] = useState("");
   const [filterStatus, setFilterStatus]       = useState("all");
 
@@ -314,9 +315,9 @@ export default function CompanyMedicalReps() {
               className="bg-white text-gray-700 border border-gray-200 px-4 py-2.5 rounded-xl font-bold hover:border-purple-300 hover:text-purple-600 transition-all flex items-center gap-1.5 text-xs">
               <span>📤</span><span>Bulk Upload</span>
             </button>
-            <button onClick={() => { setSelectedMR(null); setShowModal(true); }}
+            <button onClick={() => setShowInviteModal(true)}
               className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-1.5 text-xs">
-              <span>➕</span><span>Add MR</span>
+              <span>✉️</span><span>Invite MR</span>
             </button>
           </div>
         </div>
@@ -372,10 +373,10 @@ export default function CompanyMedicalReps() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-10 h-10 bg-purple-50 rounded-full flex items-center justify-center text-purple-600 font-bold text-sm flex-shrink-0 border border-purple-100">
-                        {mr.name?.charAt(0).toUpperCase()}
+                        {(mr.name || mr.email || "?").charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-bold text-gray-800 truncate">{mr.name}</p>
+                        <p className="font-bold text-gray-800 truncate">{mr.name || <span className="text-gray-400 italic font-normal">Pending registration</span>}</p>
                         <p className="text-xs text-gray-500 truncate">{mr.email}</p>
                         {mr.phone && <p className="text-xs text-gray-400">{mr.phone}</p>}
                       </div>
@@ -440,7 +441,18 @@ export default function CompanyMedicalReps() {
                         </div>
                       )}
                     </div>
-                    <span className={`ml-auto px-2.5 py-1 rounded-lg text-xs font-bold ${mr.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                    {mr.registration_status && (
+                      <span className={`ml-auto px-2.5 py-1 rounded-lg text-xs font-bold ${
+                        mr.registration_status === "ACTIVE" ? "bg-green-100 text-green-700" :
+                        mr.registration_status === "REGISTERED" ? "bg-blue-100 text-blue-700" :
+                        "bg-amber-100 text-amber-700"
+                      }`}>
+                        {mr.registration_status === "INVITED" ? "⏳ Invited" :
+                         mr.registration_status === "REGISTERED" ? "📝 Needs Profile" :
+                         "✓ Active"}
+                      </span>
+                    )}
+                    <span className={`${mr.registration_status ? "" : "ml-auto"} px-2.5 py-1 rounded-lg text-xs font-bold ${mr.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                       {mr.is_active ? "Active" : "Inactive"}
                     </span>
                   </div>
@@ -461,6 +473,13 @@ export default function CompanyMedicalReps() {
       </main>
 
       {showBulkModal && <MRBulkUploadModal onClose={() => setShowBulkModal(false)} onSuccess={invalidate} />}
+
+      {showInviteModal && (
+        <InviteMRModal
+          onClose={() => setShowInviteModal(false)}
+          onInvited={(msg) => { invalidate(); setToast({ message: msg, type: "success" }); setShowInviteModal(false); }}
+        />
+      )}
 
       {showModal && (
         <MRModal
@@ -483,6 +502,91 @@ export default function CompanyMedicalReps() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Invite MR Modal — Step 1: admin invites by email ──────────────────────────
+function InviteMRModal({ onClose, onInvited }) {
+  const [email, setEmail] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleInvite = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    setSending(true);
+    try {
+      const res = await post("/api/v1/mrs/invite", { email: email.trim() });
+      onInvited(res?.message || "MR invited successfully. A registration link has been sent to their email.");
+    } catch (err) {
+      const raw = err?.data?.detail || err.message || "Failed to send invite.";
+      const msg = Array.isArray(raw)
+        ? raw.map((d) => (typeof d === "string" ? d : d.msg || JSON.stringify(d))).join(", ")
+        : String(raw);
+      setError(msg);
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-gradient-to-r from-purple-600 to-purple-800 px-6 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">✉️</span>
+            <div>
+              <h2 className="text-white font-bold text-lg leading-none">Invite Medical Representative</h2>
+              <p className="text-purple-200/80 text-[11px] mt-1">Send a registration link by email</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-white/70 hover:text-white text-xl">×</button>
+        </div>
+
+        <form onSubmit={handleInvite} className="p-6 space-y-4">
+          <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 text-xs text-purple-700">
+            The MR will receive an email with a secure registration link (valid for 7 days). They'll set up their own account, then you can complete their profile.
+          </div>
+
+          {error && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 px-3 py-2.5 rounded-lg">
+              <span className="text-xs mt-0.5">⚠️</span>
+              <p className="text-[11px] font-medium">{error}</p>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1.5">MR Email Address <span className="text-red-500">*</span></label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="rajesh@xyzpharma.com"
+              autoFocus
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-transparent text-sm outline-none"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-bold text-sm hover:bg-gray-200 transition-all">Cancel</button>
+            <button type="submit" disabled={sending}
+              className="flex-1 bg-gradient-to-r from-purple-600 to-purple-800 text-white py-3 rounded-xl font-bold text-sm disabled:opacity-50 shadow-md flex items-center justify-center gap-2">
+              {sending ? (
+                <>
+                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                  <span>Sending...</span>
+                </>
+              ) : (
+                <span>Send Invite</span>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
@@ -606,90 +710,34 @@ function MRModal({ mr, onClose, onSaved }) {
     e.preventDefault();
     setError("");
 
-    // Frontend validation for Proxzar fields (create only)
-    if (!isEdit) {
-      // Username: 3-30 chars, lowercase letters, numbers, underscores only
-      if (!/^[a-z0-9_]{3,30}$/.test(form.username)) {
-        setError("Username must be 3-30 characters, only lowercase letters, numbers, and underscores.");
-        return;
-      }
-      // Password: 8-64 chars, 1 uppercase, 1 lowercase, 1 number, 1 symbol
-      const pwd = form.password || "Welcome@123";
-      if (pwd.length < 8 || pwd.length > 64) {
-        setError("Password must be 8-64 characters.");
-        return;
-      }
-      if (!/[A-Z]/.test(pwd)) { setError("Password must contain at least 1 uppercase letter."); return; }
-      if (!/[a-z]/.test(pwd)) { setError("Password must contain at least 1 lowercase letter."); return; }
-      if (!/[0-9]/.test(pwd)) { setError("Password must contain at least 1 number."); return; }
-      if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd)) { setError("Password must contain at least 1 symbol."); return; }
-      // Phone: 10 digits starting with 6-9
+    // Phone (optional): if provided, must be valid 10-digit Indian mobile
+    if (form.phone) {
       const phoneDigits = form.phone.replace(/\D/g, "").replace(/^91/, "");
       if (!/^[6-9]\d{9}$/.test(phoneDigits)) {
         setError("Phone must be a valid 10-digit Indian mobile number (starting with 6-9).");
-        return;
-      }
-      // Full Name: 2-100 chars
-      if (form.name.length < 2 || form.name.length > 100) {
-        setError("Full name must be 2-100 characters.");
         return;
       }
     }
 
     setSaving(true);
     try {
-      if (isEdit) {
-        await put(`/api/v1/mrs/${mr.id}`, {
-          name:             form.name,
-          phone:            form.phone,
-          zone:             form.zone,
-          state:            form.state,
-          territory:        form.territory,
-          assigned_doctors: assignedDoctors,
-          assigned_drugs:   assignedDrugs,
-        });
-      } else {
-        // Step 1: Register user in Proxzar OAuth2
-        const pwd = form.password || "Welcome@123";
-        const proxzarRes = await fetch((process.env.NEXT_PUBLIC_BASE_PATH || '') + "/api/v1/auth/addUser", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            UserName: form.username,
-            UserPassword: pwd,
-            UserFullName: form.name,
-            UserEmail: form.email,
-            UserPhone: form.phone.startsWith("+91") ? form.phone : `+91${form.phone.replace(/\D/g, "")}`,
-            DataSource: "MRX",
-          }),
-        });
-        const proxzarData = await proxzarRes.json();
-        if (!proxzarRes.ok) {
-          const detail = proxzarData.detail;
-          const msg = Array.isArray(detail)
-            ? detail.map((d) => d.msg || JSON.stringify(d)).join(", ")
-            : typeof detail === "string" ? detail : "Failed to register user in auth system";
-          throw new Error(msg);
-        }
-
-        // Step 2: Create MR in platform
-        await post(`/api/v1/mrs`, {
-          name:             form.name,
-          username:         form.username,
-          email:            form.email,
-          password:         pwd,
-          phone:            form.phone,
-          zone:             form.zone,
-          state:            form.state,
-          territory:        form.territory,
-          assigned_doctors: assignedDoctors,
-          assigned_drugs:   assignedDrugs,
-        });
-      }
-      onSaved(isEdit ? "MR updated successfully." : "MR added successfully.");
+      // Complete / update MR profile — Step 3 of onboarding (PUT)
+      // Setting zone + state + territory promotes the MR to ACTIVE
+      await put(`/api/v1/mrs/${mr.id}`, {
+        name:             form.name,
+        phone:            form.phone ? (form.phone.startsWith("+91") ? form.phone : `+91${form.phone.replace(/\D/g, "").replace(/^91/, "")}`) : undefined,
+        zone:             form.zone,
+        state:            form.state,
+        territory:        form.territory,
+        assigned_doctors: assignedDoctors,
+        assigned_drugs:   assignedDrugs,
+      });
+      onSaved("MR updated successfully.");
       onClose();
     } catch (err) {
-      setError(err.message || "Something went wrong");
+      const raw = err?.data?.detail || err.message || "Something went wrong";
+      const msg = Array.isArray(raw) ? raw.map((d) => (typeof d === "string" ? d : d.msg || JSON.stringify(d))).join(", ") : String(raw);
+      setError(msg);
     } finally {
       setSaving(false);
     }
@@ -717,7 +765,10 @@ function MRModal({ mr, onClose, onSaved }) {
         <div className="bg-gradient-to-r from-orange-500 to-red-500 p-5 rounded-t-3xl flex items-center justify-between sticky top-0 z-10">
           <div className="flex items-center space-x-3">
             <span className="text-3xl">💼</span>
-            <h2 className="text-xl font-bold text-white">{isEdit ? "Edit MR" : "Add Medical Representative"}</h2>
+            <div>
+              <h2 className="text-xl font-bold text-white">Complete MR Profile</h2>
+              <p className="text-white/70 text-[11px]">Set zone, state, territory and assignments</p>
+            </div>
           </div>
           <button onClick={onClose} className="text-white hover:bg-white/20 rounded-lg p-1.5">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -757,9 +808,17 @@ function MRModal({ mr, onClose, onSaved }) {
                 </div>
               </div>
             )}
-            {field("Email", "email", "email", "mr@company.com", !isEdit)}
-            {!isEdit && field("Password", "password", "password", "Welcome@123")}
-            {field("Phone", "phone", "tel", "9876543210", true)}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">Email</label>
+              <input
+                type="email"
+                value={form.email}
+                readOnly
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-500 text-sm outline-none cursor-not-allowed"
+              />
+              <p className="text-[10px] text-gray-400 mt-1">Email cannot be changed</p>
+            </div>
+            {field("Phone", "phone", "tel", "9876543210")}
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1.5">Zone <span className="text-red-500">*</span></label>
               <select value={form.zone} onChange={(e) => setForm({ ...form, zone: e.target.value, state: "", territory: "" })} required
@@ -912,7 +971,7 @@ function MRModal({ mr, onClose, onSaved }) {
             </button>
             <button type="submit" disabled={saving}
               className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white py-2.5 rounded-xl font-bold hover:shadow-lg transition-all disabled:opacity-50 text-sm">
-              {saving ? "Saving..." : isEdit ? "Update MR" : "Add MR"}
+              {saving ? "Saving..." : "Save Profile"}
             </button>
           </div>
         </form>
