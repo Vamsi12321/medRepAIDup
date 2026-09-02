@@ -158,3 +158,22 @@ select:disabled,
   scrollbar-color: #cbd5e1 transparent;
 }
 
+
+/* AI Chat panel scrollbar — thin purple */
+.scrollbar-ai::-webkit-scrollbar {
+  width: 4px;
+}
+.scrollbar-ai::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-ai::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.35);
+  border-radius: 9999px;
+}
+.scrollbar-ai::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.6);
+}
+.scrollbar-ai {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.35) transparent;
+}

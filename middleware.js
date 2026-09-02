@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 // Routes that don't require authentication
-const PUBLIC_PATHS = ["/login", "/admin/login", "/forgot-password", "/api/"];
+const PUBLIC_PATHS = ["/login", "/admin/login", "/forgot-password", "/register", "/api/"];
 
 // Role-based route prefixes — each role can only access its own section
 const ROLE_ROUTES = {
