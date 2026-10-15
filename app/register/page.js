@@ -5,6 +5,7 @@ import Image from "next/image";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const DATA_SOURCE = "MRx";
+const CALLBACK_URL = process.env.NEXT_PUBLIC_REGISTER_CALLBACK_URL || "https://drx.proxzar.ai/dobo";
 
 export default function RegisterPage() {
   return (
@@ -90,7 +91,7 @@ function MRRegister() {
           DataSource: DATA_SOURCE,
           EmailVerified: false,
           PhoneVerified: false,
-          CallbackUrl: typeof window !== "undefined" ? window.location.origin + BASE + "/login" : "",
+          CallbackUrl: CALLBACK_URL,
         }),
       });
       const data = await res.json();
@@ -154,25 +155,15 @@ function MRRegister() {
     }
   };
 
-  // ── Resend OTP: re-run register ──────────────────────────────────────────
+  // ── Resend OTP (registration): resend to pending user via /resendOTP ─────
   const handleResend = async () => {
     setError("");
     setSubmitting(true);
     try {
-      const res = await fetch(BASE + "/api/v1/auth/register", {
+      const res = await fetch(BASE + "/api/v1/auth/resend-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          UserName: form.username.trim(),
-          UserPassword: form.password,
-          UserFullName: form.full_name.trim(),
-          UserEmail: form.email.trim(),
-          UserPhone: phoneWithCode(),
-          DataSource: DATA_SOURCE,
-          EmailVerified: false,
-          PhoneVerified: false,
-          CallbackUrl: typeof window !== "undefined" ? window.location.origin + BASE + "/login" : "",
-        }),
+        body: JSON.stringify({ UserEmail: form.email.trim() }),
       });
       if (!res.ok) {
         const data = await res.json();
